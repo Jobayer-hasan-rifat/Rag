@@ -638,6 +638,16 @@ Dependency ranges live in `backend/pyproject.toml`; exact pins live in
 | `PyJWT` | Small, actively maintained, explicit algorithm pinning | `python-jose` (stagnant, past CVEs) |
 | `email-validator` | Pydantic's `EmailStr` backend; syntax and IDNA normalisation without DNS lookups | Hand-written regex |
 
+## Phase 3 Dependency Choices
+
+| Dependency | Why | Alternative not chosen |
+|------------|-----|------------------------|
+| `python-multipart` | Required by Starlette to parse `multipart/form-data`; spools large parts to disk | Hand-written parser |
+| `aiofiles` | Non-blocking file I/O in the API process, as the coding standards require | `asyncio.to_thread` around blocking calls (works, but less uniform) |
+
+Content sniffing uses signatures and the standard library (`zipfile`, incremental UTF-8 decoding) rather than
+`python-magic`/libmagic, which needs a native library and still cannot prove a file is safe.
+
 ## Technology Summary Table
 
 | Category | Technology | Purpose | Key Reason |

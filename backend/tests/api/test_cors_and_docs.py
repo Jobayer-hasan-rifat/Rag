@@ -40,6 +40,13 @@ def test_openapi_documents_versioned_routes_only(offline_client: TestClient) -> 
         "/api/v1/auth/refresh",
         "/api/v1/auth/logout",
         "/api/v1/auth/me",
+        "/api/v1/collections",
+        "/api/v1/collections/{collection_id}",
+        "/api/v1/collections/{collection_id}/documents",
+        "/api/v1/collections/{collection_id}/documents/{document_id}",
+        "/api/v1/documents",
+        "/api/v1/documents/{document_id}",
+        "/api/v1/documents/{document_id}/download",
     }
 
 

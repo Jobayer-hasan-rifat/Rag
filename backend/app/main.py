@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.error_handlers import register_error_handlers
+from app.api.middleware.body_limit import BodySizeLimitMiddleware
 from app.api.middleware.request_context import RequestContextMiddleware
 from app.api.router import api_v1_router, root_health_router
 from app.config import Settings, get_settings
@@ -14,8 +15,11 @@ from app.observability.logging import configure_logging, get_logger
 from app.redis import create_redis_client
 from app.security.jwt import JWTService
 from app.security.password import PasswordHasher
+from app.storage.factory import create_storage
 
 logger = get_logger("app.main")
+
+MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -29,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.session_factory = create_session_factory(engine)
         app.state.redis = redis
+        app.state.storage = create_storage(settings)
         app.state.password_hasher = PasswordHasher(settings.bcrypt_cost_factor)
         app.state.jwt_service = JWTService(settings)
         logger.info("application started", extra={"version": __version__})
@@ -51,12 +56,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.add_middleware(
+        BodySizeLimitMiddleware,
+        rules={("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES},
+        overhead_bytes=MULTIPART_OVERHEAD_BYTES,
+    )
+    app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-        expose_headers=["X-Request-ID"],
+        expose_headers=["X-Request-ID", "Content-Disposition"],
     )
     app.add_middleware(RequestContextMiddleware)
 

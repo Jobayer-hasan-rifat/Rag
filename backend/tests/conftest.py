@@ -1,7 +1,9 @@
 import os
+import tempfile
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import ExitStack
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -72,6 +74,9 @@ def make_settings() -> SettingsFactory:
             "log_level": "WARNING",
             "bcrypt_cost_factor": 4,
             "rate_limit_auth_attempts": 1000,
+            "rate_limit_upload_attempts": 1000,
+            "max_upload_bytes": 2 * 1024 * 1024,
+            "storage_local_path": os.path.join(tempfile.gettempdir(), "rag-test-unused"),
         }
         values.update(overrides)
         return Settings(_env_file=None, **values)
@@ -138,17 +143,20 @@ def auth_client_factory(
     migrated_database_url: str,
     redis_url: str,
     clean_auth_state: None,
+    tmp_path: Path,
 ) -> Iterator[ClientFactory]:
     stack = ExitStack()
 
     def factory(configure: Callable[[FastAPI], None] | None = None, **overrides: Any) -> TestClient:
-        settings = make_settings(
-            database_url=migrated_database_url,
-            redis_url=f"{redis_url}/0",
-            celery_broker_url=f"{redis_url}/1",
-            celery_result_backend=f"{redis_url}/2",
-            **overrides,
-        )
+        values: dict[str, Any] = {
+            "database_url": migrated_database_url,
+            "redis_url": f"{redis_url}/0",
+            "celery_broker_url": f"{redis_url}/1",
+            "celery_result_backend": f"{redis_url}/2",
+            "storage_local_path": str(tmp_path / "storage"),
+        }
+        values.update(overrides)
+        settings = make_settings(**values)
         app = create_app(settings)
         if configure:
             configure(app)

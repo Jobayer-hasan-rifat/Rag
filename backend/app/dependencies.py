@@ -7,6 +7,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.config import Settings
+from app.db.repositories.collection_repository import CollectionRepository
+from app.db.repositories.document_repository import DocumentRepository
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from app.db.repositories.user_repository import RoleRepository, UserRepository
 from app.db.session import session_scope
@@ -18,7 +20,10 @@ from app.security.password import PasswordHasher
 from app.security.rate_limit import RateLimiter
 from app.security.token_denylist import TokenDenylist
 from app.services.auth_service import AuthContext, AuthService
+from app.services.collection_service import CollectionService
+from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
+from app.storage.base import StorageProvider
 
 bearer_scheme = HTTPBearer(
     scheme_name="BearerAuth",
@@ -65,10 +70,30 @@ def get_health_service(
     return HealthService(engine=engine, redis=redis)
 
 
+def get_rate_limiter(
+    redis: Annotated[Redis, Depends(get_redis)], settings: SettingsDep
+) -> RateLimiter:
+    return RateLimiter(
+        redis,
+        enabled=settings.rate_limit_enabled,
+        max_attempts=settings.rate_limit_auth_attempts,
+        window_seconds=settings.rate_limit_window_seconds,
+    )
+
+
+LimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
+
+
+def get_storage(request: Request) -> StorageProvider:
+    storage: StorageProvider = request.app.state.storage
+    return storage
+
+
 def get_auth_service(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
+    limiter: LimiterDep,
     settings: SettingsDep,
 ) -> AuthService:
     hasher: PasswordHasher = request.app.state.password_hasher
@@ -81,12 +106,7 @@ def get_auth_service(
         hasher=hasher,
         jwt_service=jwt_service,
         denylist=TokenDenylist(redis),
-        limiter=RateLimiter(
-            redis,
-            enabled=settings.rate_limit_enabled,
-            max_attempts=settings.rate_limit_auth_attempts,
-            window_seconds=settings.rate_limit_window_seconds,
-        ),
+        limiter=limiter,
         settings=settings,
     )
 
@@ -137,3 +157,36 @@ def require_roles(*allowed: RoleName) -> Callable[[User], Awaitable[User]]:
 
 
 AdminUser = Annotated[User, Depends(require_roles(RoleName.ADMIN))]
+
+
+def get_collection_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> CollectionService:
+    return CollectionService(session=session, collections=CollectionRepository(session))
+
+
+def get_document_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    storage: Annotated[StorageProvider, Depends(get_storage)],
+    settings: SettingsDep,
+) -> DocumentService:
+    return DocumentService(
+        session=session,
+        documents=DocumentRepository(session),
+        collections=CollectionRepository(session),
+        storage=storage,
+        settings=settings,
+    )
+
+
+CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
+DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
+
+
+async def enforce_upload_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    """Runs before the request body is parsed, so throttled clients cost almost nothing."""
+    await limiter.check(
+        "upload:user", str(user.id), max_attempts=settings.rate_limit_upload_attempts
+    )

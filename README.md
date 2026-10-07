@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 2 complete (Authentication). No document features yet.
+> **Status**: 🚧 In Development - Phase 3 complete (Document management). Processing and search are not implemented yet.
 
 ## Overview
 
@@ -20,7 +20,10 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
-Infrastructure and authentication; there is no document functionality yet.
+Infrastructure, authentication and secure document management; documents are stored and managed but not yet parsed, searched or used for answers.
+
+- Upload PDF, DOCX, TXT and Markdown with content validation, checksums and per-user duplicate detection
+- Collections, filtered and paginated listing, metadata, streaming download and deletion, all owner-scoped
 
 - Registration, login, refresh-token rotation with reuse detection, logout and `GET /api/v1/auth/me`
 - Role-based access control (user, admin) enforced server-side; rate-limited auth endpoints
@@ -192,7 +195,7 @@ npm run typecheck && npm run build
 | 0 | Foundation & Architecture | ✅ Complete |
 | 1 | Infrastructure | ✅ Complete |
 | 2 | Authentication | ✅ Complete |
-| 3 | Document Management | ⏳ Pending |
+| 3 | Document Management | ✅ Complete |
 | 4 | Document Processing | ⏳ Pending |
 | 5 | Embeddings & Vector Search | ⏳ Pending |
 | 6 | Hybrid Retrieval | ⏳ Pending |
@@ -232,7 +235,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 2): 277 tests passing (unit, API and infrastructure integration),
+Current state (Phase 3): 582 tests passing and 1 POSIX-only test skipped on Windows (unit, API and infrastructure integration),
 about 99% line coverage of `app/`. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
@@ -257,7 +260,7 @@ Security is a first-class concern in this project:
 - **Authentication**: short-lived JWT access tokens, rotating hashed refresh tokens with reuse detection, bcrypt password hashing, Redis-backed rate limiting
 - **Authorization**: Role-based access control (RBAC)
 - **Input Validation**: Pydantic schemas, file validation
-- **Document Security**: All uploads treated as untrusted
+- **Document Security**: all uploads treated as untrusted: size caps, signature and structure checks, generated storage keys, attachment-only downloads, owner-scoped access
 - **Secrets Management**: Environment variables, no hardcoded credentials
 
 See the [Security Overview](docs/06_SECURITY.md) for details.

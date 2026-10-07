@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -31,9 +32,15 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
     bcrypt_cost_factor: int = Field(default=12, ge=4, le=16)
 
+    storage_backend: Literal["local"] = "local"
+    storage_local_path: str = Field(default="./data/uploads", min_length=1)
+    max_upload_bytes: int = Field(default=52_428_800, ge=1024, le=1_073_741_824)
+    max_storage_bytes_per_user: int = Field(default=1_073_741_824, ge=1024)
+
     rate_limit_enabled: bool = True
     rate_limit_auth_attempts: int = Field(default=10, ge=1)
     rate_limit_window_seconds: int = Field(default=60, ge=1)
+    rate_limit_upload_attempts: int = Field(default=20, ge=1)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -84,6 +91,11 @@ class Settings(BaseSettings):
                 raise ValueError("APP_DEBUG must be false in staging and production")
             if self.bcrypt_cost_factor < 12:
                 raise ValueError("BCRYPT_COST_FACTOR must be at least 12 in staging and production")
+            path = self.storage_local_path
+            if not (PurePosixPath(path).is_absolute() or PureWindowsPath(path).is_absolute()):
+                raise ValueError(
+                    "STORAGE_LOCAL_PATH must be an absolute path in staging and production"
+                )
             if not self.rate_limit_enabled:
                 raise ValueError("RATE_LIMIT_ENABLED must be true in staging and production")
         return self

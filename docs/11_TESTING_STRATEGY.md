@@ -552,6 +552,13 @@ Tests marked `integration` need real PostgreSQL/Redis.
 - The Celery test starts a real worker thread against real Redis.
 - PostgreSQL and Redis are never mocked.
 
+**Phase 3 results (2026-10-08)**: 583 tests (582 pass; 1 POSIX-permissions test is skipped on Windows and runs in CI) cover unit, API and
+integration levels, with about 99% line coverage of `app/`. Document tests run through the real HTTP API against real
+PostgreSQL, Redis and a real local storage directory (a fresh temporary directory per test): upload of every format, MIME spoofing,
+filename and traversal payloads, oversize bodies (declared and streamed), duplicates and races, storage and database failure
+injection with cleanup checks, cross-user and admin access, streaming downloads (chunk sizes observed at the ASGI layer),
+deletion consistency, listing filters and N+1 checks, schema constraints and cascades. Only failure injection monkey-patches storage or the repository.
+
 **Phase 2 results (2026-10-08)**: 277 tests (unit, API, integration) passing, about 99% line
 coverage of `app/`; all authentication and security modules are fully covered. Registration, login, refresh
 rotation and reuse detection, logout revocation, RBAC and rate limiting are tested end to end through the HTTP API

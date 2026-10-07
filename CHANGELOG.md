@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 3: Document Management
+
+- Collections (`/api/v1/collections`): create, list, get, rename, delete, and add or remove documents
+- Documents (`/api/v1/documents`): multipart upload, filtered/sorted/paginated listing, metadata, rename, streaming download and deletion
+- `StorageProvider` extended with streaming save (size and SHA-256), streaming open, size, delete and exists, plus a local filesystem backend using generated storage keys
+- File validation: extension, declared type and content signature/structure for PDF, DOCX, TXT and Markdown; filename sanitisation; size limits (declared and streamed); per-user duplicate detection
+- Document lifecycle states and an enforced transition map (processing itself arrives in Phase 4)
+- Per-user upload rate limiting, a per-user storage quota (403 `QUOTA_EXCEEDED`) and a body-size guard that runs before multipart buffering
+- Migration `0003` (collections, documents, document_collections) with same-owner composite foreign keys
+
+### Changed
+
+- `StorageProvider.get()` (bytes) replaced by streaming `open()`; storage keys are opaque instead of path-like (see DEC-018, DEC-023)
+- New settings: `STORAGE_BACKEND`, `STORAGE_LOCAL_PATH`, `MAX_UPLOAD_BYTES`, `MAX_STORAGE_BYTES_PER_USER`, `RATE_LIMIT_UPLOAD_ATTEMPTS`; Compose adds an `uploads_data` volume
+
 ### Added - Phase 2: Authentication & Authorization
 
 - `POST /api/v1/auth/register`, `/login`, `/refresh`, `/logout` and `GET /api/v1/auth/me`

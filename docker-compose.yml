@@ -15,6 +15,11 @@ x-backend-environment: &backend-environment
   RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
   RATE_LIMIT_AUTH_ATTEMPTS: ${RATE_LIMIT_AUTH_ATTEMPTS:-10}
   RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+  RATE_LIMIT_UPLOAD_ATTEMPTS: ${RATE_LIMIT_UPLOAD_ATTEMPTS:-20}
+  STORAGE_BACKEND: local
+  STORAGE_LOCAL_PATH: /data/uploads
+  MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-52428800}
+  MAX_STORAGE_BYTES_PER_USER: ${MAX_STORAGE_BYTES_PER_USER:-1073741824}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
   DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
   DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
@@ -80,6 +85,7 @@ services:
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./backend:/app
+      - uploads_data:/data/uploads
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
     depends_on:
@@ -107,6 +113,7 @@ services:
     environment: *backend-environment
     volumes:
       - ./backend:/app
+      - uploads_data:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,5 +150,6 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:
   redis_data:
   frontend_node_modules:

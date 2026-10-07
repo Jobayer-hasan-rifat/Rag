@@ -23,3 +23,15 @@ class ErrorBody(BaseModel):
 class ErrorResponse(BaseModel):
     error: ErrorBody
     meta: Meta
+
+
+class PageMeta(Meta):
+    page: int
+    page_size: int
+    total_items: int
+    total_pages: int
+
+
+class PagedResponse[ItemT](BaseModel):
+    data: list[ItemT]
+    meta: PageMeta

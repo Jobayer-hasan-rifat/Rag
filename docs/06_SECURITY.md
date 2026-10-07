@@ -93,7 +93,7 @@ future enhancement.
 - Login, registration and refresh are rate limited in Redis (see Rate Limiting).
 - Login failures return one generic 401 regardless of cause.
 - Registration returns a neutral 409 for an existing email. This still reveals existence; it is
-  mitigated by rate limiting and accepted until email verification exists (AUD-013).
+  mitigated by rate limiting and accepted until email verification exists.
 
 ## Authorization Security
 
@@ -156,82 +156,50 @@ async def get_document(document_id: UUID, user: User) -> Document:
 
 ## File Handling Security
 
-### File Upload Validation
+All uploaded files, and every part of an upload (name, declared type, content), are untrusted. Phase 3 never
+parses, renders or executes document contents.
 
-**Multi-layer Validation**:
+### Upload Pipeline
 
-1. **Extension Check** (First line, easy to bypass):
-```python
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md"}
-if not filename.lower().endswith(tuple(ALLOWED_EXTENSIONS)):
-    raise ValidationError("Invalid file type")
-```
+1. **Authenticate and rate limit first.** These run as dependencies before the multipart body is read, so unauthenticated or throttled clients cost almost nothing.
+2. **Cap the body.** `BodySizeLimitMiddleware` rejects a declared `Content-Length` above the limit immediately and counts streamed bytes for requests without one, before multipart parsing spools data to disk. Exactly one file and at most one other field are accepted.
+3. **Validate** (`app/security/file_validation.py`):
+   - the sanitised filename must have an allowed extension (`.pdf`, `.docx`, `.txt`, `.md`);
+   - the declared `Content-Type` must not contradict the extension (a missing or `application/octet-stream` type is tolerated because clients differ; the content check is authoritative);
+   - the content must match the type: PDF needs a `%PDF-` header in the first 1 KiB and `%%EOF` in the last 4 KiB; DOCX must be a ZIP container with `[Content_Types].xml` and `word/document.xml`, at most 5000 entries, a total uncompressed size under 1 GiB and a compression ratio under 200:1; TXT/MD must be valid UTF-8 without NUL bytes;
+   - size is enforced while reading (`MAX_UPLOAD_BYTES`, default 50 MiB) and empty files are rejected.
+4. **Checksum, deduplicate, check quota**: SHA-256 is computed in the same pass; identical content from the same user is refused (409) before anything is stored, and an upload that would push the user past their storage quota (`MAX_STORAGE_BYTES_PER_USER`, default 1 GiB) is refused with 403.
+5. **Store** the file by streaming it in 64 KiB chunks under a generated key, then **re-verify** that the stored size and hash match.
+6. **Persist** the record. If that fails, the stored file is deleted. The user can never see a record without a file from a failed upload.
 
-2. **Magic Bytes Check** (Verify actual file type):
-```python
-MAGIC_BYTES = {
-    b"%PDF": "application/pdf",
-    b"PK\x03\x04": "application/docx",  # DOCX is a ZIP file
-}
-```
+**Limitations of type detection**: signatures and container structure prove a file *looks like* its type, not that it is benign or well formed. A crafted file can satisfy these checks. This is why files are never opened by the API, are always served as attachments with `nosniff` and a sandboxing CSP, and why parsing (Phase 4) must happen in isolated workers with limits. Legacy `.doc`, UTF-16 text and other formats are rejected rather than guessed at.
 
-3. **File Size Limit**:
-```python
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-if file_size > MAX_FILE_SIZE:
-    raise ValidationError("File too large")
-```
+### Filenames
 
-4. **Content Validation**:
-- Parse file structure
-- Check for embedded scripts
-- Validate document integrity
+The client filename is display metadata only. It is NFC-normalised, reduced to its last path component (both `/` and `\` are separators), stripped of control, format and bidi-override characters, whitespace-collapsed, trimmed of leading/trailing dots and spaces, and truncated to 255 characters keeping its extension. It never influences where a file is stored, and downloads use `Content-Disposition` with an ASCII fallback and a percent-encoded UTF-8 name, so quotes, CR/LF and non-ASCII cannot inject headers.
 
 ### File Storage Security
 
-**Secure Storage**:
-- Files stored outside web root
-- Random UUID filenames (not user-provided)
-- Original filename stored in database only
-- File permissions: read/write by application only
+- Storage is behind `StorageProvider`; the local backend writes under `STORAGE_LOCAL_PATH` (a private directory, absolute in staging/production, never served by the application: there are no static mounts).
+- Keys are generated with a CSPRNG (`documents/{2 hex}/{32 hex}`) and independent of user, filename and content. The local backend accepts only that exact format, resolves the path and verifies it is inside the root.
+- Writes go to a temporary file in the root, are made owner-only (`0600`, directories `0700`), then are atomically hard-linked into place, so an existing object is never overwritten and a failed write leaves nothing behind.
+- Files are never executable and are never executed.
 
-**Path Traversal Prevention**:
-```python
-import os
+### Authorization for Files
 
-def sanitize_path(base_dir: str, filename: str) -> str:
-    # Resolve to absolute path
-    full_path = os.path.realpath(os.path.join(base_dir, filename))
-    
-    # Ensure it's within base directory
-    if not full_path.startswith(os.path.realpath(base_dir)):
-        raise SecurityError("Path traversal attempt detected")
-    
-    return full_path
-```
+Every endpoint resolves the document through one service method that returns 404 for both "does not exist" and "belongs to someone else", so identifiers cannot be probed. Database foreign keys additionally guarantee that a document and a collection linked together share an owner. Administrators can read, download, rename and delete any document by ID per the documented RBAC policy; listing and uploading act only on the caller's own data.
 
-### Untrusted File Handling
+### Deletion and Consistency
 
-**Assumption**: All uploaded files are potentially malicious.
+Downloads also compare the stored size with the recorded size and fail closed on a mismatch. Deletion removes the stored object first, then the record: a storage failure keeps the record so the caller can retry, and a record never claims a file that was successfully removed. A missing file during deletion is logged at ERROR and deletion proceeds; a missing file during download returns 500 `STORAGE_INCONSISTENCY` and is logged for operators. An upload whose record cannot be saved removes its file; if even that cleanup fails, the orphaned key is logged at ERROR (see the audit for the planned reconciliation job).
 
-**Measures**:
-- Never execute uploaded files
-- Parse in isolated workers (not API processes)
-- Memory limits on parsing
-- Timeout on parsing operations
-- No execution of embedded scripts
+### Logging
 
-**PDF-Specific Risks**:
-- Embedded JavaScript
-- Launch actions
-- External references
-- Malformed PDFs
+Filenames and file contents are never logged; events carry user and document IDs. A storage key is logged only when an object could not be cleaned up, so operators can find the orphan (the key is an opaque random identifier).
 
-**Mitigation**:
-- Use PyMuPDF with security options
-- Disable JavaScript execution
-- Disable external resource loading
-- Catch parsing errors gracefully
+### Not Yet Implemented
+
+Antivirus scanning, parsing isolation (Phase 4), a reconciliation job for orphaned objects, and encryption at rest (provided by the storage layer in production). The per-user quota is checked before each upload but is not atomic across simultaneous uploads, so it can be overshot by a few files.
 
 ## Input Validation Security
 
@@ -418,7 +386,7 @@ Authentication endpoints use a fixed-window counter in Redis (`app/security/rate
   account is still capped.
 - Exceeding a budget returns 429 `RATE_LIMIT_EXCEEDED` with a `Retry-After` header.
 - Identifiers are hashed in Redis keys. The client IP is the direct TCP peer; behind a reverse proxy, the
-  proxy must be configured as a trusted source of forwarded headers (tracked in AUD-011).
+  proxy must be configured as a trusted source of forwarded headers (to be configured at deployment).
 - If Redis is unavailable the limiter fails open and logs an error (availability over throttling); the token denylist fails closed.
 - Requires Redis 7+ (`EXPIRE ... NX`). Configure with `RATE_LIMIT_ENABLED`, `RATE_LIMIT_AUTH_ATTEMPTS`, `RATE_LIMIT_WINDOW_SECONDS`; it cannot be disabled in staging/production.
 

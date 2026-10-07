@@ -119,14 +119,15 @@ backend/
 │   │   ├── error_handlers.py
 │   │   └── responses.py    # Response/error envelope builders
 │   ├── schemas/            # Pydantic API schemas
-│   ├── services/           # Service layer (AuthService, HealthService)
+│   ├── services/           # AuthService, CollectionService, DocumentService, HealthService
 │   ├── models/             # SQLAlchemy models (User, Role, RefreshToken)
 │   ├── db/                 # Base, async engine/session, DB probe, repositories/
-│   ├── security/           # Password hashing, JWT, refresh tokens, denylist, rate limit, RBAC helpers
+│   ├── security/           # Passwords, JWT, refresh tokens, denylist, rate limit, RBAC, file validation
+│   ├── core/documents/     # Document types and lifecycle state machine
 │   ├── observability/      # JSON logging, request-ID context
 │   ├── workers/            # Celery app and tasks
-│   └── storage/            # StorageProvider interface (no implementation yet)
-├── alembic/                # Migrations (0001 pgvector, 0002 users/roles/refresh_tokens)
+│   └── storage/            # StorageProvider interface, local filesystem backend
+├── alembic/                # Migrations (0001 pgvector, 0002 auth, 0003 documents/collections)
 └── tests/                  # unit, api, integration
 ```
 
@@ -430,13 +431,63 @@ graph TB
     style S3 fill:#ffe1f5
 ```
 
-**File Path Structure**:
+**Object Keys**: opaque and generated (`documents/{2 hex}/{32 hex}`). They contain no user ID, document
+name, version or file name, so they can be neither guessed nor used to traverse a path. Ownership and
+display names live only in PostgreSQL. (This replaces the earlier `/{user_id}/{document_id}/{version}/{filename}` sketch; see DEC-018.)
+
+**Interface** (`app/storage/base.py`): `save(key, chunks)` streams bytes in and returns size and SHA-256;
+`open(key)` streams bytes out; `size`, `exists` and `delete` complete it. The local filesystem backend is
+implemented; an S3-compatible backend only needs to implement the same five methods.
+
+### Document Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: upload accepted
+    pending --> parsing
+    parsing --> chunking
+    chunking --> embedding
+    embedding --> indexing
+    indexing --> ready
+    pending --> failed
+    parsing --> failed
+    chunking --> failed
+    embedding --> failed
+    indexing --> failed
+    ready --> pending: re-process
+    failed --> pending: retry
+    pending --> [*]: delete
+    ready --> [*]: delete
+    failed --> [*]: delete
 ```
-/uploads/
-  └── {user_id}/
-      └── {document_id}/
-          └── {version}/
-              └── {filename}
+
+Transitions are enforced by `ensure_transition` (`app/core/documents/lifecycle.py`); anything else is
+rejected with 409 `INVALID_STATE_TRANSITION`. `error_message` is only allowed while `failed` (database CHECK).
+Phase 3 creates documents as `pending`; the processing worker (Phase 4) will drive the other transitions.
+Deletion is a hard delete, so there is no `deleted` status.
+
+### Upload Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API
+    participant Svc as DocumentService
+    participant S as StorageProvider
+    participant DB as PostgreSQL
+
+    C->>API: POST /documents (multipart)
+    API->>API: Body size cap, authenticate, rate limit
+    API->>Svc: upload(user, file)
+    Svc->>Svc: Validate type, size, structure; SHA-256
+    Svc->>DB: Duplicate check (user, checksum)
+    Svc->>S: save(generated key, stream)
+    S-->>Svc: size + SHA-256 (verified)
+    Svc->>DB: INSERT document + collection links, COMMIT
+    alt insert fails
+        Svc->>S: delete(key)
+    end
+    Svc-->>C: 201 Document (status pending)
 ```
 
 ### Database Storage

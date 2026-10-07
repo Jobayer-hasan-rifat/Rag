@@ -223,471 +223,121 @@ password will revoke all of the user's refresh tokens.
 
 ## Collection Endpoints
 
+All endpoints require authentication. A collection that does not exist and one that belongs to someone
+else are indistinguishable: both return 404. Administrators may act on any collection by ID (FR-1.4);
+listings always show only the caller's own.
+
 ### GET /collections
 
-List user's collections.
+List your collections, ordered by name.
 
-**Authentication**: Required
+**Query parameters**: `page` (default 1), `page_size` (default 20, max 100), `search` (name substring, case-insensitive, max 100 characters).
 
-**Query Parameters**:
-- `page` (int, default: 1): Page number
-- `page_size` (int, default: 20, max: 100): Items per page
-- `search` (string, optional): Search by name
+**Response** (200): `{"data": [Collection], "meta": {"page", "page_size", "total_items", "total_pages", "request_id", "timestamp"}}`
 
-**Response** (200):
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "name": "Research Papers",
-      "description": "Academic papers on AI",
-      "document_count": 15,
-      "created_at": "2026-10-07T20:26:49.575Z",
-      "updated_at": "2026-10-07T20:26:49.575Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "page_size": 20,
-    "total_items": 5,
-    "total_pages": 1,
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
+Collection: `{"id", "name", "description", "document_count", "created_at", "updated_at"}`
 
 ---
 
 ### POST /collections
 
-Create a new collection.
+**Request**: `{"name": "Research Papers", "description": "optional"}` (name 1-255 characters, whitespace normalised; unknown fields rejected)
 
-**Authentication**: Required
-
-**Request Body**:
-```json
-{
-  "name": "Research Papers",
-  "description": "Academic papers on AI"
-}
-```
-
-**Response** (201):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "name": "Research Papers",
-    "description": "Academic papers on AI",
-    "document_count": 0,
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 422: Validation error
+**Response**: 201 with the Collection. **Errors**: 409 `CONFLICT` (you already have a collection with that name, case-insensitively), 422.
 
 ---
 
-### GET /collections/{id}
+### GET /collections/{id} / PATCH /collections/{id} / DELETE /collections/{id}
 
-Get collection details.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Collection ID
-
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "name": "Research Papers",
-    "description": "Academic papers on AI",
-    "document_count": 15,
-    "documents": [
-      {
-        "id": "uuid",
-        "filename": "paper.pdf",
-        "status": "ready"
-      }
-    ],
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Collection not found
-- 403: Not authorized to access collection
-
----
-
-### PATCH /collections/{id}
-
-Update collection.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Collection ID
-
-**Request Body**:
-```json
-{
-  "name": "Updated Name",
-  "description": "Updated description"
-}
-```
-
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "name": "Updated Name",
-    "description": "Updated description",
-    "document_count": 15,
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Collection not found
-- 403: Not authorized
-- 422: Validation error
-
----
-
-### DELETE /collections/{id}
-
-Delete collection.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Collection ID
-
-**Response** (204): No content
-
-**Errors**:
-- 404: Collection not found
-- 403: Not authorized
+- `GET` returns the Collection. `PATCH` accepts `name` and/or `description` (`null` clears the description; an empty body is a 422). `DELETE` returns 204 and keeps the collection's documents.
+- **Errors**: 404 (missing or not yours), 409 (duplicate name on PATCH), 422.
 
 ---
 
 ### POST /collections/{id}/documents
 
-Add documents to collection.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Collection ID
-
-**Request Body**:
-```json
-{
-  "document_ids": ["uuid1", "uuid2", "uuid3"]
-}
-```
-
-**Response** (200):
-```json
-{
-  "data": {
-    "added_count": 3,
-    "already_exists_count": 0
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Collection not found
-- 403: Not authorized
-- 422: Invalid document IDs
-
----
+Add your documents to a collection. **Request**: `{"document_ids": ["uuid", ...]}` (1-100 ids).
+**Response** (200): `{"data": {"added_count": 2, "already_exists_count": 0}}`.
+**Errors**: 404 if the collection or any document is missing or not yours (nothing is added), 422.
 
 ### DELETE /collections/{id}/documents/{document_id}
 
-Remove document from collection.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Collection ID
-- `document_id` (uuid): Document ID
-
-**Response** (204): No content
-
-**Errors**:
-- 404: Collection or document not found
-- 403: Not authorized
+Remove a document from a collection (204). **Errors**: 404 if the collection or membership does not exist.
 
 ---
 
 ## Document Endpoints
 
+All endpoints require authentication and enforce ownership server-side. Responses never contain storage
+keys, filesystem paths or owner IDs. A document that is missing and one that belongs to someone else both
+return 404 (administrators may access any document by ID, but `GET /documents` only lists the caller's own).
+
+Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "collections": [{"id","name"}], "created_at", "updated_at"}`
+
 ### GET /documents
 
-List user's documents.
+**Query parameters**: `page` (default 1), `page_size` (default 20, max 100), `status`, `file_type` (`pdf|docx|txt|md`), `collection_id`, `search` (filename substring), `sort` (`created_at|filename|file_size`, default `created_at`), `order` (`asc|desc`, default `desc`).
 
-**Authentication**: Required
+Ordering is stable (ties are broken by id). Unknown sort fields, filter values or out-of-range pagination return 422. Filtering by a collection that is not yours returns 404.
 
-**Query Parameters**:
-- `page` (int, default: 1): Page number
-- `page_size` (int, default: 20, max: 100): Items per page
-- `status` (string, optional): Filter by status
-- `file_type` (string, optional): Filter by file type
-- `collection_id` (uuid, optional): Filter by collection
-- `search` (string, optional): Search by filename
-- `sort` (string, default: "created_at"): Sort field
-- `order` (string, default: "desc"): Sort order (asc, desc)
-
-**Response** (200):
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "filename": "research_paper.pdf",
-      "file_type": "pdf",
-      "file_size": 1048576,
-      "status": "ready",
-      "page_count": 15,
-      "word_count": 5000,
-      "chunk_count": 25,
-      "created_at": "2026-10-07T20:26:49.575Z",
-      "updated_at": "2026-10-07T20:26:49.575Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "page_size": 20,
-    "total_items": 50,
-    "total_pages": 3,
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
+**Response** (200): `{"data": [Document], "meta": {pagination..., "request_id", "timestamp"}}`
 
 ---
 
 ### POST /documents
 
-Upload a new document.
+Upload a document as `multipart/form-data`.
 
-**Authentication**: Required
+**Fields**: `file` (required, exactly one) and `collection_ids` (optional JSON array of your collection UUIDs, max 20). Any other form field is rejected (400).
 
-**Request**: `multipart/form-data`
+**Behaviour**: authentication and the per-user upload rate limit are checked before the body is read; the body is
+capped (configured maximum plus 1 MiB of multipart overhead) before it is buffered; the extension, declared content type and the
+actual content are validated (see the security document); a SHA-256 checksum is computed; the file is streamed
+into storage under a generated key; then the record is created. If the record cannot be saved, the stored file is removed.
 
-**Fields**:
-- `file` (file, required): Document file (PDF, DOCX, TXT, MD)
-- `collection_ids` (string, optional): JSON array of collection UUIDs
-
-**File Constraints**:
-- Maximum size: 50MB
-- Allowed types: pdf, docx, txt, md
-
-**Response** (201):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "filename": "research_paper.pdf",
-    "file_type": "pdf",
-    "file_size": 1048576,
-    "status": "pending",
-    "created_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
+**Response** (201): the Document with `"status": "pending"`.
 
 **Errors**:
-- 413: File too large
-- 415: Unsupported file type
-- 422: Validation error
+- 401 authentication required; 429 `RATE_LIMIT_EXCEEDED` (default 20 uploads per user per minute, `Retry-After` set)
+- 404 a listed collection is missing or not yours (nothing is stored)
+- 403 `QUOTA_EXCEEDED` the upload would exceed your storage quota (`details.quota_bytes`; default 1 GiB)
+- 409 `DUPLICATE_DOCUMENT` you already uploaded identical content (`details.existing_document_id`)
+- 413 `FILE_TOO_LARGE` (`details.max_bytes`); 415 `UNSUPPORTED_FILE_TYPE` (extension, declared type or content not acceptable)
+- 422 `INVALID_FILE` (empty file, unusable filename) or `VALIDATION_ERROR` (missing `file`, bad `collection_ids`)
+- 503 `STORAGE_UNAVAILABLE` (nothing was saved; retry)
 
 ---
 
 ### GET /documents/{id}
 
-Get document details.
+Metadata for one document. **Errors**: 404.
 
-**Authentication**: Required
+### PATCH /documents/{id}
 
-**Path Parameters**:
-- `id` (uuid): Document ID
+Rename the display name: `{"filename": "New name.pdf"}`. The name is sanitised and its extension must match the
+document's type (415 otherwise). The stored file is untouched. **Errors**: 404, 415, 422.
 
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "filename": "research_paper.pdf",
-    "file_type": "pdf",
-    "file_size": 1048576,
-    "status": "ready",
-    "error_message": null,
-    "page_count": 15,
-    "word_count": 5000,
-    "chunk_count": 25,
-    "metadata": {
-      "author": "John Doe",
-      "created_date": "2026-01-15"
-    },
-    "collections": [
-      {
-        "id": "uuid",
-        "name": "Research Papers"
-      }
-    ],
-    "versions": [
-      {
-        "version_number": 1,
-        "created_at": "2026-10-07T20:26:49.575Z"
-      }
-    ],
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
+### GET /documents/{id}/download
 
-**Errors**:
-- 404: Document not found
-- 403: Not authorized
+Streams the original file. Headers: `Content-Disposition: attachment` (ASCII fallback plus RFC 5987 UTF-8 name),
+`Content-Type` set by the server, `Content-Length`, `X-Content-Type-Options: nosniff`,
+`Cache-Control: private, no-store`, `Content-Security-Policy: default-src 'none'; sandbox`.
+No public URL is ever created.
 
----
+**Errors**: 404; 500 `STORAGE_INCONSISTENCY` if the record exists but its stored file is missing or its size no longer matches (logged at ERROR);
+503 `STORAGE_UNAVAILABLE`.
 
 ### DELETE /documents/{id}
 
-Delete document.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Document ID
-
-**Response** (204): No content
-
-**Errors**:
-- 404: Document not found
-- 403: Not authorized
+Deletes the stored file, then the record and its collection links (204). A file that is already missing is
+logged at ERROR and does not block deletion; a storage failure returns 503 and keeps the record so the call can be retried.
+**Errors**: 404, 503.
 
 ---
 
-### POST /documents/{id}/versions
+### Planned
 
-Upload a new version of a document.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Document ID
-
-**Request**: `multipart/form-data`
-
-**Fields**:
-- `file` (file, required): New version of document
-
-**Response** (201):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "filename": "research_paper.pdf",
-    "file_type": "pdf",
-    "file_size": 2097152,
-    "status": "pending",
-    "version_number": 2,
-    "created_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Document not found
-- 403: Not authorized
-- 413: File too large
-- 415: Unsupported file type
-
----
-
-### GET /documents/{id}/versions
-
-List document versions.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Document ID
-
-**Response** (200):
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "version_number": 2,
-      "file_size": 2097152,
-      "created_at": "2026-10-07T20:26:49.575Z"
-    },
-    {
-      "id": "uuid",
-      "version_number": 1,
-      "file_size": 1048576,
-      "created_at": "2026-10-07T20:26:49.575Z"
-    }
-  ],
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Document not found
-- 403: Not authorized
+`POST/GET /documents/{id}/versions` arrive with versioning in Phase 10.
 
 ---
 

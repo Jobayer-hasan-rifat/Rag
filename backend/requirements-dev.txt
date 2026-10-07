@@ -1,3 +1,5 @@
+aiofiles==25.1.0
+    # via rag-backend (pyproject.toml)
 alembic==1.20.0
     # via rag-backend (pyproject.toml)
 amqp==5.4.1
@@ -138,6 +140,8 @@ python-dotenv==1.2.4
     #   pydantic-settings
     #   testcontainers
     #   uvicorn
+python-multipart==0.0.32
+    # via rag-backend (pyproject.toml)
 pytokens==0.4.1
     # via black
 pywin32==312 ; sys_platform == 'win32'
@@ -161,6 +165,8 @@ sqlalchemy==2.0.54
 starlette==1.7.0
     # via fastapi
 testcontainers==4.13.3
+    # via rag-backend (pyproject.toml)
+types-aiofiles==25.1.0.20260518
     # via rag-backend (pyproject.toml)
 typing-extensions==4.16.0
     # via

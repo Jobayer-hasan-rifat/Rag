@@ -450,7 +450,7 @@ budget. Fails open if Redis is down; cannot be disabled in staging or production
 adopted because it would add a dependency for three call sites and does not give per-account budgets.
 
 **Tradeoffs**:
-Fixed windows allow a burst across a window boundary. The IP is the direct peer; proxy deployments need trusted-proxy configuration (AUD-011).
+Fixed windows allow a burst across a window boundary. The IP is the direct peer; proxy deployments need trusted-proxy configuration (to be configured at deployment).
 
 ---
 
@@ -469,6 +469,99 @@ rejected.
 **Tradeoffs**:
 Argon2id is more resistant to GPU attacks and has no length limit; migrating later is possible by storing the
 algorithm in the hash prefix and re-hashing on login.
+
+---
+
+### DEC-018: Opaque Storage Keys
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Context**:
+The Phase 0 sketch stored files at `/uploads/{user_id}/{document_id}/{version}/{filename}`, which embeds user input and ties storage layout to ownership and versions.
+
+**Chosen Option**:
+Keys are generated server-side (`documents/{2 hex}/{32 hex}`, 128 random bits). The local backend accepts only that exact pattern. Original filenames, owners and versions exist only in PostgreSQL.
+
+**Tradeoffs**:
+Storage can no longer be browsed by user, so reconciliation must go through the database. In exchange, path traversal through names is structurally impossible and moving to S3 needs no layout changes.
+
+---
+
+### DEC-019: Upload Pipeline Ordering
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Authentication and rate limiting run before the body is parsed (the route parses the form itself, after dependencies); a middleware caps the body before it is spooled; validation and hashing happen first, then a duplicate check, then the streamed save, then the database insert with compensating deletion of the stored file on failure. Identical content per user is a 409 (`UNIQUE (user_id, checksum_sha256)`).
+
+**Reason**:
+FastAPI parses declared form parameters before running dependencies, so the usual `UploadFile` parameter would buffer arbitrarily large bodies for unauthenticated or throttled callers.
+
+**Tradeoffs**:
+The OpenAPI body schema is supplied manually, and the file is read twice (validate, then store) from a local temporary file. Storage and database cannot share a transaction, so a crash between the two steps can orphan an object; this is logged, and a reconciliation job is planned.
+
+---
+
+### DEC-020: Ownership, 404 Semantics and Administrator Access
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Missing and not-owned resources return the same 404. The documented RBAC policy (FR-1.4) lets administrators access any document or collection by ID (read, download, rename, delete); listing and uploading always act on the caller's own data. Database composite foreign keys guarantee that document-collection links never cross owners.
+
+**Tradeoffs**:
+Any administrator can read any user's files by ID. This follows the Phase 0 requirements; if stricter privacy is wanted, restricting `can_access_owned_resource` to owners is a one-line change plus an audited break-glass endpoint.
+
+---
+
+### DEC-021: Document Lifecycle
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Keep the Phase 0 statuses (`pending, parsing, chunking, embedding, indexing, ready, failed`) with a transition map: forward one stage, any in-progress stage may fail, and `ready`/`failed` may return to `pending`. There is no `deleted` status because deletion is a hard delete (FR-2.4). `error_message` is only valid when `failed`.
+
+---
+
+### DEC-022: Deletion and Consistency Policy
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Delete the stored object first, then the record. Storage failure keeps the record (503, retryable). A missing object is logged at ERROR and deletion proceeds. Download of a record whose object is missing returns 500 `STORAGE_INCONSISTENCY`.
+
+**Reason**:
+A user is never told a document is gone while data remains; inconsistencies are loud for operators and generic for clients.
+
+---
+
+### DEC-023: Deferred Schema
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+`document_versions` (Phase 10), and `page_count`, `word_count` and `metadata` (Phase 4) are not created now, to avoid unused tables and columns. The Phase 0 `storage_path` column is replaced by `storage_key`, and `content_type` and `checksum_sha256` are added to `documents`. `StorageProvider.get() -> bytes` is replaced by streaming `open()`, `save()` now streams and returns a checksum, and `size()` and `delete() -> bool` are added.
+
+---
+
+### DEC-024: Per-User Storage Quota
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Context**:
+Rate limits and a per-file size cap still allow a registered user to store unbounded data over time (20 uploads a minute of up to 50 MiB each).
+
+**Chosen Option**:
+One total-bytes quota per user (`MAX_STORAGE_BYTES_PER_USER`, default 1 GiB), checked from `SUM(file_size)` before the file is stored; over-quota uploads return 403 `QUOTA_EXCEEDED`. Duplicates are reported as duplicates and not charged.
+
+**Tradeoffs**:
+Deliberately simple: no per-plan tiers or document-count caps, and the check is not atomic across concurrent uploads (it can be overshot slightly). It is enough to bound disk growth per account.
 
 ---
 

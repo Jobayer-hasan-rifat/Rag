@@ -5,7 +5,14 @@ from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
-from app.schemas.common import ErrorBody, ErrorResponse, Meta, ResponseEnvelope
+from app.schemas.common import (
+    ErrorBody,
+    ErrorResponse,
+    Meta,
+    PagedResponse,
+    PageMeta,
+    ResponseEnvelope,
+)
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -21,6 +28,23 @@ def build_meta(request: Request) -> Meta:
 
 def envelope(request: Request, data: Any) -> ResponseEnvelope[Any]:
     return ResponseEnvelope[Any](data=data, meta=build_meta(request))
+
+
+def paged[ItemT](
+    request: Request, items: list[ItemT], *, page: int, page_size: int, total: int
+) -> PagedResponse[ItemT]:
+    meta = build_meta(request)
+    return PagedResponse[ItemT](
+        data=items,
+        meta=PageMeta(
+            request_id=meta.request_id,
+            timestamp=meta.timestamp,
+            page=page,
+            page_size=page_size,
+            total_items=total,
+            total_pages=-(-total // page_size),
+        ),
+    )
 
 
 def error_response(

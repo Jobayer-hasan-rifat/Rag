@@ -69,18 +69,17 @@ erDiagram
         uuid id PK
         uuid user_id FK
         string filename
-        string storage_path
+        string storage_key UK
         string file_type
+        string content_type
         bigint file_size
+        string checksum_sha256
         string status
         text error_message
-        int page_count
-        int word_count
-        jsonb metadata
         datetime created_at
         datetime updated_at
     }
-    
+
     DocumentVersion {
         uuid id PK
         uuid document_id FK
@@ -211,105 +210,69 @@ One row per issued refresh token. Tokens are opaque random values; only their SH
 
 #### collections
 
-Document collections for organization.
+A user's named grouping of documents. Deleting a collection never deletes its documents.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
-| user_id | UUID | FOREIGN KEY, NOT NULL | Owner user |
-| name | VARCHAR(255) | NOT NULL | Collection name |
-| description | TEXT | NULLABLE | Collection description |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Creation timestamp |
-| updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Last update timestamp |
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| user_id | UUID | FOREIGN KEY users(id) ON DELETE CASCADE, NOT NULL | Owner |
+| name | VARCHAR(255) | NOT NULL, CHECK (1-255 characters) | Normalised name (NFC, single spaces) |
+| description | TEXT | NULLABLE | Optional description (max 2000 characters, enforced by the API) |
+| created_at / updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamps |
 
-**Indexes**:
-- `idx_collections_user_id` on `user_id`
-- `idx_collections_name` on `name` (for search)
-
-**Constraints**:
-- `fk_collections_user` FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+**Indexes / constraints**: `ix_collections_user_id`; `uq_collections_user_name` unique on
+`(user_id, lower(name))` (names are unique per owner, case-insensitively);
+`uq_collections_id_user_id` unique on `(id, user_id)` (target of the same-owner foreign key below).
 
 #### documents
 
-Main document metadata table.
+Metadata for an uploaded file. The file itself lives in object storage, never in PostgreSQL.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
-| user_id | UUID | FOREIGN KEY, NOT NULL | Owner user |
-| filename | VARCHAR(255) | NOT NULL | Original filename |
-| storage_path | VARCHAR(500) | NOT NULL | Server storage path |
-| file_type | VARCHAR(10) | NOT NULL | pdf, docx, txt, md |
-| file_size | BIGINT | NOT NULL | File size in bytes |
-| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending' | Processing status |
-| error_message | TEXT | NULLABLE | Error if processing failed |
-| page_count | INTEGER | NULLABLE | Number of pages |
-| word_count | INTEGER | NULLABLE | Total word count |
-| metadata | JSONB | DEFAULT '{}' | Additional metadata |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Upload timestamp |
-| updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Last update timestamp |
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| user_id | UUID | FOREIGN KEY users(id) ON DELETE CASCADE, NOT NULL | Owner (always the authenticated uploader) |
+| filename | VARCHAR(255) | NOT NULL, CHECK (1-255 characters) | Sanitised display name; never used as a path |
+| storage_key | VARCHAR(255) | UNIQUE, NOT NULL | Opaque generated key, e.g. `documents/3f/3fa9...` |
+| file_type | VARCHAR(10) | NOT NULL, CHECK IN ('pdf','docx','txt','md') | Type determined from validated content |
+| content_type | VARCHAR(127) | NOT NULL | Canonical media type chosen by the server |
+| file_size | BIGINT | NOT NULL, CHECK (> 0) | Size in bytes |
+| checksum_sha256 | VARCHAR(64) | NOT NULL | Hex SHA-256 of the content |
+| status | VARCHAR(20) | NOT NULL, DEFAULT 'pending', CHECK (valid status) | Lifecycle state |
+| error_message | TEXT | NULLABLE, CHECK (only when status = 'failed') | Failure reason |
+| created_at / updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamps |
 
-**Status Values**:
-- `pending` - Uploaded, not yet processed
-- `parsing` - Being parsed
-- `chunking` - Being chunked
-- `embedding` - Generating embeddings
-- `indexing` - Indexing vectors
-- `ready` - Ready for search and RAG
-- `failed` - Processing failed
+**Status values** (see the lifecycle in the architecture document): `pending`, `parsing`, `chunking`,
+`embedding`, `indexing`, `ready`, `failed`.
 
-**Indexes**:
-- `idx_documents_user_id` on `user_id`
-- `idx_documents_status` on `status`
-- `idx_documents_file_type` on `file_type`
-- `idx_documents_created_at` on `created_at` DESC
-- `idx_documents_metadata` on `metadata` USING GIN (for JSON queries)
-
-**Constraints**:
-- `fk_documents_user` FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-- `chk_documents_status` CHECK (status IN ('pending', 'parsing', 'chunking', 'embedding', 'indexing', 'ready', 'failed'))
-- `chk_documents_file_type` CHECK (file_type IN ('pdf', 'docx', 'txt', 'md'))
-- `chk_documents_file_size` CHECK (file_size > 0 AND file_size <= 52428800) -- 50MB max
+**Indexes / constraints**: `ix_documents_user_created` on `(user_id, created_at DESC, id DESC)` (the
+listing query); `ix_documents_status`; `uq_documents_storage_key`;
+`uq_documents_user_checksum` unique on `(user_id, checksum_sha256)` (identical content is stored once per user);
+`uq_documents_id_user_id` unique on `(id, user_id)`.
 
 #### document_collections
 
-Many-to-many relationship between documents and collections.
+Many-to-many membership. The composite foreign keys make it **impossible at the database level**
+to link a document to a collection owned by a different user.
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| document_id | UUID | FOREIGN KEY, NOT NULL | Reference to document |
-| collection_id | UUID | FOREIGN KEY, NOT NULL | Reference to collection |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Addition timestamp |
+| Column | Type | Constraints |
+|--------|------|-------------|
+| document_id | UUID | PRIMARY KEY (with collection_id) |
+| collection_id | UUID | PRIMARY KEY (with document_id) |
+| user_id | UUID | NOT NULL |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() |
 
-**Primary Key**: (document_id, collection_id)
+`(document_id, user_id)` references `documents(id, user_id)` and `(collection_id, user_id)` references
+`collections(id, user_id)`, both `ON DELETE CASCADE`. Index: `ix_document_collections_collection_id`.
 
-**Indexes**:
-- `idx_document_collections_collection_id` on `collection_id`
+**Deletion behaviour**: deleting a document or a collection removes only the link rows; deleting a user
+cascades to their documents, collections and links.
 
-**Constraints**:
-- `fk_document_collections_document` FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-- `fk_document_collections_collection` FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE
+#### document_versions (deferred to Phase 10)
 
-#### document_versions
-
-Document version history.
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
-| document_id | UUID | FOREIGN KEY, NOT NULL | Reference to document |
-| version_number | INTEGER | NOT NULL | Version sequence number |
-| storage_path | VARCHAR(500) | NOT NULL | Storage path for this version |
-| file_size | BIGINT | NOT NULL | File size in bytes |
-| checksum | VARCHAR(64) | NOT NULL | SHA-256 checksum |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Upload timestamp |
-
-**Indexes**:
-- `idx_document_versions_document_id` on `document_id`
-- `uq_document_versions_number` UNIQUE (document_id, version_number)
-
-**Constraints**:
-- `fk_document_versions_document` FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+Version history is designed but not yet created, so Phase 3 has no unused tables. The Phase 10 migration will
+add `document_versions` and move per-file storage details there. Likewise `page_count`, `word_count` and
+`metadata` are added by the Phase 4 processing migration.
 
 #### document_chunks
 

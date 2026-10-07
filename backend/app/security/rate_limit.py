@@ -20,7 +20,14 @@ class RateLimiter:
         self._max_attempts = max_attempts
         self._window_seconds = window_seconds
 
-    async def check(self, scope: str, identifier: str, *, budget_multiplier: int = 1) -> None:
+    async def check(
+        self,
+        scope: str,
+        identifier: str,
+        *,
+        budget_multiplier: int = 1,
+        max_attempts: int | None = None,
+    ) -> None:
         """Count one attempt; raise RateLimitExceededError once the window's budget is spent."""
         if not self._enabled:
             return
@@ -35,5 +42,5 @@ class RateLimiter:
         except RedisError:
             logger.error("rate limiter unavailable; allowing request", extra={"scope": scope})
             return
-        if attempts > self._max_attempts * budget_multiplier:
+        if attempts > (max_attempts or self._max_attempts * budget_multiplier):
             raise RateLimitExceededError(max(int(ttl), 1))

@@ -1,4 +1,9 @@
+import secrets
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+
+DEFAULT_CHUNK_SIZE = 64 * 1024
 
 
 class StorageError(Exception):
@@ -9,21 +14,49 @@ class ObjectNotFoundError(StorageError):
     """Raised when a requested object does not exist."""
 
 
-class StorageProvider(ABC):
-    """Backend-agnostic object storage (local filesystem, S3, S3-compatible).
+class ObjectExistsError(StorageError):
+    """Raised when saving would overwrite an existing object."""
 
-    Keys are opaque, server-generated identifiers; implementations must never
-    derive filesystem paths from user-supplied file names.
+
+class InvalidStorageKeyError(StorageError):
+    """Raised for a key that is not a well-formed, server-generated identifier."""
+
+
+@dataclass(frozen=True)
+class StoredObject:
+    key: str
+    size_bytes: int
+    sha256: str
+
+
+def generate_storage_key(prefix: str = "documents") -> str:
+    """Opaque, unguessable, collision-resistant key. Never derived from user input."""
+    token = secrets.token_hex(16)
+    return f"{prefix}/{token[:2]}/{token}"
+
+
+class StorageProvider(ABC):
+    """Backend-agnostic object storage (local filesystem now; S3-compatible later).
+
+    Keys are server-generated identifiers; implementations must reject anything else and
+    must never derive paths from user-supplied file names.
     """
 
     @abstractmethod
-    async def save(self, key: str, data: bytes, *, content_type: str | None = None) -> None: ...
+    async def save(self, key: str, chunks: AsyncIterator[bytes]) -> StoredObject:
+        """Stream `chunks` into a new object; raises ObjectExistsError instead of overwriting."""
 
     @abstractmethod
-    async def get(self, key: str) -> bytes: ...
+    def open(self, key: str, *, chunk_size: int = DEFAULT_CHUNK_SIZE) -> AsyncIterator[bytes]:
+        """Stream an object's bytes; raises ObjectNotFoundError if it does not exist."""
 
     @abstractmethod
-    async def delete(self, key: str) -> None: ...
+    async def size(self, key: str) -> int:
+        """Size in bytes; raises ObjectNotFoundError if the object does not exist."""
+
+    @abstractmethod
+    async def delete(self, key: str) -> bool:
+        """Delete an object; returns False if it did not exist."""
 
     @abstractmethod
     async def exists(self, key: str) -> bool: ...
