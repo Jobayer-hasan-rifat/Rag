@@ -537,15 +537,24 @@ pytest --cov=app --cov-report=html
 
 ### Test Configuration
 
-```ini
-# pytest.ini
-[pytest]
-asyncio_mode = auto
-testpaths = tests
-python_files = test_*.py
-python_classes = Test*
-python_functions = test_*
-```
+Configuration lives in `backend/pyproject.toml` (`asyncio_mode = auto`, strict markers).
+Tests marked `integration` need real PostgreSQL/Redis.
+
+**Infrastructure approach (decided in Phase 1)**:
+
+- Locally, session-scoped fixtures start `pgvector/pgvector:pg16` and `redis:7-alpine` with
+  Testcontainers. Docker is the only requirement; nothing depends on the developer's own
+  database or Redis.
+- In CI, the same tests use service containers by setting `TEST_DATABASE_URL` and
+  `TEST_REDIS_URL`, which the fixtures prefer over starting containers.
+- Migration tests create a fresh database per test and exercise `upgrade head`,
+  `downgrade -1` and a second `upgrade head`.
+- The Celery test starts a real worker thread against real Redis.
+- PostgreSQL and Redis are never mocked.
+
+**Phase 1 results (2026-10-08)**: 63 tests (unit, API, integration) passing, about 98%
+line coverage of `app/`. The only uncovered lines are DB session/dependency wiring that no
+route uses yet.
 
 ## CI/CD Integration
 

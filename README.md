@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 0 (Foundation & Architecture)
+> **Status**: 🚧 In Development - Phase 1 complete (Infrastructure). No business features yet.
 
 ## Overview
 
@@ -20,7 +20,13 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
-*None yet - currently in Phase 0 (Architecture & Foundation)*
+Infrastructure only; there is no user-facing functionality yet.
+
+- FastAPI service with liveness/readiness health endpoints and versioned `/api/v1` routing
+- PostgreSQL 16 + pgvector, Redis and a Celery worker, all running under Docker Compose with health checks
+- Alembic migrations, structured JSON logging with request IDs, consistent error responses
+- React + TypeScript + Vite shell that displays backend readiness
+- Test, lint, type-check and CI foundations
 
 ### Planned
 
@@ -101,46 +107,87 @@ Organizations need to extract insights from large document collections. Traditio
 
 ## Quick Start
 
-> ⚠️ **Note**: Setup instructions will be available after Phase 1 (Infrastructure) is complete.
+Prerequisites: Docker Desktop (Compose v2). Nothing else is needed to run the stack.
 
 ```bash
-# Clone repository
 git clone https://github.com/Jobayer-hasan-rifat/Rag.git
-cd rag-platform
+cd Rag
 
-# Copy environment variables
+# 1. Create your local environment file and replace the placeholder secrets
 cp .env.example .env
 
-# Start services
-docker-compose up -d
+# 2. Build and start everything (migrations run automatically)
+docker compose up -d --build
 
-# Run database migrations
-docker-compose exec backend alembic upgrade head
+# 3. Check status; every service should become "healthy"
+docker compose ps
+```
 
-# Access application
-open http://localhost:3000
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| API docs (Swagger) | http://localhost:8000/docs |
+| Readiness probe | http://localhost:8000/health/ready |
+
+PostgreSQL and Redis are published on `127.0.0.1` only. If a host port is taken (for example Windows reserves 6379 on some machines), change `POSTGRES_HOST_PORT` / `REDIS_HOST_PORT` in `.env`.
+
+### Development commands
+
+| Task | Command |
+|------|---------|
+| Start / rebuild stack | `docker compose up -d --build` |
+| Stop stack (keep data) | `docker compose down` |
+| Stop and delete data volumes | `docker compose down -v` |
+| View logs | `docker compose logs -f backend celery_worker` |
+| Run migrations manually | `docker compose run --rm migrate alembic upgrade head` |
+| Roll back one migration | `docker compose run --rm migrate alembic downgrade -1` |
+| Start the worker only | `docker compose up -d celery_worker` |
+
+Working on the backend on the host (Python 3.12+; `make` is optional, the raw commands work everywhere):
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt                    # make install
+docker compose up -d postgres redis                    # infrastructure only
+alembic upgrade head                                   # make migrate
+uvicorn app.main:get_app --factory --reload            # run the API
+celery -A app.workers.celery_app:celery_app worker -l INFO   # run a worker
+python -m ruff check .                                 # make lint
+python -m black .                                      # make format
+python -m mypy                                         # make typecheck
+python -m pytest                                       # make test
+```
+
+Frontend on the host (Node 22):
+
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+npm run typecheck && npm run build
 ```
 
 ## Project Structure
 
 ```
 /
-├── backend/           # Python FastAPI application
-│   ├── app/          # Application code
-│   ├── tests/        # Test suite
-│   └── alembic/      # Database migrations
-├── frontend/          # React TypeScript application
-├── docs/              # Engineering documentation
-├── docker/            # Docker configurations
-└── scripts/           # Development scripts
+├── backend/             # FastAPI application, Celery workers, Alembic migrations, tests
+│   ├── app/             # api, services, db, workers, storage, observability, schemas
+│   ├── alembic/         # Database migrations
+│   └── tests/           # unit, api, integration
+├── frontend/            # React + TypeScript + Vite application shell
+├── docs/                # Engineering documentation
+├── docker-compose.yml   # Development environment
+└── .github/workflows/   # CI
 ```
 
 ## Development Status
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 0 | Foundation & Architecture | 🚧 **Current** |
-| 1 | Infrastructure | ⏳ Pending |
+| 0 | Foundation & Architecture | ✅ Complete |
+| 1 | Infrastructure | ✅ Complete |
 | 2 | Authentication | ⏳ Pending |
 | 3 | Document Management | ⏳ Pending |
 | 4 | Document Processing | ⏳ Pending |
@@ -172,20 +219,18 @@ Published engineering documentation is in the `docs/` directory:
 
 ## Testing
 
-> Testing infrastructure will be established in Phase 1. No tests or results exist yet; see the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
+Integration tests run against real PostgreSQL (pgvector) and Redis containers started by
+Testcontainers, so they do not depend on your local setup. Docker must be running.
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app --cov-report=html
-
-# Run specific test types
-pytest tests/unit/          # Unit tests
-pytest tests/integration/   # Integration tests
-pytest tests/e2e/           # End-to-end tests
+cd backend
+python -m pytest -m "not integration"   # fast tests, no Docker needed
+python -m pytest -m integration         # real PostgreSQL, Redis and Celery worker
+python -m pytest --cov                  # everything, with coverage
 ```
+
+Current state (Phase 1): 63 tests passing (unit, API and infrastructure integration),
+about 98% line coverage of `app/`. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
 

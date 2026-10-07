@@ -615,6 +615,21 @@ This document details the technology stack for the Intelligent Document Processi
 - Can slow down development initially
 - Some libraries lack type stubs
 
+## Phase 1 Dependency Choices
+
+| Dependency | Why | Alternative not chosen |
+|------------|-----|------------------------|
+| `asyncpg` (via SQLAlchemy async) | Fast native async PostgreSQL driver; matches the async-API rule | `psycopg` 3 (also viable; asyncpg chosen for throughput) |
+| `redis` (redis-py, asyncio client) | Official client; async API for readiness probes | `aioredis` (merged into redis-py) |
+| `celery` | Decided in DEC-004 | RQ, Dramatiq, Arq |
+| Stdlib `logging` + small JSON formatter | No extra dependency; full control over redaction | `structlog`, `python-json-logger` |
+| `testcontainers` | Real PostgreSQL/Redis in tests without relying on a developer's machine | Shared docker-compose database, mocks |
+| `uv` (tooling only) | Generates pinned, cross-platform `requirements*.txt` from `pyproject.toml` | `pip-tools`, Poetry |
+| `black` 26.x, `pytest` 9.x | Minimum versions chosen after `pip-audit` flagged older releases | n/a |
+
+Dependency ranges live in `backend/pyproject.toml`; exact pins live in
+`backend/requirements.txt` and `backend/requirements-dev.txt` (regenerate with `make lock`).
+
 ## Technology Summary Table
 
 | Category | Technology | Purpose | Key Reason |

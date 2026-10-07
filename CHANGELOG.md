@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 1: Infrastructure
+
+- FastAPI application factory with `/health`, `/health/live`, `/health/ready` and the versioned `/api/v1/health` routes
+- Configuration via Pydantic Settings with fail-fast validation (no wildcard CORS, no placeholder secrets outside development)
+- Structured JSON logging with request IDs and credential redaction
+- Request ID middleware and a consistent error response envelope
+- Async SQLAlchemy 2.x engine/session infrastructure and Alembic migrations (the initial migration enables pgvector)
+- Redis client, Celery application and a `health_check_task`
+- Storage provider interface (abstraction only)
+- React + TypeScript + Vite application shell that reads backend readiness
+- Docker Compose development environment (PostgreSQL + pgvector, Redis, migrations, backend, worker, frontend) with health checks
+- Test infrastructure (pytest, Testcontainers), Ruff, Black, mypy, a Makefile, and a GitHub Actions CI workflow
+
 ### Added - 2026-10-07
 
 #### Project Foundation

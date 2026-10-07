@@ -102,43 +102,37 @@ graph TD
 
 ### Module Structure
 
+Implemented in Phase 1 (modules are added only when a phase needs them):
+
 ```
 backend/
 ├── app/
-│   ├── api/              # API Layer
-│   │   ├── routes/       # Route handlers
-│   │   └── middleware/   # Request/response middleware
-│   │
-│   ├── services/         # Service Layer (Business Logic)
-│   │   ├── auth_service.py
-│   │   ├── document_service.py
-│   │   ├── search_service.py
-│   │   └── rag_service.py
-│   │
-│   ├── repositories/     # Repository Layer (Data Access)
-│   │   ├── user_repository.py
-│   │   ├── document_repository.py
-│   │   └── chunk_repository.py
-│   │
-│   ├── models/           # Domain Models
-│   │   ├── user.py
-│   │   ├── document.py
-│   │   └── chunk.py
-│   │
-│   ├── schemas/          # API Schemas (Pydantic)
-│   │   ├── auth.py
-│   │   ├── document.py
-│   │   └── search.py
-│   │
-│   ├── core/             # Core Domain Logic
-│   │   ├── auth/
-│   │   ├── documents/
-│   │   ├── search/
-│   │   └── rag/
-│   │
-│   └── workers/          # Background Tasks
-│       └── tasks/
+│   ├── main.py             # Application factory (create_app / get_app)
+│   ├── config.py           # Pydantic Settings, fail-fast validation
+│   ├── dependencies.py     # FastAPI dependency providers
+│   ├── exceptions.py       # AppError base class
+│   ├── redis.py            # Redis client factory and probe
+│   ├── api/
+│   │   ├── router.py       # /api/v1 router (+ root health routes for orchestrators)
+│   │   ├── routes/         # Route handlers (orchestration only)
+│   │   ├── middleware/     # Request-context (request ID, access log) middleware
+│   │   ├── error_handlers.py
+│   │   └── responses.py    # Response/error envelope builders
+│   ├── schemas/            # Pydantic API schemas
+│   ├── services/           # Service layer (HealthService so far)
+│   ├── db/                 # Declarative base, async engine/session, DB probe
+│   ├── observability/      # JSON logging, request-ID context
+│   ├── workers/            # Celery app and tasks
+│   └── storage/            # StorageProvider interface (no implementation yet)
+├── alembic/                # Migrations (0001 enables pgvector)
+└── tests/                  # unit, api, integration
 ```
+
+Planned layers added in later phases: `repositories/` (data access), `models/`, `core/`
+(domain logic), `parsers/`, `embeddings/`, `llm/`, `retrieval/`, `security/`.
+
+Dependency direction: `api -> services -> (db | redis | storage)`. Infrastructure modules
+(`db`, `redis`, `storage`, `observability`) never import from `api` or `services`.
 
 ### Dependency Injection
 
@@ -751,6 +745,11 @@ graph TB
     style Worker fill:#ffe1f5
     style DB fill:#e1ffe1
 ```
+
+The development stack is defined in `docker-compose.yml`: `postgres` (pgvector image),
+`redis` (password-protected), a one-shot `migrate` job, `backend`, `celery_worker` and
+`frontend`. The API starts only after migrations complete and its dependencies are healthy.
+Database and Redis ports are published on `127.0.0.1` only.
 
 ### Production Environment (Future)
 
