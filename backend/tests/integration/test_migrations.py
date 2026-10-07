@@ -64,15 +64,25 @@ def test_upgrade_head_enables_pgvector(alembic_config: Config, fresh_database_ur
 
     assert _has_vector(fresh_database_url)
     version = asyncio.run(_scalar(fresh_database_url, "SELECT version_num FROM alembic_version"))
-    assert version == "0001"
+    assert version == "0002"
 
 
-def test_downgrade_removes_pgvector(alembic_config: Config, fresh_database_url: str) -> None:
+def test_downgrade_to_base_removes_pgvector(
+    alembic_config: Config, fresh_database_url: str
+) -> None:
+    command.upgrade(alembic_config, "head")
+
+    command.downgrade(alembic_config, "base")
+
+    assert not _has_vector(fresh_database_url)
+
+
+def test_downgrade_one_step_keeps_pgvector(alembic_config: Config, fresh_database_url: str) -> None:
     command.upgrade(alembic_config, "head")
 
     command.downgrade(alembic_config, "-1")
 
-    assert not _has_vector(fresh_database_url)
+    assert _has_vector(fresh_database_url)
 
 
 def test_upgrade_is_repeatable_after_downgrade(
@@ -98,4 +108,4 @@ def test_migration_history_has_a_single_head(alembic_config: Config) -> None:
 
     heads = ScriptDirectory.from_config(alembic_config).get_heads()
 
-    assert heads == ["0001"]
+    assert heads == ["0002"]

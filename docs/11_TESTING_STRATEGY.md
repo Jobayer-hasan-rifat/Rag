@@ -182,7 +182,7 @@ async def test_complete_document_workflow():
         # 1. Register
         response = await client.post("/api/v1/auth/register", json={
             "email": "test@example.com",
-            "username": "testuser",
+            "display_name": "Test User",
             "password": "TestPass123!"
         })
         assert response.status_code == 201
@@ -305,7 +305,7 @@ async def test_user(db_session):
     
     user = await AuthService.register_user(
         email="test@example.com",
-        username="testuser",
+        display_name="Test User",
         password="TestPass123!",
         db=db_session
     )
@@ -342,8 +342,8 @@ class UserFactory(Factory):
     
     id = Faker("uuid4")
     email = Faker("email")
-    username = Faker("user_name")
-    hashed_password = "hashed_password_hash"
+    display_name = Faker("name")
+    password_hash = "hashed_password_hash"
     is_active = True
     role_id = 1
 
@@ -552,9 +552,12 @@ Tests marked `integration` need real PostgreSQL/Redis.
 - The Celery test starts a real worker thread against real Redis.
 - PostgreSQL and Redis are never mocked.
 
-**Phase 1 results (2026-10-08)**: 63 tests (unit, API, integration) passing, about 98%
-line coverage of `app/`. The only uncovered lines are DB session/dependency wiring that no
-route uses yet.
+**Phase 2 results (2026-10-08)**: 277 tests (unit, API, integration) passing, about 99% line
+coverage of `app/`; all authentication and security modules are fully covered. Registration, login, refresh
+rotation and reuse detection, logout revocation, RBAC and rate limiting are tested end to end through the HTTP API
+against real PostgreSQL and Redis. Migration tests cover upgrade, downgrade, re-upgrade, constraints, cascades
+and model/migration drift. The only mocks are narrow Redis-outage simulations. Coverage is measured with
+`concurrency = [thread, greenlet]` because SQLAlchemy's async layer runs on greenlets.
 
 ## CI/CD Integration
 

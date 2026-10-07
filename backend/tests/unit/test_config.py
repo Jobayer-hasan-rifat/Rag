@@ -100,3 +100,44 @@ def test_invalid_log_level_is_rejected(make_settings: SettingsFactory) -> None:
 def test_secret_is_not_exposed_in_repr(make_settings: SettingsFactory) -> None:
     settings = make_settings()
     assert "test-only-secret" not in repr(settings)
+
+
+@pytest.mark.parametrize("env", ["staging", "production"])
+def test_weak_bcrypt_cost_is_rejected_outside_development(
+    make_settings: SettingsFactory, env: str
+) -> None:
+    with pytest.raises(ValidationError, match="BCRYPT_COST_FACTOR"):
+        make_settings(app_env=env, bcrypt_cost_factor=10)
+
+
+def test_rate_limiting_cannot_be_disabled_in_production(make_settings: SettingsFactory) -> None:
+    with pytest.raises(ValidationError, match="RATE_LIMIT_ENABLED"):
+        make_settings(app_env="production", bcrypt_cost_factor=12, rate_limit_enabled=False)
+
+
+def test_production_accepts_a_hardened_configuration(make_settings: SettingsFactory) -> None:
+    settings = make_settings(app_env="production", bcrypt_cost_factor=12)
+
+    assert settings.rate_limit_enabled is True
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"access_token_expire_minutes": 0},
+        {"access_token_expire_minutes": 600},
+        {"refresh_token_expire_days": 0},
+        {"bcrypt_cost_factor": 3},
+        {"rate_limit_auth_attempts": 0},
+    ],
+)
+def test_token_and_hashing_settings_are_bounded(
+    make_settings: SettingsFactory, overrides: dict[str, int]
+) -> None:
+    with pytest.raises(ValidationError):
+        make_settings(**overrides)
+
+
+def test_unsupported_jwt_algorithm_is_rejected(make_settings: SettingsFactory) -> None:
+    with pytest.raises(ValidationError):
+        make_settings(jwt_algorithm="none")

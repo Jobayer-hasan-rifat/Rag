@@ -81,25 +81,30 @@ Authorization: Bearer <access_token>
 
 ## Authentication Endpoints
 
+All responses use the standard envelope (`data` + `meta`, or `error` + `meta`). Request bodies
+reject unknown fields (HTTP 422), so clients cannot submit fields such as `role`.
+Authenticated endpoints expect `Authorization: Bearer <access_token>`; OpenAPI declares this as
+the `BearerAuth` security scheme.
+
 ### POST /auth/register
 
-Register a new user account.
+Create an account with the default `user` role.
 
-**Authentication**: None
+**Authentication**: None. **Rate limited** (per client IP).
 
 **Request Body**:
 ```json
 {
   "email": "user@example.com",
-  "username": "johndoe",
-  "password": "SecurePassword123!"
+  "password": "SecurePassword123",
+  "display_name": "John Doe"
 }
 ```
 
 **Validation**:
-- Email: Valid email format, unique
-- Username: 3-50 characters, alphanumeric + underscore, unique
-- Password: Minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 digit
+- `email`: valid address; trimmed and lowercased before use
+- `password`: 8-72 bytes, at least one uppercase letter, one lowercase letter and one digit
+- `display_name`: 1-100 characters after trimming, no control characters
 
 **Response** (201):
 ```json
@@ -107,175 +112,112 @@ Register a new user account.
   "data": {
     "id": "uuid",
     "email": "user@example.com",
-    "username": "johndoe",
+    "display_name": "John Doe",
+    "role": "user",
     "is_active": true,
-    "created_at": "2026-10-07T20:26:49.575Z"
+    "created_at": "2026-10-08T10:00:00Z"
   },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-08T10:00:00Z"}
 }
 ```
 
 **Errors**:
-- 409: Email or username already exists
-- 422: Validation error
+- 409 `CONFLICT`: "Unable to register with the provided details" (deliberately does not say what clashed)
+- 422 `VALIDATION_ERROR`: field-level messages; the submitted password is never echoed
+- 429 `RATE_LIMIT_EXCEEDED`
 
 ---
 
 ### POST /auth/login
 
-Authenticate user and receive tokens.
+Exchange credentials for tokens.
 
-**Authentication**: None
+**Authentication**: None. **Rate limited** (per client IP and per account).
 
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123!"
-}
-```
+**Request Body**: `{"email": "user@example.com", "password": "SecurePassword123"}`
 
-**Response** (200):
+**Response** (200, `Cache-Control: no-store`):
 ```json
 {
   "data": {
-    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-    "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+    "access_token": "eyJ...",
+    "refresh_token": "opaque-random-string",
     "token_type": "bearer",
     "expires_in": 900
   },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-08T10:00:00Z"}
 }
 ```
 
 **Errors**:
-- 401: Invalid credentials
-- 400: Account deactivated
+- 401 `AUTHENTICATION_ERROR`: "Invalid email or password". Returned identically for an unknown
+  account, a wrong password, a deactivated account and a deleted account.
+- 422 `VALIDATION_ERROR`, 429 `RATE_LIMIT_EXCEEDED` (with `Retry-After`)
 
 ---
 
 ### POST /auth/refresh
 
-Refresh access token using refresh token.
+Rotate a refresh token. The presented token is consumed and a new access and refresh token are returned.
 
-**Authentication**: None
+**Authentication**: None (the refresh token is the credential). **Rate limited**.
 
-**Request Body**:
-```json
-{
-  "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-}
-```
+**Request Body**: `{"refresh_token": "opaque-random-string"}`
 
-**Response** (200):
-```json
-{
-  "data": {
-    "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-    "token_type": "bearer",
-    "expires_in": 900
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
+**Response** (200, `Cache-Control: no-store`): same shape as login.
 
 **Errors**:
-- 401: Invalid or expired refresh token
+- 401 `AUTHENTICATION_ERROR`: unknown, expired or revoked token. Presenting a token that was
+  already used revokes the entire session (token family).
+- 422, 429
 
 ---
 
 ### POST /auth/logout
 
-Logout user and invalidate refresh token.
+End the current session.
 
-**Authentication**: Required
+**Authentication**: Required (access token).
 
-**Request Body**:
+**Request Body**: `{"refresh_token": "opaque-random-string"}`
+
+**Response**: 204 No Content. The refresh-token family is revoked (only if it belongs to the
+caller) and the presented access token is denylisted until it would have expired. The response
+is the same whether or not the refresh token was recognised.
+
+**Errors**: 401 (missing/invalid access token), 422, 503 (revocation could not be recorded; retry)
+
+---
+
+### GET /auth/me
+
+Return the authenticated user.
+
+**Authentication**: Required.
+
+**Response** (200):
 ```json
 {
-  "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+  "data": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "display_name": "John Doe",
+    "role": "user",
+    "is_active": true,
+    "created_at": "2026-10-08T10:00:00Z"
+  },
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-08T10:00:00Z"}
 }
 ```
 
-**Response** (204): No content
-
-**Errors**:
-- 401: Invalid token
+**Errors**: 401 `AUTHENTICATION_ERROR` (missing, malformed, expired, revoked token, or deactivated user), 503 (token revocation list unavailable)
 
 ---
 
 ## User Endpoints
 
-### GET /users/me
-
-Get current user profile.
-
-**Authentication**: Required
-
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "johndoe",
-    "is_active": true,
-    "role": "user",
-    "created_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
----
-
-### PATCH /users/me
-
-Update current user profile.
-
-**Authentication**: Required
-
-**Request Body**:
-```json
-{
-  "username": "newusername",
-  "password": "NewSecurePassword123!"
-}
-```
-
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "username": "newusername",
-    "is_active": true,
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 409: Username already exists
-- 422: Validation error
+Planned (not implemented): `PATCH /users/me` to change `display_name` and password. Changing a
+password will revoke all of the user's refresh tokens.
 
 ---
 

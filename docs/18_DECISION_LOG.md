@@ -380,6 +380,98 @@ builds while `pyproject.toml` stays the single source of intent.
 
 ---
 
+### DEC-013: Authentication Token Design
+
+**Date**: 2026-10-08
+**Status**: Accepted (refines DEC-005)
+
+**Context**:
+DEC-005 chose JWT access and refresh tokens but left signing, rotation and revocation open, and
+accepted that access tokens could not be revoked.
+
+**Chosen Option**:
+- Access token: short-lived HS256 JWT (PyJWT) carrying identity only (`sub`, `jti`, `type`, `iss`, `aud`, `iat`, `exp`).
+- Refresh token: opaque random value, stored as SHA-256, single use, rotated within a *family*; reuse revokes the family.
+- Role and active status are loaded from the database on each request, not trusted from the token.
+- Logout revokes the family and denylists the access token `jti` in Redis until expiry.
+- `/auth/refresh` returns a new access *and* refresh token (the Phase 0 draft returned only an access token).
+
+**Reason**:
+Rotation with reuse detection limits the damage of a stolen refresh token. DB-authoritative roles make deactivation and
+demotion immediate, at the cost of one indexed query per request. HS256 is sufficient while one service both
+issues and verifies tokens.
+
+**Tradeoffs**:
+Not purely stateless (a DB read and a Redis read per authenticated request); a client that loses a refresh response
+and retries will be logged out. Moving to asymmetric signing is straightforward if other services must verify tokens.
+
+---
+
+### DEC-014: User Model Changes from the Phase 0 Draft
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+`display_name` (not unique) replaces the unique `username`; `is_superuser` is dropped in favour of the `role`
+relationship; `password_hash` replaces `hashed_password`; emails carry a lowercase CHECK constraint;
+`GET /auth/me` replaces `GET /users/me`.
+
+**Reason**:
+A unique handle adds another enumeration surface and a second identity to keep consistent; the email is
+the login identifier. A single source of privilege (role) avoids two flags drifting apart.
+
+---
+
+### DEC-015: Account Enumeration and Account-State Policy
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Login returns one generic 401 for unknown, wrong-password, deactivated and deleted accounts (the Phase 0 draft returned 400 for deactivated
+accounts, which confirmed valid credentials); unknown accounts still incur a bcrypt comparison.
+Registration returns a neutral 409 for existing emails.
+
+**Tradeoffs**:
+Deactivated users get no explanatory message (support must tell them). Registration existence is still observable;
+accepted until email verification exists.
+
+---
+
+### DEC-016: Authentication Rate Limiting
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Chosen Option**:
+Fixed-window counters in Redis, per client IP for register/login/refresh and per account for login at 5x the IP
+budget. Fails open if Redis is down; cannot be disabled in staging or production. A library such as `slowapi` was not
+adopted because it would add a dependency for three call sites and does not give per-account budgets.
+
+**Tradeoffs**:
+Fixed windows allow a burst across a window boundary. The IP is the direct peer; proxy deployments need trusted-proxy configuration (AUD-011).
+
+---
+
+### DEC-017: Keep bcrypt for Password Hashing
+
+**Date**: 2026-10-08
+**Status**: Accepted
+
+**Context**:
+The Phase 2 brief allowed Argon2id or another modern algorithm "supported by the project's security requirements".
+
+**Chosen Option**:
+bcrypt (cost >= 12 in staging/production), the algorithm named in the project's security rules. Inputs over 72 bytes are
+rejected.
+
+**Tradeoffs**:
+Argon2id is more resistant to GPU attacks and has no length limit; migrating later is possible by storing the
+algorithm in the hash prefix and re-hashing on login.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

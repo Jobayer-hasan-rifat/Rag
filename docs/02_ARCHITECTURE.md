@@ -119,12 +119,14 @@ backend/
 │   │   ├── error_handlers.py
 │   │   └── responses.py    # Response/error envelope builders
 │   ├── schemas/            # Pydantic API schemas
-│   ├── services/           # Service layer (HealthService so far)
-│   ├── db/                 # Declarative base, async engine/session, DB probe
+│   ├── services/           # Service layer (AuthService, HealthService)
+│   ├── models/             # SQLAlchemy models (User, Role, RefreshToken)
+│   ├── db/                 # Base, async engine/session, DB probe, repositories/
+│   ├── security/           # Password hashing, JWT, refresh tokens, denylist, rate limit, RBAC helpers
 │   ├── observability/      # JSON logging, request-ID context
 │   ├── workers/            # Celery app and tasks
 │   └── storage/            # StorageProvider interface (no implementation yet)
-├── alembic/                # Migrations (0001 enables pgvector)
+├── alembic/                # Migrations (0001 pgvector, 0002 users/roles/refresh_tokens)
 └── tests/                  # unit, api, integration
 ```
 
@@ -358,36 +360,42 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant User
+    participant C as Client
     participant API
-    participant Auth_Service
-    participant DB
-    participant Redis
-    
-    User->>API: Login (email, password)
-    API->>Auth_Service: Authenticate
-    Auth_Service->>DB: Find user
-    DB-->>Auth_Service: User data
-    Auth_Service->>Auth_Service: Verify password
-    Auth_Service->>Auth_Service: Generate tokens
-    Auth_Service->>DB: Store refresh token (hashed)
-    Auth_Service-->>API: Access + Refresh tokens
-    API-->>User: Tokens in response
-    
-    User->>API: Request with access token
-    API->>API: Validate token
-    API->>Auth_Service: Get user from token
-    Auth_Service-->>API: User data
-    API->>API: Process request
-    API-->>User: Response
-    
-    User->>API: Refresh access token
-    API->>Auth_Service: Validate refresh token
-    Auth_Service->>DB: Check refresh token
-    DB-->>Auth_Service: Token valid
-    Auth_Service->>Auth_Service: Generate new access token
-    Auth_Service-->>API: New access token
-    API-->>User: New token
+    participant Auth as AuthService
+    participant DB as PostgreSQL
+    participant R as Redis
+
+    C->>API: POST /auth/login (email, password)
+    API->>R: Rate limit (client IP, account)
+    API->>Auth: login()
+    Auth->>DB: Find user by email
+    Auth->>Auth: bcrypt verify (dummy hash if unknown)
+    Auth->>DB: Store SHA-256 of new refresh token (new family)
+    Auth-->>C: Access JWT (15 min) + opaque refresh token
+
+    C->>API: Request with Bearer access token
+    API->>Auth: authenticate()
+    Auth->>Auth: Verify signature, exp, iss, aud, type
+    Auth->>R: Denylist check (jti)
+    Auth->>DB: Load active user and role
+    Auth-->>API: Current user (role from DB)
+
+    C->>API: POST /auth/refresh
+    API->>Auth: refresh()
+    Auth->>DB: Lock token row by hash
+    alt token already used or revoked
+        Auth->>DB: Revoke whole token family
+        Auth-->>C: 401
+    else valid
+        Auth->>DB: Revoke old token, insert new token in same family
+        Auth-->>C: New access + refresh tokens
+    end
+
+    C->>API: POST /auth/logout
+    Auth->>DB: Revoke token family
+    Auth->>R: Denylist access token jti until expiry
+    Auth-->>C: 204
 ```
 
 ## Storage Architecture

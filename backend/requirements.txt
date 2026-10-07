@@ -12,6 +12,8 @@ anyio==4.15.1
     #   watchfiles
 asyncpg==0.32.0
     # via rag-backend (pyproject.toml)
+bcrypt==5.0.0
+    # via rag-backend (pyproject.toml)
 billiard==4.3.1
     # via celery
 celery==5.6.3
@@ -29,6 +31,10 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.4.1
     # via celery
+dnspython==2.8.0
+    # via email-validator
+email-validator==2.3.0
+    # via rag-backend (pyproject.toml)
 fastapi==0.142.4
     # via rag-backend (pyproject.toml)
 greenlet==3.5.6
@@ -38,7 +44,9 @@ h11==0.16.0
 httptools==0.8.0
     # via uvicorn
 idna==3.20
-    # via anyio
+    # via
+    #   anyio
+    #   email-validator
 kombu==5.6.2
     # via celery
 mako==1.4.3
@@ -61,7 +69,9 @@ pydantic-core==2.46.5
 pydantic-settings==2.15.0
     # via rag-backend (pyproject.toml)
 pyjwt==2.15.1
-    # via redis
+    # via
+    #   rag-backend (pyproject.toml)
+    #   redis
 python-dateutil==2.9.0.post0
     # via celery
 python-dotenv==1.2.4

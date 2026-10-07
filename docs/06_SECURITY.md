@@ -44,78 +44,56 @@ graph TB
 
 ### Password Security
 
-**Requirements**:
-- Minimum 8 characters
-- At least 1 uppercase letter
-- At least 1 lowercase letter
-- At least 1 digit
-- No common passwords (check against breach database - future)
+**Algorithm**: bcrypt via the `bcrypt` library. The work factor is configurable
+(`BCRYPT_COST_FACTOR`, default 12) and must be at least 12 in staging and production.
+Argon2id is a reasonable future alternative; bcrypt is the project standard (DEC-017).
 
-**Implementation**:
-```python
-import bcrypt
+**Policy** (enforced by the registration schema): 8-72 bytes (bcrypt ignores input beyond 72
+bytes, so longer passwords are rejected rather than silently truncated), at least one
+uppercase letter, one lowercase letter and one digit. A breached/common-password check is a
+future enhancement.
 
-# Hashing with bcrypt, cost factor 12
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt(rounds=12)
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed.decode('utf-8')
+**Handling**:
+- Hashing and verification run in a worker thread so they do not block the event loop.
+- Login always performs one bcrypt comparison, using a dummy hash for unknown accounts, so
+  response time does not reveal whether an account exists.
+- Passwords and hashes are never returned by the API, never logged, and never echoed in validation errors.
 
-# Verification
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.verify(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-```
+### Access Tokens (JWT)
 
-**Why bcrypt**:
-- Built-in salt
-- Adjustable cost factor (future-proof)
-- Resistant to GPU/ASIC attacks
-- Industry standard
+- Signed with HMAC (`HS256` by default; `HS384`/`HS512` allowed) using `JWT_SECRET_KEY` (at
+  least 32 characters; placeholder values are rejected outside development). The accepted
+  algorithm is pinned to the configured one, so `none` and algorithm-confusion tokens fail.
+- Lifetime 15 minutes (`ACCESS_TOKEN_EXPIRE_MINUTES`).
+- Claims: `sub` (user id), `jti`, `type` (`access`), `iss`, `aud`, `iat`, `exp`. All are required
+  and validated. No email, role, password or other personal data is placed in the token.
+- The user's **role and active status are read from the database on every request**, never from the token, so
+  deactivation and role changes take effect immediately (DEC-013).
+- Logout adds the token's `jti` to a Redis denylist until its natural expiry. If the denylist is
+  unreachable, authenticated requests fail closed with 503.
 
-### JWT Token Security
+### Refresh Tokens
 
-**Access Token**:
-- Algorithm: HS256 or RS256
-- Expiry: 15 minutes
-- Contains: user_id, role, exp, iat, jti
-- Stored: Client-side (memory or httpOnly cookie)
-
-**Refresh Token**:
-- Expiry: 7 days
-- Stored: Database (hashed with SHA-256)
-- One-time use (rotated on refresh)
-- Revoked on logout
-
-**Token Structure**:
-```json
-{
-  "sub": "user_uuid",
-  "role": "user",
-  "exp": 1602083200,
-  "iat": 1602082300,
-  "jti": "unique_token_id"
-}
-```
-
-**Security Measures**:
-- Short expiry on access tokens limits exposure window
-- Refresh tokens hashed before database storage
-- Token rotation prevents replay attacks
-- Revocation list for compromised tokens
+- Opaque 384-bit random values (not JWTs). Only a SHA-256 digest is stored, so a database leak
+  does not yield usable tokens.
+- Single use with rotation: every refresh revokes the presented token and issues a new one in the same *family* (one family per login).
+- **Reuse detection**: presenting a token that was already rotated or revoked revokes the whole family, ending
+  that session for both the thief and the victim, and logs a warning.
+- Lifetime 7 days (`REFRESH_TOKEN_EXPIRE_DAYS`). Rows are locked (`SELECT ... FOR UPDATE`) while
+  rotating, so concurrent use of one token cannot yield two valid successors.
 
 ### Session Management
 
-**Requirements**:
-- One active session per user (configurable)
-- Session invalidation on password change
-- Session invalidation on logout
-- Automatic cleanup of expired sessions
+- Multiple concurrent sessions per user are allowed (one family each); logout ends one session.
+- Deactivating a user invalidates access immediately and revokes the family on next refresh.
+- Planned: revoke all sessions on password change; scheduled cleanup of expired rows.
 
-**Implementation**:
-- Refresh tokens stored in database with expiration
-- Cleanup job runs daily to remove expired tokens
-- On logout, mark refresh token as revoked
-- On password change, revoke all refresh tokens for user
+### Brute Force and Enumeration
+
+- Login, registration and refresh are rate limited in Redis (see Rate Limiting).
+- Login failures return one generic 401 regardless of cause.
+- Registration returns a neutral 409 for an existing email. This still reveals existence; it is
+  mitigated by rate limiting and accepted until email verification exists (AUD-013).
 
 ## Authorization Security
 
@@ -261,24 +239,9 @@ def sanitize_path(base_dir: str, filename: str) -> str:
 
 All input validated with Pydantic schemas:
 
-```python
-from pydantic import BaseModel, EmailStr, Field, validator
-
-class UserCreate(BaseModel):
-    email: EmailStr
-    username: str = Field(..., min_length=3, max_length=50, regex="^[a-zA-Z0-9_]+$")
-    password: str = Field(..., min_length=8)
-    
-    @validator('password')
-    def validate_password(cls, v):
-        if not any(c.isupper() for c in v):
-            raise ValueError('Must contain uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Must contain lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Must contain digit')
-        return v
-```
+`RegisterRequest` (`app/schemas/auth.py`) normalises the email, enforces the password policy and rejects
+unknown fields (`extra="forbid"`), which blocks mass assignment such as `{"role": "admin"}`. Validation messages
+state the rule that failed and never include the submitted value.
 
 ### SQL Injection Prevention
 
@@ -443,26 +406,21 @@ class SecureFormatter(logging.Formatter):
 
 ### Implementation
 
-```python
-from fastapi import FastAPI, Request, HTTPException
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+Authentication endpoints use a fixed-window counter in Redis (`app/security/rate_limit.py`):
 
-limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
+| Scope | Key | Budget (default) |
+|-------|-----|------------------|
+| `register:ip`, `login:ip`, `refresh:ip` | client IP | 10 per 60 s |
+| `login:email` | SHA-256 of the email | 5 x the IP budget per 60 s |
 
-# General API rate limit
-@app.route("/api/")
-@limiter.limit("100/minute")
-async def api_endpoint(request: Request):
-    pass
-
-# Stricter rate limit for auth
-@app.route("/auth/login")
-@limiter.limit("10/minute")
-async def login(request: Request):
-    pass
-```
+- The per-account budget is larger than the per-IP budget so that a single address cannot
+  exhaust it and lock a victim out of their own account; distributed guessing against one
+  account is still capped.
+- Exceeding a budget returns 429 `RATE_LIMIT_EXCEEDED` with a `Retry-After` header.
+- Identifiers are hashed in Redis keys. The client IP is the direct TCP peer; behind a reverse proxy, the
+  proxy must be configured as a trusted source of forwarded headers (tracked in AUD-011).
+- If Redis is unavailable the limiter fails open and logs an error (availability over throttling); the token denylist fails closed.
+- Requires Redis 7+ (`EXPIRE ... NX`). Configure with `RATE_LIMIT_ENABLED`, `RATE_LIMIT_AUTH_ATTEMPTS`, `RATE_LIMIT_WINDOW_SECONDS`; it cannot be disabled in staging/production.
 
 ### Rate Limit Strategy
 
@@ -476,11 +434,7 @@ async def login(request: Request):
 
 ### Response Headers
 
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1602083200
-```
+Throttled responses include `Retry-After` (seconds). `X-RateLimit-*` headers are not implemented.
 
 ## Security Headers
 

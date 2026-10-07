@@ -25,6 +25,15 @@ class Settings(BaseSettings):
 
     jwt_secret_key: SecretStr
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
+    jwt_issuer: str = "rag-platform"
+    jwt_audience: str = "rag-platform-users"
+    access_token_expire_minutes: int = Field(default=15, ge=1, le=60)
+    refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
+    bcrypt_cost_factor: int = Field(default=12, ge=4, le=16)
+
+    rate_limit_enabled: bool = True
+    rate_limit_auth_attempts: int = Field(default=10, ge=1)
+    rate_limit_window_seconds: int = Field(default=60, ge=1)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -73,6 +82,10 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET_KEY must not be a placeholder outside development")
             if self.app_debug:
                 raise ValueError("APP_DEBUG must be false in staging and production")
+            if self.bcrypt_cost_factor < 12:
+                raise ValueError("BCRYPT_COST_FACTOR must be at least 12 in staging and production")
+            if not self.rate_limit_enabled:
+                raise ValueError("RATE_LIMIT_ENABLED must be true in staging and production")
         return self
 
 

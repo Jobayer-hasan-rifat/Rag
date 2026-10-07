@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 2: Authentication & Authorization
+
+- `POST /api/v1/auth/register`, `/login`, `/refresh`, `/logout` and `GET /api/v1/auth/me`
+- User, role and refresh-token tables with Alembic migration `0002` (seeded `user` and `admin` roles)
+- bcrypt password hashing (configurable cost, minimum 12 outside development) and a documented password policy
+- Short-lived JWT access tokens; opaque, single-use refresh tokens stored as SHA-256 with family-based reuse detection
+- Logout revocation: refresh family revoked and access token denylisted in Redis until expiry
+- Reusable FastAPI dependencies for the current user, optional user and required roles; ownership helpers for RBAC
+- Redis rate limiting for registration, login (per IP and per account) and refresh
+- OpenAPI `BearerAuth` security scheme and documented error responses
+
+### Changed
+
+- Phase 0 draft of the user model: `display_name` replaces `username`, `is_superuser` removed (see DEC-014)
+- `/auth/refresh` now rotates and returns a new refresh token; `/auth/me` replaces `/users/me` (see DEC-013)
+- Login returns a generic 401 for deactivated accounts (see DEC-015)
+
 ### Added - Phase 1: Infrastructure
 
 - FastAPI application factory with `/health`, `/health/live`, `/health/ready` and the versioned `/api/v1/health` routes

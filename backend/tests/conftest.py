@@ -1,8 +1,12 @@
 import os
+import uuid
 from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from typing import Any
 
 import pytest
+import redis as redis_sync
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # Importing app.workers.celery_app builds a Celery app from settings at import time.
@@ -66,6 +70,8 @@ def make_settings() -> SettingsFactory:
             "jwt_secret_key": TEST_JWT_SECRET,
             "cors_origins": ["http://localhost:5173"],
             "log_level": "WARNING",
+            "bcrypt_cost_factor": 4,
+            "rate_limit_auth_attempts": 1000,
         }
         values.update(overrides)
         return Settings(_env_file=None, **values)
@@ -94,3 +100,64 @@ def offline_client(make_settings: SettingsFactory) -> Iterator[TestClient]:
 def infra_client(infra_settings: Settings) -> Iterator[TestClient]:
     with TestClient(create_app(infra_settings), raise_server_exceptions=False) as client:
         yield client
+
+
+@pytest.fixture(scope="session")
+def migrated_database_url(postgres_url: str) -> Iterator[str]:
+    """A dedicated database migrated to head with the real Alembic migrations."""
+    from sqlalchemy.engine import make_url
+
+    from tests.helpers import db_autocommit, upgrade
+
+    name = f"app_{uuid.uuid4().hex[:12]}"
+    db_autocommit(postgres_url, f'CREATE DATABASE "{name}"')
+    url = make_url(postgres_url).set(database=name).render_as_string(hide_password=False)
+    upgrade(url)
+    yield url
+    db_autocommit(postgres_url, f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+@pytest.fixture
+def clean_auth_state(migrated_database_url: str, redis_url: str) -> None:
+    from tests.helpers import db_execute
+
+    db_execute(migrated_database_url, "TRUNCATE refresh_tokens, users RESTART IDENTITY CASCADE")
+    client = redis_sync.Redis.from_url(f"{redis_url}/0")
+    try:
+        client.flushdb()
+    finally:
+        client.close()
+
+
+ClientFactory = Callable[..., TestClient]
+
+
+@pytest.fixture
+def auth_client_factory(
+    make_settings: SettingsFactory,
+    migrated_database_url: str,
+    redis_url: str,
+    clean_auth_state: None,
+) -> Iterator[ClientFactory]:
+    stack = ExitStack()
+
+    def factory(configure: Callable[[FastAPI], None] | None = None, **overrides: Any) -> TestClient:
+        settings = make_settings(
+            database_url=migrated_database_url,
+            redis_url=f"{redis_url}/0",
+            celery_broker_url=f"{redis_url}/1",
+            celery_result_backend=f"{redis_url}/2",
+            **overrides,
+        )
+        app = create_app(settings)
+        if configure:
+            configure(app)
+        return stack.enter_context(TestClient(app, raise_server_exceptions=False))
+
+    yield factory
+    stack.close()
+
+
+@pytest.fixture
+def auth_client(auth_client_factory: ClientFactory) -> TestClient:
+    return auth_client_factory()

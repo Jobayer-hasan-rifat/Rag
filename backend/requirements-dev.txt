@@ -13,6 +13,8 @@ anyio==4.15.1
     #   watchfiles
 asyncpg==0.32.0
     # via rag-backend (pyproject.toml)
+bcrypt==5.0.0
+    # via rag-backend (pyproject.toml)
 billiard==4.3.1
     # via celery
 black==26.10.0
@@ -44,8 +46,12 @@ colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
 coverage==7.16.2
     # via pytest-cov
+dnspython==2.8.0
+    # via email-validator
 docker==7.2.0
     # via testcontainers
+email-validator==2.3.0
+    # via rag-backend (pyproject.toml)
 fastapi==0.142.4
     # via rag-backend (pyproject.toml)
 greenlet==3.5.6
@@ -63,6 +69,7 @@ httpx==0.28.1
 idna==3.20
     # via
     #   anyio
+    #   email-validator
     #   httpx
     #   requests
 iniconfig==2.3.1
@@ -112,7 +119,9 @@ pydantic-settings==2.15.0
 pygments==2.21.0
     # via pytest
 pyjwt==2.15.1
-    # via redis
+    # via
+    #   rag-backend (pyproject.toml)
+    #   redis
 pytest==9.1.1
     # via
     #   rag-backend (pyproject.toml)

@@ -13,6 +13,9 @@ dependencies = [
     "alembic>=1.14,<2",
     "redis>=5.2,<6",
     "celery>=5.4,<6",
+    "pyjwt>=2.10,<3",
+    "bcrypt>=4.2,<6",
+    "email-validator>=2.2,<3",
 ]
 
 [project.optional-dependencies]
@@ -77,4 +80,5 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["app"]
+concurrency = ["thread", "greenlet"]
 omit = ["app/workers/celery_app.py"]

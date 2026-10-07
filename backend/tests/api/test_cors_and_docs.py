@@ -27,7 +27,7 @@ def test_preflight_for_allowed_origin_succeeds(offline_client: TestClient) -> No
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
-def test_openapi_documents_versioned_health_routes_only(offline_client: TestClient) -> None:
+def test_openapi_documents_versioned_routes_only(offline_client: TestClient) -> None:
     schema = offline_client.get("/openapi.json").json()
 
     assert schema["info"]["title"] == "RAG-Platform"
@@ -35,6 +35,11 @@ def test_openapi_documents_versioned_health_routes_only(offline_client: TestClie
         "/api/v1/health",
         "/api/v1/health/live",
         "/api/v1/health/ready",
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/me",
     }
 
 

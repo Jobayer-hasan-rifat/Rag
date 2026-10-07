@@ -30,10 +30,10 @@ erDiagram
     User {
         uuid id PK
         string email UK
-        string username UK
-        string hashed_password
+        string display_name
+        string password_hash
         boolean is_active
-        boolean is_superuser
+        int role_id FK
         datetime created_at
         datetime updated_at
         datetime deleted_at
@@ -49,6 +49,7 @@ erDiagram
     RefreshToken {
         uuid id PK
         uuid user_id FK
+        uuid family_id
         string token_hash UK
         datetime expires_at
         datetime revoked_at
@@ -156,68 +157,55 @@ erDiagram
 
 #### users
 
-Primary user table with soft delete support.
+Accounts. Soft-deleted via `deleted_at` (rows are retained for audit; the email stays reserved).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
-| email | VARCHAR(255) | UNIQUE, NOT NULL | User email address |
-| username | VARCHAR(50) | UNIQUE, NOT NULL | Display username |
-| hashed_password | VARCHAR(255) | NOT NULL | Bcrypt hashed password |
-| is_active | BOOLEAN | NOT NULL, DEFAULT true | Account active status |
-| is_superuser | BOOLEAN | NOT NULL, DEFAULT false | Admin flag |
-| role_id | INTEGER | FOREIGN KEY, NOT NULL | Reference to role |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Creation timestamp |
-| updated_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Last update timestamp |
-| deleted_at | TIMESTAMP WITH TIME ZONE | NULLABLE | Soft delete timestamp |
+| email | VARCHAR(255) | UNIQUE, NOT NULL, CHECK (email = lower(email)) | Normalised (trimmed, lowercased) address |
+| display_name | VARCHAR(100) | NOT NULL, CHECK (1-100 characters) | Name shown in the UI; not unique |
+| password_hash | VARCHAR(255) | NOT NULL | bcrypt hash (never the password) |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | Deactivated accounts cannot authenticate |
+| role_id | INTEGER | FOREIGN KEY roles(id) ON DELETE RESTRICT, NOT NULL | The user's role |
+| deleted_at | TIMESTAMPTZ | NULLABLE | Soft-delete timestamp |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW(), refreshed by the ORM on update | Last update |
 
-**Indexes**:
-- `idx_users_email` on `email` (for login lookups)
-- `idx_users_username` on `username` (for profile lookups)
-- `idx_users_role_id` on `role_id` (foreign key)
+**Indexes**: `uq_users_email` (unique; serves login lookups), `ix_users_role_id` (foreign key).
 
-**Constraints**:
-- `chk_users_email_format` - Valid email format
-- `chk_users_username_length` - Username 3-50 characters
+**Design notes**: There is no `is_superuser` flag; the role is the single source of truth for
+privilege. There is no unique `username`; the email is the login identifier and `display_name`
+is only presentation (see DEC-014).
 
 #### roles
 
-Role definitions for RBAC.
-
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | SERIAL | PRIMARY KEY | Auto-increment ID |
-| name | VARCHAR(50) | UNIQUE, NOT NULL | Role name (user, admin) |
-| description | TEXT | NULLABLE | Role description |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Creation timestamp |
+| id | INTEGER | PRIMARY KEY (identity) | Identifier |
+| name | VARCHAR(50) | UNIQUE, NOT NULL | `user` or `admin` |
+| description | TEXT | NULLABLE | Description |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
 
-**Default Data**:
-```sql
-INSERT INTO roles (name, description) VALUES 
-    ('user', 'Standard user with basic permissions'),
-    ('admin', 'Administrator with full permissions');
-```
+Seeded by migration `0002` with `user` and `admin`.
 
 #### refresh_tokens
 
-Refresh tokens for JWT authentication.
+One row per issued refresh token. Tokens are opaque random values; only their SHA-256 digest is stored.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier |
-| user_id | UUID | FOREIGN KEY, NOT NULL | Reference to user |
-| token_hash | VARCHAR(255) | UNIQUE, NOT NULL | SHA-256 hash of token |
-| expires_at | TIMESTAMP WITH TIME ZONE | NOT NULL | Token expiration |
-| revoked_at | TIMESTAMP WITH TIME ZONE | NULLABLE | Revocation timestamp |
-| created_at | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT NOW() | Creation timestamp |
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| user_id | UUID | FOREIGN KEY users(id) ON DELETE CASCADE, NOT NULL | Owner |
+| family_id | UUID | NOT NULL | Shared by every token in one login session (rotation chain) |
+| token_hash | VARCHAR(64) | UNIQUE, NOT NULL | Hex SHA-256 of the token |
+| expires_at | TIMESTAMPTZ | NOT NULL, CHECK (expires_at > created_at) | Expiry (7 days by default) |
+| revoked_at | TIMESTAMPTZ | NULLABLE | Set when rotated, logged out or revoked |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
 
-**Indexes**:
-- `idx_refresh_tokens_user_id` on `user_id` (for user's tokens)
-- `idx_refresh_tokens_token_hash` on `token_hash` (unique lookup)
-- `idx_refresh_tokens_expires_at` on `expires_at` (for cleanup)
+**Indexes**: `uq_refresh_tokens_token_hash`, `ix_refresh_tokens_user_id`,
+`ix_refresh_tokens_family_id`, `ix_refresh_tokens_expires_at` (for cleanup).
 
-**Constraints**:
-- `fk_refresh_tokens_user` FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+**Cascade**: deleting a user deletes their refresh tokens; a role that is in use cannot be deleted.
 
 ### Documents & Collections
 

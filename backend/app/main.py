@@ -12,6 +12,8 @@ from app.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
 from app.observability.logging import configure_logging, get_logger
 from app.redis import create_redis_client
+from app.security.jwt import JWTService
+from app.security.password import PasswordHasher
 
 logger = get_logger("app.main")
 
@@ -27,6 +29,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.session_factory = create_session_factory(engine)
         app.state.redis = redis
+        app.state.password_hasher = PasswordHasher(settings.bcrypt_cost_factor)
+        app.state.jwt_service = JWTService(settings)
         logger.info("application started", extra={"version": __version__})
         try:
             yield

@@ -630,6 +630,14 @@ This document details the technology stack for the Intelligent Document Processi
 Dependency ranges live in `backend/pyproject.toml`; exact pins live in
 `backend/requirements.txt` and `backend/requirements-dev.txt` (regenerate with `make lock`).
 
+## Phase 2 Dependency Choices
+
+| Dependency | Why | Alternative not chosen |
+|------------|-----|------------------------|
+| `bcrypt` | The project's documented password-hashing standard; maintained, no wrapper needed | `passlib` (unmaintained), Argon2id (see DEC-017) |
+| `PyJWT` | Small, actively maintained, explicit algorithm pinning | `python-jose` (stagnant, past CVEs) |
+| `email-validator` | Pydantic's `EmailStr` backend; syntax and IDNA normalisation without DNS lookups | Hand-written regex |
+
 ## Technology Summary Table
 
 | Category | Technology | Purpose | Key Reason |
