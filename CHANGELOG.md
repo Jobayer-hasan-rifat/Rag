@@ -1,0 +1,180 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added - 2026-10-07
+
+#### Project Foundation
+- Initial project structure and architecture documentation
+- Comprehensive engineering documentation system in `docs/`
+- Project overview in `README.md`
+- Detailed project plan with 17 development phases
+- Contributing guidelines
+- Code of conduct placeholder
+- MIT license
+
+#### Architecture Documentation
+- System architecture design with modular monolith pattern
+- Database schema design with 10+ entities
+- Complete API specification for all endpoints
+- Security model
+- AI/RAG architecture with provider abstraction
+- Document processing pipeline design
+- Search and retrieval strategy
+- Testing strategy
+- Evaluation strategy
+- Performance strategy
+- Observability design
+- Error handling design
+- Coding standards
+- Git workflow
+
+#### Security Documentation
+- Comprehensive security requirements
+- Threat model covering file, RAG, authorization, API, and infrastructure threats
+- Security controls for authentication, file handling, and input validation
+
+#### Database Design
+- Entity-relationship diagram for all models
+- User, Role, Collection, Document, DocumentVersion models
+- DocumentChunk with vector column design
+- Conversation, Message, Citation models
+- EvaluationRun, EvaluationResult models
+- RefreshToken model for authentication
+
+#### API Specification
+- Authentication endpoints (register, login, logout, refresh)
+- User management endpoints
+- Document CRUD endpoints
+- Collection management endpoints
+- Search endpoints (semantic, keyword, hybrid)
+- Conversation endpoints
+- RAG query endpoint
+- Evaluation endpoints
+- Health check endpoints
+
+#### Development Infrastructure
+- `.gitignore` for Python, Node.js, IDE files
+- `.env.example` with all required environment variables
+- Directory structure design
+
+### Changed
+- None (initial release)
+
+### Deprecated
+- None
+
+### Removed
+- None
+
+### Fixed
+- None
+
+### Security
+- Established security-first development approach
+- Documented threat model before implementation
+- Defined security requirements for all phases
+
+---
+
+## Release Phases
+
+### Phase 0: Foundation & Architecture ✅
+**Status**: Complete
+
+- Complete documentation system established
+- Architecture designed and documented
+- Database schema designed
+- API specification created
+- Security model defined
+- Threat model created
+- Testing strategy defined
+- Project initialized
+
+### Phase 1: Infrastructure
+**Status**: Pending
+
+### Phase 2: Authentication
+**Status**: Pending
+
+### Phase 3: Document Management
+**Status**: Pending
+
+### Phase 4: Document Processing
+**Status**: Pending
+
+### Phase 5: Embeddings & Vector Search
+**Status**: Pending
+
+### Phase 6: Hybrid Retrieval
+**Status**: Pending
+
+### Phase 7: Reranking
+**Status**: Pending
+
+### Phase 8: RAG
+**Status**: Pending
+
+### Phase 9: Conversations
+**Status**: Pending
+
+### Phase 10: Versioning & Access Control
+**Status**: Pending
+
+### Phase 11: Evaluation
+**Status**: Pending
+
+### Phase 12: Frontend
+**Status**: Pending
+
+### Phase 13: Security Hardening
+**Status**: Pending
+
+### Phase 14: Performance & Benchmarking
+**Status**: Pending
+
+### Phase 15: CI/CD & Deployment
+**Status**: Pending
+
+### Phase 16: Final Audit & Portfolio Preparation
+**Status**: Pending
+
+---
+
+## Version History
+
+This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH format.
+
+- **MAJOR**: Breaking changes to API or architecture
+- **MINOR**: New features, backwards compatible
+- **PATCH**: Bug fixes, backwards compatible
+
+### Version Milestones (Planned)
+
+| Version | Milestone | Description |
+|---------|-----------|-------------|
+| 0.1.0 | Phase 1 Complete | Infrastructure working |
+| 0.2.0 | Phase 2 Complete | Authentication working |
+| 0.3.0 | Phase 3 Complete | Document management working |
+| 0.4.0 | Phase 4 Complete | Document processing working |
+| 0.5.0 | Phase 5 Complete | Vector search working |
+| 0.6.0 | Phase 6 Complete | Hybrid search working |
+| 0.7.0 | Phase 7 Complete | Reranking working |
+| 0.8.0 | Phase 8 Complete | RAG working |
+| 0.9.0 | Phase 9 Complete | Conversations working |
+| 0.10.0 | Phase 10 Complete | Versioning & access control working |
+| 0.11.0 | Phase 11 Complete | Evaluation framework working |
+| 0.12.0 | Phase 12 Complete | Frontend working |
+| 0.13.0 | Phase 13 Complete | Security hardened |
+| 0.14.0 | Phase 14 Complete | Performance optimized |
+| 0.15.0 | Phase 15 Complete | CI/CD established |
+| 1.0.0 | Phase 16 Complete | Production ready |
+
+---
+
+[Unreleased]: https://github.com/username/rag-platform/compare/v0.0.0...HEAD
