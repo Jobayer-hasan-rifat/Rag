@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 4: Document Processing
+
+- Asynchronous processing pipeline: upload queues a Celery task; a worker extracts, normalises and stores each document's text and marks it `ready` (or `failed`)
+- Extractors behind a common interface for PDF (PyMuPDF, page-aware), DOCX (python-docx, headings and tables), Markdown (heading-aware) and plain text
+- Conservative Unicode-safe normalisation that preserves Bangla, ZWJ/ZWNJ, case and punctuation; script profile (Bengali/Latin/mixed) stored per document
+- `document_sections` table and processing columns on `documents` (migration `0004`): page count, character count, timestamps, attempts, failure reason, metadata
+- `POST /api/v1/documents/{id}/retry`; document responses now include processing state, counts and `failure_reason`
+- Classified failures with safe messages, bounded retries with backoff, atomic claiming, and a Celery beat recovery sweep for stuck or lost work
+- Configurable limits (pages, text size, DOCX archive size, time budget, worker recycling), a hardened worker container (read-only filesystem, dropped capabilities, memory and process caps) and a `celery_beat` service
+- Benchmark script `benchmarks/processing_baseline.py`
+
+### Changed
+
+- Lifecycle: `parsing` now means "being processed"; added `parsing -> ready` and `parsing -> pending` transitions (see DEC-025)
+- Worker consumes the `processing` queue in addition to the default queue
+- API task publishing no longer subscribes to Celery result channels
+
 ### Added - Phase 3: Document Management
 
 - Collections (`/api/v1/collections`): create, list, get, rename, delete, and add or remove documents

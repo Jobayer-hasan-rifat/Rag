@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     max_upload_bytes: int = Field(default=52_428_800, ge=1024, le=1_073_741_824)
     max_storage_bytes_per_user: int = Field(default=1_073_741_824, ge=1024)
 
+    processing_max_attempts: int = Field(default=3, ge=1, le=10)
+    processing_retry_backoff_seconds: int = Field(default=30, ge=0, le=3600)
+    processing_timeout_seconds: int = Field(default=120, ge=2, le=3600)
+    processing_max_pages: int = Field(default=2000, ge=1)
+    processing_max_text_chars: int = Field(default=20_000_000, ge=1000)
+    processing_max_docx_uncompressed_bytes: int = Field(default=200 * 1024 * 1024, ge=1024 * 1024)
+    processing_stale_after_seconds: int = Field(default=300, ge=10)
+    processing_sweep_interval_seconds: int = Field(default=60, ge=5)
+    processing_pending_requeue_after_seconds: int = Field(default=120, ge=10)
+    processing_sweep_batch_size: int = Field(default=100, ge=1, le=1000)
+    worker_max_tasks_per_child: int = Field(default=50, ge=1)
+    worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
+
     rate_limit_enabled: bool = True
     rate_limit_auth_attempts: int = Field(default=10, ge=1)
     rate_limit_window_seconds: int = Field(default=60, ge=1)
@@ -80,6 +93,23 @@ class Settings(BaseSettings):
         if len(secret.get_secret_value()) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
         return secret
+
+    @model_validator(mode="after")
+    def _check_processing_timing(self) -> "Settings":
+        if self.processing_stale_after_seconds <= self.processing_hard_time_limit_seconds:
+            raise ValueError(
+                "PROCESSING_STALE_AFTER_SECONDS must exceed the task hard time limit "
+                "(PROCESSING_TIMEOUT_SECONDS + 45)"
+            )
+        return self
+
+    @property
+    def processing_soft_time_limit_seconds(self) -> int:
+        return self.processing_timeout_seconds + 15
+
+    @property
+    def processing_hard_time_limit_seconds(self) -> int:
+        return self.processing_timeout_seconds + 45
 
     @model_validator(mode="after")
     def _enforce_production_safety(self) -> "Settings":

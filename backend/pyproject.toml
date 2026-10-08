@@ -18,6 +18,8 @@ dependencies = [
     "email-validator>=2.2,<3",
     "python-multipart>=0.0.20,<1",
     "aiofiles>=24.1,<26",
+    "pymupdf>=1.24,<2",
+    "python-docx>=1.1,<2",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +33,7 @@ dev = [
     "black>=26.3.1,<27",
     "mypy>=1.13,<2",
     "types-aiofiles",
+    "fonttools>=4.50,<5",
 ]
 
 [build-system]
@@ -64,7 +67,7 @@ known-first-party = ["app", "tests"]
 known-third-party = ["alembic"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]
+"tests/**" = ["S101", "S105", "S106", "RUF001", "RUF002", "RUF003"]  # tests use deliberate Unicode
 
 [tool.black]
 line-length = 100
@@ -78,8 +81,12 @@ plugins = ["pydantic.mypy"]
 files = ["app", "tests", "alembic/env.py"]
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "testcontainers.*"]
+module = ["celery.*", "testcontainers.*", "fitz.*", "pymupdf.*", "docx.*", "fontTools.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["app.parsers.*", "tests.pdf_factory"]
+disallow_untyped_calls = false
 
 [tool.coverage.run]
 source = ["app"]

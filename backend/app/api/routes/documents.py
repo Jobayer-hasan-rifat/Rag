@@ -15,6 +15,7 @@ from app.db.repositories.document_repository import DocumentFilters, SortField, 
 from app.dependencies import (
     CurrentUser,
     DocumentServiceDep,
+    enforce_retry_rate_limit,
     enforce_upload_rate_limit,
 )
 from app.exceptions import RequestValidationFailedError
@@ -63,6 +64,11 @@ def _to_response(view: DocumentView) -> DocumentResponse:
         checksum_sha256=document.checksum_sha256,
         status=document.status,
         error_message=document.error_message,
+        failure_reason=document.failure_reason,
+        processing_started_at=document.processing_started_at,
+        processing_completed_at=document.processing_completed_at,
+        page_count=document.page_count,
+        character_count=document.character_count,
         collections=[CollectionSummary(id=ref.id, name=ref.name) for ref in view.collections],
         created_at=document.created_at,
         updated_at=document.updated_at,
@@ -165,6 +171,23 @@ async def update_document(
     service: DocumentServiceDep,
 ) -> ResponseEnvelope[DocumentResponse]:
     return envelope(request, _to_response(await service.rename(user, document_id, body.filename)))
+
+
+@router.post(
+    "/{document_id}/retry",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-queue processing of a failed document",
+    responses={
+        **_ERRORS,
+        409: {"model": ErrorResponse, "description": "Only failed documents can be retried"},
+        429: {"model": ErrorResponse, "description": "Too many requests"},
+    },
+    dependencies=[Depends(enforce_retry_rate_limit)],
+)
+async def retry_document(
+    document_id: uuid.UUID, request: Request, user: CurrentUser, service: DocumentServiceDep
+) -> ResponseEnvelope[DocumentResponse]:
+    return envelope(request, _to_response(await service.retry_processing(user, document_id)))
 
 
 @router.get(

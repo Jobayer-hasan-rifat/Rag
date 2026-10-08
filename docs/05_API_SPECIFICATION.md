@@ -272,7 +272,9 @@ All endpoints require authentication and enforce ownership server-side. Response
 keys, filesystem paths or owner IDs. A document that is missing and one that belongs to someone else both
 return 404 (administrators may access any document by ID, but `GET /documents` only lists the caller's own).
 
-Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "collections": [{"id","name"}], "created_at", "updated_at"}`
+Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "failure_reason", "processing_started_at", "processing_completed_at", "page_count", "character_count", "collections": [{"id","name"}], "created_at", "updated_at"}`
+
+**Processing state**: uploads start as `pending` and are processed asynchronously. `status` moves `pending -> parsing -> ready` (or `failed`); `page_count` is set for PDFs and `character_count` once text is stored. For `failed` documents `failure_reason` is a stable code (`corrupt_document`, `encrypted_document`, `empty_document`, `too_many_pages`, `content_too_large`, `timeout`, `storage_missing`, `storage_unavailable`, `extraction_failed`, `database_error`, `retries_exhausted`) and `error_message` a fixed, safe sentence. Stack traces, paths and exception text are never returned. Poll `GET /documents/{id}` for progress.
 
 ### GET /documents
 
@@ -295,7 +297,7 @@ capped (configured maximum plus 1 MiB of multipart overhead) before it is buffer
 actual content are validated (see the security document); a SHA-256 checksum is computed; the file is streamed
 into storage under a generated key; then the record is created. If the record cannot be saved, the stored file is removed.
 
-**Response** (201): the Document with `"status": "pending"`.
+**Response** (201): the Document with `"status": "pending"`. Processing is queued and runs in the background; the request never waits for it.
 
 **Errors**:
 - 401 authentication required; 429 `RATE_LIMIT_EXCEEDED` (default 20 uploads per user per minute, `Retry-After` set)
@@ -316,6 +318,14 @@ Metadata for one document. **Errors**: 404.
 
 Rename the display name: `{"filename": "New name.pdf"}`. The name is sanitised and its extension must match the
 document's type (415 otherwise). The stored file is untouched. **Errors**: 404, 415, 422.
+
+### POST /documents/{id}/retry
+
+Re-queue a **failed** document for processing with a fresh attempt budget. Rate limited per user (same budget as uploads).
+
+**Response** (202): the Document, now `pending` with `failure_reason` and `error_message` cleared.
+
+**Errors**: 401; 404 (missing or not yours); 409 `INVALID_STATE_TRANSITION` if the document is not `failed`; 429.
 
 ### GET /documents/{id}/download
 

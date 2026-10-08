@@ -24,11 +24,19 @@ _PIPELINE = [
 
 # Forward through the pipeline, any in-progress stage may fail, and finished (ready or
 # failed) documents may be re-queued. Deletion is a hard delete, not a status.
+#
+# Phase 4 additions: `parsing` is the "processing" stage of the current pipeline (extract,
+# normalise, persist), so it may complete straight to `ready` (the chunking, embedding and
+# indexing stages arrive in later phases and will replace that shortcut) and may be released
+# back to `pending` for a retry or after a worker crash.
+_FORWARD = {
+    stage: frozenset({_PIPELINE[index + 1], DocumentStatus.FAILED})
+    for index, stage in enumerate(_PIPELINE[:-1])
+}
 ALLOWED_TRANSITIONS: dict[DocumentStatus, frozenset[DocumentStatus]] = {
-    **{
-        stage: frozenset({_PIPELINE[index + 1], DocumentStatus.FAILED})
-        for index, stage in enumerate(_PIPELINE[:-1])
-    },
+    **_FORWARD,
+    DocumentStatus.PARSING: _FORWARD[DocumentStatus.PARSING]
+    | {DocumentStatus.READY, DocumentStatus.PENDING},
     DocumentStatus.READY: frozenset({DocumentStatus.PENDING}),
     DocumentStatus.FAILED: frozenset({DocumentStatus.PENDING}),
 }

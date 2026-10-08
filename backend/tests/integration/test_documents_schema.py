@@ -19,6 +19,7 @@ from app.services.document_service import DocumentService
 from app.storage.local import LocalStorageProvider
 from tests.conftest import SettingsFactory
 from tests.helpers import (
+    RecordingQueue,
     create_user_in_db,
     db_autocommit,
     db_execute,
@@ -266,6 +267,7 @@ async def lifecycle_env(
             documents=DocumentRepository(session),
             collections=CollectionRepository(session),
             storage=LocalStorageProvider(tmp_path / "s"),
+            processing_queue=RecordingQueue(),
             settings=settings,
         )
         yield service, document, settings
@@ -318,3 +320,123 @@ async def test_failure_records_the_error_and_requeue_clears_it(
 
     assert tuple(failed[0]) == ("failed", "unreadable")
     assert tuple(requeued[0]) == ("pending", None)
+
+
+# --- Phase 4: processing columns and document_sections -------------------------------------
+
+INSERT_SECTION = (
+    "INSERT INTO document_sections (document_id, ordinal, kind, page_number, text, char_count) "
+    "VALUES (:d, :o, :k, :p, :t, :c)"
+)
+
+
+def _section(url: str, doc: str, *, ordinal: int = 0, kind: str = "page", page: int | None = 1,
+             text: str = "abc", count: int | None = None) -> None:  # fmt: skip
+    db_execute(
+        url, INSERT_SECTION, d=doc, o=ordinal, k=kind, p=page, t=text,
+        c=len(text) if count is None else count,
+    )  # fmt: skip
+
+
+def test_migration_0004_downgrade_and_upgrade_cycle(database_url: str) -> None:
+    downgrade(database_url, "0003")
+    tables = asyncio.run(_inspect(database_url, lambda c: set(inspect(c).get_table_names())))
+    columns = asyncio.run(
+        _inspect(
+            database_url, lambda c: {col["name"] for col in inspect(c).get_columns("documents")}
+        )
+    )
+    assert "document_sections" not in tables and "documents" in tables
+    assert not {"page_count", "failure_reason", "processing_metadata"} & columns
+
+    upgrade(database_url)
+
+    columns = asyncio.run(
+        _inspect(
+            database_url, lambda c: {col["name"] for col in inspect(c).get_columns("documents")}
+        )
+    )
+    assert {"page_count", "character_count", "failure_reason", "processing_attempts"} <= columns
+
+
+def test_existing_documents_survive_the_migration_with_defaults(database_url: str) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+    downgrade(database_url, "0003")
+    upgrade(database_url)
+
+    row = db_rows(
+        database_url,
+        "SELECT status, processing_attempts, processing_metadata::text, page_count "
+        "FROM documents WHERE id = :d",
+        d=doc,
+    )[0]
+
+    assert tuple(row) == ("pending", 0, "{}", None)
+
+
+def test_sections_store_text_with_matching_character_counts(database_url: str) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+
+    _section(database_url, doc, text="বাংলা 😀")  # non-BMP and Bengali count as characters
+
+    assert (
+        db_scalar(database_url, "SELECT char_count FROM document_sections") == len("বাংলা 😀") == 7
+    )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "constraint"),
+    [
+        ({"count": 99}, "char_count_matches"),
+        ({"kind": "chapter"}, "kind_valid"),
+        ({"kind": "section", "page": 3}, "page_number_iff_page"),
+        ({"kind": "page", "page": None}, "page_number_iff_page"),
+        ({"page": 0}, "page_number_positive"),
+        ({"ordinal": -1}, "ordinal_non_negative"),
+    ],
+)
+def test_section_constraints_reject_bad_rows(
+    database_url: str, kwargs: dict[str, object], constraint: str
+) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+
+    with pytest.raises(IntegrityError, match=constraint):
+        _section(database_url, doc, **kwargs)  # type: ignore[arg-type]
+
+
+def test_section_ordinals_are_unique_per_document_and_cascade_on_delete(database_url: str) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+    _section(database_url, doc, ordinal=0)
+
+    with pytest.raises(IntegrityError, match="uq_document_sections_document_ordinal"):
+        _section(database_url, doc, ordinal=0, page=2)
+    db_execute(database_url, "DELETE FROM documents WHERE id = :d", d=doc)
+
+    assert db_scalar(database_url, "SELECT count(*) FROM document_sections") == 0
+
+
+def test_failure_reason_is_only_allowed_on_failed_documents(database_url: str) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+
+    with pytest.raises(IntegrityError, match="failure_only_when_failed"):
+        db_execute(database_url, "UPDATE documents SET failure_reason = 'x' WHERE id = :d", d=doc)
+    db_execute(
+        database_url,
+        "UPDATE documents SET status='failed', failure_reason='corrupt_document' WHERE id = :d",
+        d=doc,
+    )
+
+
+def test_negative_counts_are_rejected(database_url: str) -> None:
+    user = create_user_in_db(database_url, email="u@example.com")
+    doc = _insert_document(database_url, user)
+
+    for column in ("page_count", "character_count", "processing_attempts"):
+        with pytest.raises(IntegrityError):
+            statement = f"UPDATE documents SET {column} = -1 WHERE id = :d"  # noqa: S608
+            db_execute(database_url, statement, d=doc)

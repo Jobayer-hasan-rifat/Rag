@@ -179,3 +179,14 @@ def register_and_login(
 
 def bearer(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
+
+
+class RecordingQueue:
+    """Stands in for the broker where a test builds DocumentService directly."""
+
+    def __init__(self) -> None:
+        self.enqueued: list[Any] = []
+
+    async def enqueue(self, document_id: Any) -> bool:
+        self.enqueued.append(document_id)
+        return True

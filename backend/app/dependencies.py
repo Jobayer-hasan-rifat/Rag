@@ -23,6 +23,7 @@ from app.services.auth_service import AuthContext, AuthService
 from app.services.collection_service import CollectionService
 from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
+from app.services.processing_queue import ProcessingQueue
 from app.storage.base import StorageProvider
 
 bearer_scheme = HTTPBearer(
@@ -87,6 +88,11 @@ LimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
 def get_storage(request: Request) -> StorageProvider:
     storage: StorageProvider = request.app.state.storage
     return storage
+
+
+def get_processing_queue(request: Request) -> ProcessingQueue:
+    queue: ProcessingQueue = request.app.state.processing_queue
+    return queue
 
 
 def get_auth_service(
@@ -168,6 +174,7 @@ def get_collection_service(
 def get_document_service(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     storage: Annotated[StorageProvider, Depends(get_storage)],
+    processing_queue: Annotated[ProcessingQueue, Depends(get_processing_queue)],
     settings: SettingsDep,
 ) -> DocumentService:
     return DocumentService(
@@ -175,6 +182,7 @@ def get_document_service(
         documents=DocumentRepository(session),
         collections=CollectionRepository(session),
         storage=storage,
+        processing_queue=processing_queue,
         settings=settings,
     )
 
@@ -189,4 +197,12 @@ async def enforce_upload_rate_limit(
     """Runs before the request body is parsed, so throttled clients cost almost nothing."""
     await limiter.check(
         "upload:user", str(user.id), max_attempts=settings.rate_limit_upload_attempts
+    )
+
+
+async def enforce_retry_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    await limiter.check(
+        "retry:user", str(user.id), max_attempts=settings.rate_limit_upload_attempts
     )

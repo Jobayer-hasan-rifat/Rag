@@ -17,6 +17,7 @@ erDiagram
     Role ||--o{ User : contains
     
     Document }o--o{ Collection : belongs_to
+    Document ||--o{ DocumentSection : has
     Document ||--o{ DocumentVersion : has
     Document ||--o{ DocumentChunk : contains
     
@@ -78,6 +79,19 @@ erDiagram
         text error_message
         datetime created_at
         datetime updated_at
+    }
+
+    DocumentSection {
+        uuid id PK
+        uuid document_id FK
+        int ordinal
+        string kind
+        int page_number
+        text heading
+        smallint heading_level
+        text text
+        int char_count
+        datetime created_at
     }
 
     DocumentVersion {
@@ -239,7 +253,14 @@ Metadata for an uploaded file. The file itself lives in object storage, never in
 | file_size | BIGINT | NOT NULL, CHECK (> 0) | Size in bytes |
 | checksum_sha256 | VARCHAR(64) | NOT NULL | Hex SHA-256 of the content |
 | status | VARCHAR(20) | NOT NULL, DEFAULT 'pending', CHECK (valid status) | Lifecycle state |
-| error_message | TEXT | NULLABLE, CHECK (only when status = 'failed') | Failure reason |
+| error_message | TEXT | NULLABLE, CHECK (only when status = 'failed') | Safe, fixed human-readable failure message |
+| failure_reason | VARCHAR(50) | NULLABLE, CHECK (only when status = 'failed') | Machine-readable failure code |
+| page_count | INTEGER | NULLABLE, CHECK (>= 0) | Pages (PDF only; otherwise NULL) |
+| character_count | BIGINT | NULLABLE, CHECK (>= 0) | Characters of normalised text |
+| processing_started_at | TIMESTAMPTZ | NULLABLE | Start of the latest attempt |
+| processing_completed_at | TIMESTAMPTZ | NULLABLE | When the latest attempt ended (ready or failed) |
+| processing_attempts | INTEGER | NOT NULL, DEFAULT 0, CHECK (>= 0) | Attempts in the current retry budget |
+| processing_metadata | JSONB | NOT NULL, DEFAULT '{}' | Extractor, processing version, duration, script profile, sanitised file properties |
 | created_at / updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamps |
 
 **Status values** (see the lifecycle in the architecture document): `pending`, `parsing`, `chunking`,
@@ -249,6 +270,27 @@ Metadata for an uploaded file. The file itself lives in object storage, never in
 listing query); `ix_documents_status`; `uq_documents_storage_key`;
 `uq_documents_user_checksum` unique on `(user_id, checksum_sha256)` (identical content is stored once per user);
 `uq_documents_id_user_id` unique on `(id, user_id)`.
+
+#### document_sections
+
+The normalised text of a document, split at its natural boundaries. This is the input to the chunking phase.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| document_id | UUID | FOREIGN KEY documents(id) ON DELETE CASCADE, NOT NULL | Owning document |
+| ordinal | INTEGER | NOT NULL, CHECK (>= 0), UNIQUE with document_id | Reading order |
+| kind | VARCHAR(10) | NOT NULL, CHECK IN ('page','section','body') | Source structure |
+| page_number | INTEGER | NULLABLE, CHECK (>= 1) | 1-based page; set exactly when `kind = 'page'` |
+| heading | TEXT | NULLABLE | Section heading text |
+| heading_level | SMALLINT | NULLABLE, CHECK (1-9) | Heading level |
+| text | TEXT | NOT NULL | Normalised text (may be empty for blank pages) |
+| char_count | INTEGER | NOT NULL, CHECK (= char_length(text)) | Characters in `text` |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
+
+**Indexes**: `uq_document_sections_document_ordinal`, `ix_document_sections_document_page` on `(document_id, page_number)`.
+
+Text is stored once, in sections; chunks (Phase 5) will reference sections by position instead of duplicating whole documents.
 
 #### document_collections
 

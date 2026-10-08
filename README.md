@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 3 complete (Document management). Processing and search are not implemented yet.
+> **Status**: 🚧 In Development - Phase 4 complete (Document processing). Chunking, embeddings, search and RAG are not implemented yet.
 
 ## Overview
 
@@ -20,7 +20,11 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
-Infrastructure, authentication and secure document management; documents are stored and managed but not yet parsed, searched or used for answers.
+Infrastructure, authentication, secure document management and asynchronous text extraction; documents are processed into clean, page-aware text but not yet chunked, embedded, searched or used for answers.
+
+- Background processing (Celery + Redis) of PDF, DOCX, TXT and Markdown into normalised text with page and heading locations
+- Bangla, English and mixed-script documents are preserved (Unicode-safe normalisation, ZWJ/ZWNJ kept, no translation)
+- Classified, safe failure reasons, bounded retries, manual retry, and automatic recovery of stuck work
 
 - Upload PDF, DOCX, TXT and Markdown with content validation, checksums and per-user duplicate detection
 - Collections, filtered and paginated listing, metadata, streaming download and deletion, all owner-scoped
@@ -147,7 +151,7 @@ PostgreSQL and Redis are published on `127.0.0.1` only. If a host port is taken 
 | View logs | `docker compose logs -f backend celery_worker` |
 | Run migrations manually | `docker compose run --rm migrate alembic upgrade head` |
 | Roll back one migration | `docker compose run --rm migrate alembic downgrade -1` |
-| Start the worker only | `docker compose up -d celery_worker` |
+| Start the worker only | `docker compose up -d celery_worker celery_beat` |
 
 Working on the backend on the host (Python 3.12+; `make` is optional, the raw commands work everywhere):
 
@@ -179,7 +183,7 @@ npm run typecheck && npm run build
 ```
 /
 ├── backend/             # FastAPI application, Celery workers, Alembic migrations, tests
-│   ├── app/             # api, services, db, workers, storage, observability, schemas
+│   ├── app/             # api, services, db, workers, parsers, storage, observability, schemas
 │   ├── alembic/         # Database migrations
 │   └── tests/           # unit, api, integration
 ├── frontend/            # React + TypeScript + Vite application shell
@@ -196,7 +200,7 @@ npm run typecheck && npm run build
 | 1 | Infrastructure | ✅ Complete |
 | 2 | Authentication | ✅ Complete |
 | 3 | Document Management | ✅ Complete |
-| 4 | Document Processing | ⏳ Pending |
+| 4 | Document Processing | ✅ Complete |
 | 5 | Embeddings & Vector Search | ⏳ Pending |
 | 6 | Hybrid Retrieval | ⏳ Pending |
 | 7 | Reranking | ⏳ Pending |
@@ -235,7 +239,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 3): 582 tests passing and 1 POSIX-only test skipped on Windows (unit, API and infrastructure integration),
+Current state (Phase 3): 726 tests passing and 1 POSIX-only test skipped on Windows (unit, API and infrastructure integration),
 about 99% line coverage of `app/`. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
@@ -267,7 +271,18 @@ See the [Security Overview](docs/06_SECURITY.md) for details.
 
 ## Performance
 
-Performance benchmarks will be established during Phase 14:
+Document processing baseline (Phase 4, extraction + normalisation only, median of 5 runs; AMD64 Family 25 desktop CPU, Python 3.12, PyMuPDF 1.28; reproduce with `python -m benchmarks.processing_baseline` from `backend/`):
+
+| Document | Chars | Extract | Normalise | Total | Throughput |
+|----------|------:|--------:|----------:|------:|-----------:|
+| PDF 100 pages, English | 202,500 | 97 ms | 43 ms | 157 ms | 1.3 M chars/s |
+| PDF 100 pages, Bangla | 202,500 | 115 ms | 60 ms | 211 ms | 1.0 M chars/s |
+| PDF 100 pages, mixed | 202,500 | 160 ms | 62 ms | 257 ms | 0.8 M chars/s |
+| DOCX 2,000 paragraphs | 955,950 | 110 ms | 245 ms | 483 ms | 2.0 M chars/s |
+| TXT 5 MB | 2,862,450 | 3 ms | 726 ms | 1.1 s | 2.6 M chars/s |
+| Markdown 2,000 headings | 537,783 | 11 ms | 121 ms | 177 ms | 3.0 M chars/s |
+
+These exclude storage reads, database writes and queueing. Remaining benchmarks are planned for Phase 14:
 
 - Document parsing throughput
 - Embedding generation latency

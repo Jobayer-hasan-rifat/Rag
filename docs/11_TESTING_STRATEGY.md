@@ -552,6 +552,11 @@ Tests marked `integration` need real PostgreSQL/Redis.
 - The Celery test starts a real worker thread against real Redis.
 - PostgreSQL and Redis are never mocked.
 
+**Phase 4 results (2026-10-09)**: 727 tests (726 pass; 1 POSIX-permissions test is skipped on Windows and runs in CI), about 99% line coverage of `app/`.
+New coverage: extractors for every format (Bangla, mixed Bangla/English, ZWJ/ZWNJ, blank pages, encrypted, truncated and corrupt PDFs, DOCX headings/tables, archive bombs, XXE, Markdown code fences),
+the normaliser (NFC, joiners, whitespace, artefacts, idempotence), the script profile, the pipeline against real PostgreSQL and local storage (success, every failure class, bounded retries, concurrent claims, stale-worker recovery, sweep, deletion during processing, log hygiene), and a real Celery worker consuming the real Redis broker (upload to `ready`, failure, manual retry, transient-failure retry, recovery sweep, broker outage at upload).
+Test Bangla PDFs are generated with a synthetic font (see `tests/pdf_factory.py`), so extraction is verified without a font file; shaping and rendering are not tested.
+
 **Phase 3 results (2026-10-08)**: 583 tests (582 pass; 1 POSIX-permissions test is skipped on Windows and runs in CI) cover unit, API and
 integration levels, with about 99% line coverage of `app/`. Document tests run through the real HTTP API against real
 PostgreSQL, Redis and a real local storage directory (a fresh temporary directory per test): upload of every format, MIME spoofing,

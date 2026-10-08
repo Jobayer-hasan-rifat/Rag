@@ -127,11 +127,12 @@ def clean_auth_state(migrated_database_url: str, redis_url: str) -> None:
     from tests.helpers import db_execute
 
     db_execute(migrated_database_url, "TRUNCATE refresh_tokens, users RESTART IDENTITY CASCADE")
-    client = redis_sync.Redis.from_url(f"{redis_url}/0")
-    try:
-        client.flushdb()
-    finally:
-        client.close()
+    for database in (0, 1, 2):  # app state, Celery broker, Celery results
+        client = redis_sync.Redis.from_url(f"{redis_url}/{database}")
+        try:
+            client.flushdb()
+        finally:
+            client.close()
 
 
 ClientFactory = Callable[..., TestClient]
@@ -144,6 +145,7 @@ def auth_client_factory(
     redis_url: str,
     clean_auth_state: None,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[ClientFactory]:
     stack = ExitStack()
 
@@ -157,6 +159,9 @@ def auth_client_factory(
         }
         values.update(overrides)
         settings = make_settings(**values)
+        # Celery gives these environment variables precedence over app configuration.
+        monkeypatch.setenv("CELERY_BROKER_URL", settings.celery_broker_url)
+        monkeypatch.setenv("CELERY_RESULT_BACKEND", settings.celery_result_backend)
         app = create_app(settings)
         if configure:
             configure(app)
@@ -169,3 +174,30 @@ def auth_client_factory(
 @pytest.fixture
 def auth_client(auth_client_factory: ClientFactory) -> TestClient:
     return auth_client_factory()
+
+
+@pytest.fixture
+def pipeline_client_factory(auth_client_factory: ClientFactory) -> Iterator[ClientFactory]:
+    """Like `auth_client_factory`, plus a real Celery worker consuming the processing queue."""
+    from celery.contrib.testing.worker import start_worker
+
+    from app.workers.celery_app import create_celery_app
+
+    stack = ExitStack()
+
+    def factory(configure: Callable[[FastAPI], None] | None = None, **overrides: Any) -> TestClient:
+        client = auth_client_factory(configure, **overrides)
+        worker_app = create_celery_app(client.app.state.settings, configure_logs=False)  # type: ignore[attr-defined]
+        stack.enter_context(
+            start_worker(
+                worker_app,
+                pool="solo",
+                perform_ping_check=False,
+                loglevel="WARNING",
+                queues=["celery", "processing"],
+            )
+        )
+        return client
+
+    yield factory
+    stack.close()

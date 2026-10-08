@@ -32,7 +32,6 @@ def test_finished_documents_can_be_requeued(finished: S) -> None:
     [
         (S.PENDING, S.READY),
         (S.PENDING, S.EMBEDDING),
-        (S.PARSING, S.PENDING),
         (S.READY, S.FAILED),
         (S.READY, S.PARSING),
         (S.FAILED, S.READY),

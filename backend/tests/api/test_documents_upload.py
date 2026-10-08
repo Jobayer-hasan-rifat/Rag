@@ -70,7 +70,9 @@ def test_response_exposes_no_storage_details(auth_client: TestClient) -> None:
     assert str(auth_client.app.state.settings.storage_local_path) not in body  # type: ignore[attr-defined]
     assert set(response.json()["data"]) == {
         "id", "filename", "file_type", "content_type", "file_size", "checksum_sha256",
-        "status", "error_message", "collections", "created_at", "updated_at",
+        "status", "error_message", "failure_reason", "processing_started_at",
+        "processing_completed_at", "page_count", "character_count",
+        "collections", "created_at", "updated_at",
     }  # fmt: skip
 
 

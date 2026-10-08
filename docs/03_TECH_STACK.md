@@ -648,6 +648,19 @@ Dependency ranges live in `backend/pyproject.toml`; exact pins live in
 Content sniffing uses signatures and the standard library (`zipfile`, incremental UTF-8 decoding) rather than
 `python-magic`/libmagic, which needs a native library and still cannot prove a file is safe.
 
+## Phase 4 Dependency Choices
+
+| Dependency | Why | Alternative not chosen |
+|------------|-----|------------------------|
+| `pymupdf` | Mature, fast C library (MuPDF) with good Unicode handling and page-level extraction; named in the project stack | `pypdf` (pure Python, weaker on complex scripts and slower), `pdfminer.six` |
+| `python-docx` | Standard DOCX reader; resolves no external entities | Hand-parsing the XML |
+| Native Markdown/text parsing | Only headings need recognising; avoids a dependency that would render or interpret content | `markdown-it-py`, `mistune` |
+| `fonttools` (dev only) | Builds a synthetic font so tests can generate Bangla PDFs without shipping a font | Committing a real font file |
+
+**Licensing note**: PyMuPDF/MuPDF is licensed AGPL-3.0 (commercial licences are available from Artifex). That suits an open-source
+portfolio project; a closed-source deployment would need a commercial licence or a swap to a permissively licensed
+parser behind the same `DocumentExtractor` interface. OCR is not included.
+
 ## Technology Summary Table
 
 | Category | Technology | Purpose | Key Reason |

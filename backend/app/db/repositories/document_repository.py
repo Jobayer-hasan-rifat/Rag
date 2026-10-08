@@ -1,8 +1,9 @@
 import uuid
 from dataclasses import dataclass
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
-from sqlalchemy import ColumnElement, exists, func, select
+from sqlalchemy import ColumnElement, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.collection import Collection
@@ -22,6 +23,15 @@ class DocumentFilters:
     file_type: str | None = None
     collection_id: uuid.UUID | None = None
     search: str | None = None
+
+
+@dataclass(frozen=True)
+class ClaimedDocument:
+    id: uuid.UUID
+    storage_key: str
+    file_type: str
+    file_size: int
+    attempts: int
 
 
 @dataclass(frozen=True)
@@ -125,3 +135,151 @@ class DocumentRepository:
         for document_id, collection_id, name in result.all():
             grouped[document_id].append(CollectionRef(id=collection_id, name=name))
         return grouped
+
+    async def claim_for_processing(
+        self, document_id: uuid.UUID, *, stale_before: datetime
+    ) -> ClaimedDocument | None:
+        """Atomically move a pending (or abandoned, stale) document to `parsing`.
+
+        The single UPDATE is the lock: of several workers handed the same task, exactly one
+        gets a row back, so a document is never processed concurrently.
+        """
+        statement = (
+            update(Document)
+            .where(
+                Document.id == document_id,
+                (Document.status == "pending")
+                | (
+                    (Document.status == "parsing") & (Document.processing_started_at < stale_before)
+                ),
+            )
+            .values(
+                status="parsing",
+                processing_started_at=func.now(),
+                processing_completed_at=None,
+                processing_attempts=Document.processing_attempts + 1,
+                failure_reason=None,
+                error_message=None,
+            )
+            .returning(
+                Document.id,
+                Document.storage_key,
+                Document.file_type,
+                Document.file_size,
+                Document.processing_attempts,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        row = (await self._session.execute(statement)).first()
+        return ClaimedDocument(*row) if row else None
+
+    async def complete_processing(
+        self,
+        document_id: uuid.UUID,
+        *,
+        page_count: int | None,
+        character_count: int,
+        metadata: dict[str, Any],
+    ) -> bool:
+        """parsing -> ready. False if the document was deleted or changed state meanwhile."""
+        result = await self._session.execute(
+            update(Document)
+            .where(Document.id == document_id, Document.status == "parsing")
+            .values(
+                status="ready",
+                page_count=page_count,
+                character_count=character_count,
+                processing_completed_at=func.now(),
+                processing_metadata=metadata,
+                failure_reason=None,
+                error_message=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def fail_processing(
+        self,
+        document_id: uuid.UUID,
+        *,
+        reason: str,
+        message: str,
+        started_before: datetime | None = None,
+    ) -> bool:
+        """parsing -> failed with a safe machine-readable reason and message."""
+        conditions = [Document.id == document_id, Document.status == "parsing"]
+        if started_before is not None:
+            conditions.append(Document.processing_started_at < started_before)
+        result = await self._session.execute(
+            update(Document)
+            .where(*conditions)
+            .values(
+                status="failed",
+                failure_reason=reason,
+                error_message=message,
+                processing_completed_at=func.now(),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def release_for_retry(
+        self, document_id: uuid.UUID, *, started_before: datetime | None = None
+    ) -> bool:
+        """parsing -> pending, so the document can be claimed again."""
+        conditions = [Document.id == document_id, Document.status == "parsing"]
+        if started_before is not None:
+            conditions.append(Document.processing_started_at < started_before)
+        result = await self._session.execute(
+            update(Document)
+            .where(*conditions)
+            .values(status="pending")
+            .execution_options(synchronize_session=False)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def reset_for_manual_retry(self, document_id: uuid.UUID) -> bool:
+        """failed -> pending with a fresh attempt budget."""
+        result = await self._session.execute(
+            update(Document)
+            .where(Document.id == document_id, Document.status == "failed")
+            .values(
+                status="pending",
+                failure_reason=None,
+                error_message=None,
+                processing_attempts=0,
+                processing_completed_at=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def find_stalled(
+        self, started_before: datetime, limit: int
+    ) -> list[tuple[uuid.UUID, int]]:
+        result = await self._session.execute(
+            select(Document.id, Document.processing_attempts)
+            .where(Document.status == "parsing", Document.processing_started_at < started_before)
+            .order_by(Document.processing_started_at)
+            .limit(limit)
+        )
+        return [(row[0], row[1]) for row in result.all()]
+
+    async def find_waiting(self, idle_since: datetime, limit: int) -> list[uuid.UUID]:
+        """Pending documents nobody has claimed for a while (lost or expired queue messages)."""
+        result = await self._session.execute(
+            select(Document.id)
+            .where(Document.status == "pending", Document.updated_at < idle_since)
+            .order_by(Document.updated_at)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def touch(self, document_ids: list[uuid.UUID]) -> None:
+        if document_ids:
+            await self._session.execute(
+                update(Document)
+                .where(Document.id.in_(document_ids))
+                .values(updated_at=func.now())
+                .execution_options(synchronize_session=False)
+            )

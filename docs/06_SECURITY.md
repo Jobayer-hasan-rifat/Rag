@@ -201,6 +201,27 @@ Filenames and file contents are never logged; events carry user and document IDs
 
 Antivirus scanning, parsing isolation (Phase 4), a reconciliation job for orphaned objects, and encryption at rest (provided by the storage layer in production). The per-user quota is checked before each upload but is not atomic across simultaneous uploads, so it can be overshot by a few files.
 
+## Document Processing Security
+
+Extracted text is **data**. It is stored and later retrieved, never executed, rendered or interpreted as instructions. This matters most for the RAG
+phases, where text inside a document may try to steer the model (prompt injection); processing neither strips nor obeys such text.
+
+**Parser containment**
+- Parsing happens only in Celery workers, never in the API process. PyMuPDF does not run JavaScript, launch actions or fetch external resources; pages are never rendered. python-docx does not resolve external XML entities, macros and embedded objects are ignored, and DOCX archives are never extracted to disk.
+- The worker container runs as a non-root user with a read-only root filesystem (only a tmpfs `/tmp` and the upload volume are writable), all Linux capabilities dropped, `no-new-privileges`, a memory cap (`WORKER_MEMORY_LIMIT`, default 2 GiB) and a process cap. A parser crash or out-of-memory kill takes down one worker process; the task is redelivered and the document's attempt budget stops a repeat offender.
+- Parser libraries are version-pinned and covered by `pip-audit`. Running parsers in a separate, network-less sandbox container is a recommended future hardening.
+
+**Resource limits** (all configurable, see `.env.example`): file size (`MAX_UPLOAD_BYTES`), pages (`PROCESSING_MAX_PAGES`, default 2000), extracted characters (`PROCESSING_MAX_TEXT_CHARS`, default 20 million), DOCX archive size, entry count and compression ratio
+(`PROCESSING_MAX_DOCX_UNCOMPRESSED_BYTES`), a cooperative time budget per document (`PROCESSING_TIMEOUT_SECONDS`, default 120 s) with Celery soft (+15 s) and hard (+45 s) kill limits, worker recycling by task count and memory, and a bounded retry budget.
+
+**Task flooding**: uploads and retries are rate limited per user, uploads are bounded by the storage quota, the recovery sweep re-queues at most 100 documents per run and only documents idle for two minutes, and duplicate queue messages are harmless because a document can only be claimed once.
+
+**Authorization**: workers receive only a document ID. The retry endpoint resolves the document through the same owner-or-admin check as every other endpoint (404 otherwise).
+
+**Data hygiene**: failure details shown to users are fixed strings; logs carry IDs, counts, durations and failure codes but never document text, filenames or file-embedded metadata; file properties (title, author) are untrusted, normalised, truncated and stored only in `processing_metadata`.
+
+**Known limits**: scanned/image-only PDFs yield no text (reported as `empty_document`; OCR is out of scope); PDFs using legacy non-Unicode Bangla fonts can extract as garbled text, which cannot be detected reliably; multi-column layouts and repeated headers/footers are not reconstructed or removed.
+
 ## Input Validation Security
 
 ### Pydantic Validation

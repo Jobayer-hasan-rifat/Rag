@@ -119,15 +119,16 @@ backend/
 │   │   ├── error_handlers.py
 │   │   └── responses.py    # Response/error envelope builders
 │   ├── schemas/            # Pydantic API schemas
-│   ├── services/           # AuthService, CollectionService, DocumentService, HealthService
+│   ├── services/           # Auth, Collection, Document, Processing and Health services
 │   ├── models/             # SQLAlchemy models (User, Role, RefreshToken)
 │   ├── db/                 # Base, async engine/session, DB probe, repositories/
 │   ├── security/           # Passwords, JWT, refresh tokens, denylist, rate limit, RBAC, file validation
-│   ├── core/documents/     # Document types and lifecycle state machine
+│   ├── core/documents/     # Types, lifecycle, processing errors, normalisation, script profile
+│   ├── parsers/            # DocumentExtractor interface and PDF/DOCX/text/Markdown extractors
 │   ├── observability/      # JSON logging, request-ID context
-│   ├── workers/            # Celery app and tasks
+│   ├── workers/            # Celery app, queue dispatcher, document tasks and recovery sweep
 │   └── storage/            # StorageProvider interface, local filesystem backend
-├── alembic/                # Migrations (0001 pgvector, 0002 auth, 0003 documents/collections)
+├── alembic/                # Migrations (0001 pgvector, 0002 auth, 0003 documents/collections, 0004 processing)
 └── tests/                  # unit, api, integration
 ```
 
@@ -444,27 +445,26 @@ implemented; an S3-compatible backend only needs to implement the same five meth
 ```mermaid
 stateDiagram-v2
     [*] --> pending: upload accepted
-    pending --> parsing
-    parsing --> chunking
-    chunking --> embedding
-    embedding --> indexing
-    indexing --> ready
+    pending --> parsing: worker claims it
+    parsing --> ready: text extracted and stored
+    parsing --> pending: transient failure, retry
+    parsing --> failed: permanent failure or retries exhausted
     pending --> failed
-    parsing --> failed
-    chunking --> failed
-    embedding --> failed
-    indexing --> failed
     ready --> pending: re-process
-    failed --> pending: retry
+    failed --> pending: manual retry
     pending --> [*]: delete
+    parsing --> [*]: delete
     ready --> [*]: delete
     failed --> [*]: delete
 ```
 
-Transitions are enforced by `ensure_transition` (`app/core/documents/lifecycle.py`); anything else is
-rejected with 409 `INVALID_STATE_TRANSITION`. `error_message` is only allowed while `failed` (database CHECK).
-Phase 3 creates documents as `pending`; the processing worker (Phase 4) will drive the other transitions.
-Deletion is a hard delete, so there is no `deleted` status.
+In the current pipeline `pending` means *uploaded and queued* and `parsing` means *being processed*
+(extract, normalise, persist). `ready` means the document's text has been extracted and stored; it does not yet mean
+searchable. The `chunking`, `embedding` and `indexing` states remain defined for later phases, and the
+temporary `parsing -> ready` shortcut will be replaced by `parsing -> chunking` when they arrive.
+Transitions are enforced by `ensure_transition` (`app/core/documents/lifecycle.py`) and, for the worker,
+by guarded `UPDATE ... WHERE status = ...` statements. `error_message` and `failure_reason` are only allowed
+while `failed` (database CHECK). Deletion is a hard delete, so there is no `deleted` status.
 
 ### Upload Flow
 
@@ -489,6 +489,83 @@ sequenceDiagram
     end
     Svc-->>C: 201 Document (status pending)
 ```
+
+### Processing Pipeline
+
+```mermaid
+sequenceDiagram
+    participant API
+    participant Q as Redis (Celery queue)
+    participant W as Celery worker
+    participant DB as PostgreSQL
+    participant S as StorageProvider
+
+    API->>DB: INSERT document (pending), COMMIT
+    API->>Q: enqueue process_document(id)
+    Note over API,Q: if the broker is down the upload still succeeds; the sweep re-queues
+    Q->>W: deliver task
+    W->>DB: claim: UPDATE ... SET status=parsing WHERE status=pending
+    alt not claimable (done, deleted or owned by another worker)
+        W-->>Q: acknowledge and skip
+    else claimed
+        W->>S: read stored file (size verified)
+        W->>W: extract (PyMuPDF / python-docx / text), enforcing limits
+        W->>W: normalise Unicode and whitespace per section
+        W->>DB: replace sections, set counts and metadata, status=ready
+        alt transient failure and attempts remain
+            W->>DB: status=pending, retry after backoff
+        else permanent failure
+            W->>DB: status=failed, failure_reason, safe message
+        end
+    end
+    loop every 60 s (Celery beat)
+        W->>DB: release stalled parsing, re-queue lost pending
+    end
+```
+
+The API never parses a document. A worker process handles one document at a time per task slot, with a
+cooperative time budget (checked between pages/sections), Celery soft and hard time limits as a backstop,
+and recycling after a number of tasks or a memory threshold.
+
+### Extraction and Normalization
+
+Extractors share one interface (`DocumentExtractor`, `app/parsers/base.py`) and return ordered sections
+of raw text plus untrusted file properties. The pipeline then normalises each section independently, so page and
+heading boundaries are never merged away.
+
+| Format | Library | Sections produced | Notes |
+|--------|---------|-------------------|-------|
+| PDF | PyMuPDF | one `page` section per page (1-based `page_number`), blank pages kept | encrypted PDFs rejected; text layer only (no OCR) |
+| DOCX | python-docx | one `section` per heading (levels 1-9, Title = 1) plus an optional leading `body`; table rows are kept as one line per row; headers, footers, comments and macros are ignored |
+| Markdown | native | one `section` per ATX heading (`#`..`######`), headings inside code fences ignored | source is kept verbatim; nothing is rendered |
+| TXT | native | one `body` section | UTF-8 (BOM tolerated) |
+
+Normalisation (`app/core/documents/normalization.py`) is deliberately conservative: Unicode NFC (not NFKC),
+`\r\n`/`\r`/U+2028/U+2029 to `\n`, Unicode spaces to a plain space, runs of blank lines collapsed to one, and invisible or
+control artefacts removed (NUL, controls, soft hyphen, zero-width space, BOM, bidi overrides). It preserves case,
+punctuation, combining marks and, importantly, ZWJ/ZWNJ (U+200D/U+200C), which Bengali conjuncts depend on. PDF and DOCX also
+collapse repeated spaces inside lines; plain text and Markdown keep interior spacing and indentation. There is no lowercasing,
+stemming, stop-word removal or translation. Bengali "nukta" letters that Unicode defines as composition exclusions (for example U+09DF) are stored in
+their canonical decomposed form; the same normalisation must be applied to queries in later phases.
+
+A dependency-free **script profile** (Bengali / Latin / other shares and a primary script of `bengali`, `latin`, `mixed`, `other` or `unknown`) is
+stored with each document. It is a heuristic about writing systems, not language identification.
+
+### Content Model
+
+Processed text lives in `document_sections` (one row per page or section: `ordinal`, `kind`, `page_number`,
+`heading`, `heading_level`, `text`, `char_count`), referenced by `document_id` with cascade delete. A later chunker
+reads sections in order and can attach each chunk to a page or heading, so citations keep their source location.
+Per-document counts, timestamps and metadata sit on `documents` (`page_count`, `character_count`,
+`processing_started_at`, `processing_completed_at`, `processing_metadata` with extractor, processing version, duration, script profile and sanitised file properties).
+Re-processing replaces a document's sections inside the same transaction that marks it `ready`, so retries never duplicate content.
+
+### Failure Handling and Recovery
+
+- Every failure is classified (`FailureReason`): `storage_missing`, `storage_unavailable`, `corrupt_document`, `encrypted_document`, `unsupported_format`, `empty_document`, `too_many_pages`, `content_too_large`, `timeout`, `extraction_failed`, `database_error`, `retries_exhausted`. Users see the code and a fixed, safe message, never exception text.
+- Only transient classes (`storage_unavailable`, `database_error`) are retried automatically, with exponential backoff, up to `PROCESSING_MAX_ATTEMPTS`. Everything else fails once, so a poisonous document cannot loop.
+- A worker claims a document with a single guarded `UPDATE`, so duplicate or redelivered tasks cannot process it twice. A worker that dies mid-task leaves the document in `parsing`; once it is older than `PROCESSING_STALE_AFTER_SECONDS` it can be re-claimed, and the beat sweep releases it (or fails it after the attempt budget). Pending documents whose queue message was lost are re-queued by the same sweep.
+- `POST /documents/{id}/retry` lets the owner re-queue a failed document with a fresh attempt budget.
 
 ### Database Storage
 

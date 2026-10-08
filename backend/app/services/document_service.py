@@ -20,6 +20,7 @@ from app.db.repositories.document_repository import (
 from app.exceptions import (
     ContentUnavailableError,
     DuplicateDocumentError,
+    InvalidStatusTransitionError,
     NotFoundError,
     QuotaExceededError,
     StorageUnavailableError,
@@ -35,6 +36,7 @@ from app.security.file_validation import (
     inspect_upload,
     sanitize_filename,
 )
+from app.services.processing_queue import ProcessingQueue
 from app.storage.base import (
     ObjectExistsError,
     ObjectNotFoundError,
@@ -73,12 +75,14 @@ class DocumentService:
         documents: DocumentRepository,
         collections: CollectionRepository,
         storage: StorageProvider,
+        processing_queue: ProcessingQueue,
         settings: Settings,
     ) -> None:
         self._session = session
         self._documents = documents
         self._collections = collections
         self._storage = storage
+        self._processing_queue = processing_queue
         self._max_upload_bytes = settings.max_upload_bytes
         self._quota_bytes = settings.max_storage_bytes_per_user
 
@@ -143,6 +147,7 @@ class DocumentService:
         logger.info(
             "document uploaded", extra={"user_id": str(actor_id), "document_id": str(document.id)}
         )
+        await self._processing_queue.enqueue(document.id)
         return await self._view(document)
 
     async def list_documents(
@@ -218,6 +223,19 @@ class DocumentService:
         logger.info(
             "document deleted", extra={"user_id": str(actor.id), "document_id": str(document_id)}
         )
+
+    async def retry_processing(self, actor: User, document_id: uuid.UUID) -> DocumentView:
+        """Re-queue a failed document with a fresh attempt budget."""
+        document = await self._accessible(actor, document_id)
+        if document.status != DocumentStatus.FAILED:
+            raise InvalidStatusTransitionError("Only failed documents can be retried")
+        if not await self._documents.reset_for_manual_retry(document.id):
+            raise InvalidStatusTransitionError("Only failed documents can be retried")
+        await self._session.commit()
+        await self._session.refresh(document)
+        logger.info("processing retry requested", extra={"document_id": str(document.id)})
+        await self._processing_queue.enqueue(document.id)
+        return await self._view(document)
 
     async def change_status(
         self, document: Document, target: DocumentStatus, *, error_message: str | None = None

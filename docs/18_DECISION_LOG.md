@@ -565,6 +565,104 @@ Deliberately simple: no per-plan tiers or document-count caps, and the check is 
 
 ---
 
+### DEC-025: Lifecycle Reuse for Processing
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Keep the Phase 0 statuses. `pending` is "uploaded and queued", `parsing` is "being processed", `ready` means text is extracted and stored. Add two transitions: `parsing -> ready` (a shortcut until chunking, embedding and indexing exist) and `parsing -> pending` (retry or crash recovery).
+
+**Reason**:
+Renaming states would churn the schema and API for no behavioural gain; the later stages are already modelled and will take over `parsing -> ready`.
+
+**Consequence**:
+`ready` does not yet imply searchable; documentation says so, and Phase 5 will route `parsing` to `chunking`.
+
+---
+
+### DEC-026: Extraction Libraries and Package Layout
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+PyMuPDF for PDF, python-docx for DOCX, native parsing for text and Markdown, all behind `DocumentExtractor` in `app/parsers/` (the package named in the project layout). No OCR.
+
+**Tradeoffs**:
+PyMuPDF is AGPL-3.0 (fine for this open-source portfolio project; a closed deployment needs a commercial licence or another parser behind the same interface). Image-only PDFs cannot be processed.
+
+---
+
+### DEC-027: Conservative, Script-Safe Normalisation
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+NFC (not NFKC), newline and space normalisation, removal of control and invisible artefacts, preserving ZWJ/ZWNJ, case, punctuation and all combining marks. Inline spaces are collapsed for PDF/DOCX but not for text/Markdown. No lowercasing, stemming, stop-word removal or translation. Normalised output is stamped with a processing version.
+
+**Reason**:
+Bengali conjuncts and many Indic and Arabic-script texts depend on joiners and combining marks; compatibility folding (NFKC) would alter fullwidth, ligature and other characters unnecessarily.
+
+**Consequence**:
+Composition-excluded Bengali letters (U+09DC, U+09DD, U+09DF) are stored decomposed. Query text must pass through the same normaliser in the retrieval phases.
+
+---
+
+### DEC-028: Section-Based Content Model
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+A `document_sections` table with one row per PDF page or heading-delimited section, plus counts and a metadata JSONB on `documents`. Blank pages are kept so numbering stays aligned. Sections are replaced atomically on reprocessing.
+
+**Reason**:
+Keeps page and heading locations for citations, avoids duplicating whole-document text, and gives the chunker a natural input. Chunks will reference sections rather than copy full text.
+
+---
+
+### DEC-029: Task Design, Retries and Recovery
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+- One Celery task per document on a dedicated `processing` queue, `acks_late` with `reject_on_worker_lost`, soft/hard time limits and worker recycling.
+- A single guarded `UPDATE` claims a document, so duplicates and redeliveries are no-ops. The attempt counter lives in the database.
+- Only transient failures retry (exponential backoff, bounded); everything else fails once with a classified reason.
+- A periodic sweep run by Celery beat (still Celery, one extra process) releases documents stuck in `parsing`, abandons those out of attempts, and re-queues `pending` documents whose message was lost, including when the broker was down at upload time.
+- Task publishing uses `ignore_result` so the API process does not subscribe to result channels.
+
+**Tradeoffs**:
+One more container (`celery_beat`, exactly one instance). Time limits are only enforced by the prefork pool; a cooperative deadline covers other pools.
+
+---
+
+### DEC-030: Failure Reporting and Manual Retry
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Users see a stable `failure_reason` code and a fixed message; details stay in logs. `POST /documents/{id}/retry` re-queues failed documents with a fresh attempt budget, under the same ownership and administrator policy as other document endpoints, rate limited.
+
+---
+
+### DEC-031: Script Profile Instead of Language Detection
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+A dependency-free Unicode-block profile (Bengali, Latin, other, with a primary script) is stored in metadata; no language-detection library.
+
+**Reason**:
+It reliably separates Bangla, Latin and mixed documents (the distinction later phases need) without a dependency, and avoids pretending to identify languages it cannot.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided
