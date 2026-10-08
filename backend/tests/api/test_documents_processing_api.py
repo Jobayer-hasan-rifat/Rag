@@ -73,7 +73,7 @@ def test_retry_requeues_a_failed_document_with_a_fresh_attempt_budget(
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 0
 
 
-@pytest.mark.parametrize("state", ["pending", "parsing", "ready"])
+@pytest.mark.parametrize("state", ["pending", "parsing", "chunking", "chunked", "ready"])
 def test_only_failed_documents_can_be_retried(
     auth_client: TestClient, migrated_database_url: str, state: str
 ) -> None:
@@ -174,4 +174,6 @@ def test_processing_does_not_cross_user_boundaries_in_listing(auth_client: TestC
     process_now(auth_client, doc_id)
 
     assert auth_client.get(DOCS, headers=bob).json()["data"] == []
-    assert auth_client.get(f"{DOCS}?status=ready", headers=alice).json()["meta"]["total_items"] == 1
+    assert (
+        auth_client.get(f"{DOCS}?status=chunked", headers=alice).json()["meta"]["total_items"] == 1
+    )

@@ -141,3 +141,24 @@ def test_token_and_hashing_settings_are_bounded(
 def test_unsupported_jwt_algorithm_is_rejected(make_settings: SettingsFactory) -> None:
     with pytest.raises(ValidationError):
         make_settings(jwt_algorithm="none")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"chunking_max_chars": 1000, "chunking_overlap_chars": 600},
+        {"chunking_max_chars": 200, "chunking_min_chars": 200},
+        {"chunking_max_chars": 100, "chunking_overlap_chars": 51},
+    ],
+)
+def test_inconsistent_chunking_sizes_are_rejected(
+    make_settings: SettingsFactory, overrides: dict[str, int]
+) -> None:
+    with pytest.raises(ValidationError):
+        make_settings(**overrides)
+
+
+def test_default_chunking_sizes_are_accepted(make_settings: SettingsFactory) -> None:
+    settings = make_settings()
+    assert (settings.chunking_max_chars, settings.chunking_overlap_chars) == (1000, 150)
+    assert settings.chunking_min_chars == 20 and settings.chunking_max_chunks == 50_000

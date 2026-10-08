@@ -260,11 +260,14 @@ Metadata for an uploaded file. The file itself lives in object storage, never in
 | processing_started_at | TIMESTAMPTZ | NULLABLE | Start of the latest attempt |
 | processing_completed_at | TIMESTAMPTZ | NULLABLE | When the latest attempt ended (ready or failed) |
 | processing_attempts | INTEGER | NOT NULL, DEFAULT 0, CHECK (>= 0) | Attempts in the current retry budget |
+| chunk_count | INTEGER | NULLABLE, CHECK (NULL or >= 0) | Chunks of the current run; NULL until chunked and again after a failure |
+| chunking_version | VARCHAR(20) | NULLABLE | Chunking algorithm version that produced the chunks |
 | processing_metadata | JSONB | NOT NULL, DEFAULT '{}' | Extractor, processing version, duration, script profile, sanitised file properties |
 | created_at / updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamps |
 
 **Status values** (see the lifecycle in the architecture document): `pending`, `parsing`, `chunking`,
-`embedding`, `indexing`, `ready`, `failed`.
+`chunked`, `embedding`, `indexing`, `ready`, `failed`. `chunked` means chunks are stored and the document awaits
+embedding; `ready` is reserved for embedded, indexed (searchable) documents.
 
 **Indexes / constraints**: `ix_documents_user_created` on `(user_id, created_at DESC, id DESC)` (the
 listing query); `ix_documents_status`; `uq_documents_storage_key`;
@@ -290,7 +293,33 @@ The normalised text of a document, split at its natural boundaries. This is the 
 
 **Indexes**: `uq_document_sections_document_ordinal`, `ix_document_sections_document_page` on `(document_id, page_number)`.
 
-Text is stored once, in sections; chunks (Phase 5) will reference sections by position instead of duplicating whole documents.
+`uq_document_sections_id_document` unique on `(id, document_id)` is the target of the chunk foreign key below.
+
+#### document_chunks
+
+Retrievable passages. Each chunk is an exact slice of one section and belongs to one document.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| document_id | UUID | FOREIGN KEY documents(id) ON DELETE CASCADE, NOT NULL | Owning document |
+| section_id | UUID | NOT NULL | Source section; `(section_id, document_id)` is a composite foreign key to `document_sections(id, document_id)` ON DELETE CASCADE, so a chunk can never point at another document's section |
+| chunking_version | VARCHAR(20) | NOT NULL | Algorithm version, for example `c1.0` |
+| chunk_index | INTEGER | NOT NULL, CHECK (>= 0) | Reading order within the document |
+| text | TEXT | NOT NULL | Exactly `section.text[start_char:end_char]` |
+| char_count | INTEGER | NOT NULL, CHECK (= char_length(text) AND > 0) | Characters in `text` |
+| text_sha256 | VARCHAR(64) | NOT NULL | Hex SHA-256 of `text` (change detection, deduplication) |
+| start_char / end_char | INTEGER | NOT NULL, CHECK (end > start >= 0 AND end - start = char_count) | Offsets within the section text |
+| overlap_chars | INTEGER | NOT NULL, DEFAULT 0, CHECK (0 <= x <= char_count) | Leading characters shared with the previous chunk |
+| page_number | INTEGER | NULLABLE, CHECK (>= 1) | Source page (PDF) |
+| heading / heading_level | TEXT / SMALLINT | NULLABLE, CHECK (1-9) | Heading of the source section |
+| heading_path | TEXT[] | NOT NULL, DEFAULT '{}' | Enclosing headings, outermost first |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
+
+**Indexes / constraints**: `uq_document_chunks_order` unique on `(document_id, chunking_version, chunk_index)`
+(idempotency and ordering), `ix_document_chunks_section_id`, `ix_document_chunks_document_page` on `(document_id, page_number)`.
+Chunk text duplicates section text (plus overlap) by design: chunks are what retrieval reads, and the exact-slice
+rule keeps the two verifiable. A later phase adds the embedding column here.
 
 #### document_collections
 

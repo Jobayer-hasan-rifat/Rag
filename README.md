@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 4 complete (Document processing). Chunking, embeddings, search and RAG are not implemented yet.
+> **Status**: 🚧 In Development - Phase 5 complete (Intelligent chunking). Embeddings, search and RAG are not implemented yet.
 
 ## Overview
 
@@ -20,7 +20,11 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
-Infrastructure, authentication, secure document management and asynchronous text extraction; documents are processed into clean, page-aware text but not yet chunked, embedded, searched or used for answers.
+Infrastructure, authentication, secure document management, asynchronous text extraction and structure-aware chunking; documents are processed into clean, page-aware text and traceable chunks but not yet embedded, searched or used for answers.
+
+- Deterministic, versioned chunking that never crosses a page or heading boundary: each chunk is an exact slice of its source with page number, heading path and character offsets, bounded in size, with overlap only inside oversized paragraphs
+- Bangla-safe splitting (Bengali danda sentence ends, no cut inside a conjunct or ZWJ/ZWNJ sequence), Markdown tables and code fences kept whole, idempotent re-chunking and a `chunked` status that keeps `ready` reserved for searchable documents
+- `GET /api/v1/documents/{id}/chunks` for owner-scoped inspection of how a document was split
 
 - Background processing (Celery + Redis) of PDF, DOCX, TXT and Markdown into normalised text with page and heading locations
 - Bangla, English and mixed-script documents are preserved (Unicode-safe normalisation, ZWJ/ZWNJ kept, no translation)
@@ -282,7 +286,21 @@ Document processing baseline (Phase 4, extraction + normalisation only, median o
 | TXT 5 MB | 2,862,450 | 3 ms | 726 ms | 1.1 s | 2.6 M chars/s |
 | Markdown 2,000 headings | 537,783 | 11 ms | 121 ms | 177 ms | 3.0 M chars/s |
 
-These exclude storage reads, database writes and queueing. Remaining benchmarks are planned for Phase 14:
+Chunking baseline (Phase 5, median of 5 runs, same machine; reproduce with `python -m benchmarks.chunking_baseline`):
+
+| Input | Chars | Chunks | Chunking time | Throughput |
+|-------|------:|-------:|--------------:|-----------:|
+| English, one section | 522,210 | 668 | 5.7 ms | 92 M chars/s |
+| Mixed Bangla/English, one section | 2,361,665 | 2,968 | 30 ms | 78 M chars/s |
+| Mixed, 500 pages | 780,912 | 1,130 | 10.9 ms | 71 M chars/s |
+| DOCX-style, 2,000 lines | 310,693 | 346 | 5.2 ms | 60 M chars/s |
+| 1 M characters without whitespace | 1,000,000 | 1,000 | 26.5 ms | 38 M chars/s |
+
+Persisting chunks in batches of 1,000 rows took 74 ms for 1,000 chunks and 676 ms for 10,000, about 9-10x faster than row-by-row inserts (652 ms and 6.7 s). Chunking is a small fraction of end-to-end processing time; extraction dominates.
+
+Chunk quality is measured on a seeded synthetic corpus (`python -m benchmarks.chunking_eval`): on all ten corpus cases every chunk is within the size limit and an exact slice of its source, all non-whitespace text is covered, no chunk starts or ends inside a grapheme cluster, and output is deterministic; prose chunks end on a sentence or paragraph boundary in 100% of cases with a mean size of roughly 65-85% of the limit. This is a structural evaluation of the splitter, not a retrieval-quality measurement; retrieval quality is evaluated in a later phase.
+
+These exclude storage reads, database writes (except the chunk insert figures above) and queueing. Remaining benchmarks are planned for Phase 14:
 
 - Document parsing throughput
 - Embedding generation latency

@@ -661,6 +661,81 @@ A dependency-free Unicode-block profile (Bengali, Latin, other, with a primary s
 **Reason**:
 It reliably separates Bangla, Latin and mixed documents (the distinction later phases need) without a dependency, and avoids pretending to identify languages it cannot.
 
+### DEC-032: A Distinct `chunked` Status
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Add `chunked` ("chunks generated, awaiting embedding") between `chunking` and `embedding`; `ready` now strictly means embedded and searchable. Phase 4 documents left in `ready` (text only) were returned to `pending` by migration `0005` and are reprocessed.
+
+**Alternatives**: Keep `ready` for "chunked" (ambiguous once search exists); a separate boolean flag.
+
+**Reason**:
+A status that means two things invites a search path that serves unindexed documents. The explicit state keeps the lifecycle checkable by CHECK constraint and transition map.
+
+**Consequence**: documents complete the pipeline in `chunked` until the embedding phase exists; clients must not treat `chunked` as searchable.
+
+### DEC-033: Chunks Never Cross Section Boundaries
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Chunk each section independently. A chunk's text is exactly a slice of its section, with page, heading path and offsets stored beside it.
+
+**Alternatives**: Sliding window over the whole document (better filling, but a chunk can span pages and headings, making citations approximate).
+
+**Reason**:
+Citations and heading context are a core requirement; an exact, verifiable source location is worth some under-filled chunks.
+
+**Consequence**: very small sections produce small chunks, and a heading-only section produces no chunk (its heading still appears in the heading path of later chunks). Revisit by merging adjacent small sections within a heading if retrieval evaluation shows a problem.
+
+### DEC-034: Hierarchical Splitting with Overlap Only Inside Oversized Blocks
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Pack whole paragraph, table and code blocks; split an oversized block by lines, sentences, words and finally a grapheme-safe hard cut. Apply overlap only between consecutive pieces of one oversized block.
+
+**Alternatives**: Fixed-size windows with uniform overlap; a language-specific sentence tokenizer.
+
+**Reason**:
+Natural boundaries keep passages coherent and independent of language; overlap across unrelated paragraphs adds noise and storage without recovering split context. The rules are Unicode-based (including the Bengali danda) and need no dependency.
+
+**Consequence**: chunk sizes vary (a median around three quarters of the maximum on the evaluation corpus); Bengali abbreviation-style sentence ends are not special-cased.
+
+### DEC-035: Character-Based Sizing Behind a `SizeMeasure`
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Measure and limit chunks in characters (default 1000, overlap 150, minimum 20), via an interface that a token-aware measure can implement later.
+
+**Alternatives**: Count tokens now with the embedding model's tokenizer.
+
+**Reason**:
+Deterministic, dependency-free and language-agnostic today; the embedding model is not chosen until the next phase. Bangla produces more tokens per character than English, so the limit must be validated against the real tokenizer then.
+
+**Consequence**: the chunk limit may need to be lowered for Bangla-heavy content or switched to tokens; chunking version changes will mark that.
+
+### DEC-036: Chunk Persistence Is Replace-All and Invariant-Preserving
+
+**Date**: 2026-10-09
+**Status**: Accepted
+
+**Chosen Option**:
+Persist a document's chunks as a set in the caller's transaction (delete then batched insert, 1000 rows per statement), enforce uniqueness on `(document_id, chunking_version, chunk_index)`, tie chunks to sections with a composite foreign key, and delete a document's chunks whenever it fails or is re-queued.
+
+**Alternatives**: Upsert per chunk; keep old chunks until new ones succeed.
+
+**Reason**:
+Replace-all is idempotent and cannot leave a mixture of two runs; batching was about 10x faster than row-by-row inserts for 10,000 chunks in the baseline. Serving a failed document's old chunks would break "chunks exist only for chunked documents".
+
+**Consequence**: re-chunking regenerates chunk IDs, so any later artefact keyed on chunk ID (embeddings) must be rebuilt after re-chunking.
+
 ---
 
 ## Future Decisions to Make

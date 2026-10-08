@@ -20,7 +20,12 @@ from app.dependencies import (
 )
 from app.exceptions import RequestValidationFailedError
 from app.schemas.common import ErrorResponse, PagedResponse, ResponseEnvelope
-from app.schemas.document import CollectionSummary, DocumentResponse, DocumentUpdate
+from app.schemas.document import (
+    ChunkResponse,
+    CollectionSummary,
+    DocumentResponse,
+    DocumentUpdate,
+)
 from app.services.document_service import DocumentView
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -69,6 +74,8 @@ def _to_response(view: DocumentView) -> DocumentResponse:
         processing_completed_at=document.processing_completed_at,
         page_count=document.page_count,
         character_count=document.character_count,
+        chunk_count=document.chunk_count,
+        chunking_version=document.chunking_version,
         collections=[CollectionSummary(id=ref.id, name=ref.name) for ref in view.collections],
         created_at=document.created_at,
         updated_at=document.updated_at,
@@ -171,6 +178,40 @@ async def update_document(
     service: DocumentServiceDep,
 ) -> ResponseEnvelope[DocumentResponse]:
     return envelope(request, _to_response(await service.rename(user, document_id, body.filename)))
+
+
+@router.get(
+    "/{document_id}/chunks",
+    summary="Inspect a document's chunks (reading order, with source locations)",
+    responses=_ERRORS,
+)
+async def list_document_chunks(
+    document_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+    page: PageParam = 1,
+    page_size: PageSizeParam = DEFAULT_PAGE_SIZE,
+) -> PagedResponse[ChunkResponse]:
+    rows, total = await service.list_chunks(user, document_id, page=page, page_size=page_size)
+    items = [
+        ChunkResponse(
+            id=chunk.id,
+            chunk_index=chunk.chunk_index,
+            text=chunk.text,
+            char_count=chunk.char_count,
+            section_ordinal=section_ordinal,
+            page_number=chunk.page_number,
+            heading=chunk.heading,
+            heading_level=chunk.heading_level,
+            heading_path=list(chunk.heading_path),
+            start_char=chunk.start_char,
+            end_char=chunk.end_char,
+            overlap_chars=chunk.overlap_chars,
+        )
+        for chunk, section_ordinal in rows
+    ]
+    return paged(request, items, page=page, page_size=page_size, total=total)
 
 
 @router.post(

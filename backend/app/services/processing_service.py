@@ -1,6 +1,6 @@
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.core.chunking.types import Chunker, ParagraphMode, SectionText
 from app.core.documents.normalization import normalize_text
 from app.core.documents.processing import (
     PROCESSING_VERSION,
@@ -19,6 +20,8 @@ from app.core.documents.processing import (
     ProcessingFailure,
 )
 from app.core.documents.scripts import profile_scripts
+from app.core.documents.types import DocumentType
+from app.db.repositories.chunk_repository import ChunkRepository, ChunkRow
 from app.db.repositories.document_repository import ClaimedDocument, DocumentRepository
 from app.db.repositories.section_repository import NewSection, SectionRepository
 from app.observability.logging import get_logger
@@ -32,7 +35,7 @@ MAX_HEADING_CHARS = 500
 MAX_PROPERTY_CHARS = 300
 MAX_BACKOFF_SECONDS = 900
 
-OutcomeStatus = Literal["ready", "failed", "retry", "skipped"]
+OutcomeStatus = Literal["chunked", "failed", "retry", "skipped"]
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,7 @@ class RecoveryReport:
 
 
 class ProcessingService:
-    """Runs the extraction pipeline for one document (worker side)."""
+    """Worker-side pipeline: extract, normalise, persist sections, chunk, persist chunks."""
 
     def __init__(
         self,
@@ -58,12 +61,16 @@ class ProcessingService:
         session: AsyncSession,
         documents: DocumentRepository,
         sections: SectionRepository,
+        chunks: ChunkRepository,
+        chunker: Chunker,
         storage: StorageProvider,
         settings: Settings,
     ) -> None:
         self._session = session
         self._documents = documents
         self._sections = sections
+        self._chunks = chunks
+        self._chunker = chunker
         self._storage = storage
         self._settings = settings
         self._limits = ExtractionLimits(
@@ -72,48 +79,44 @@ class ProcessingService:
             max_docx_uncompressed_bytes=settings.processing_max_docx_uncompressed_bytes,
         )
 
+    # --- entry points ---------------------------------------------------------------------
+
     async def process(self, document_id: uuid.UUID, *, task_id: str = "-") -> ProcessingOutcome:
+        """Full pipeline for a `pending` (or abandoned) document: extract, then chunk."""
         stale_before = datetime.now(UTC) - timedelta(
             seconds=self._settings.processing_stale_after_seconds
         )
         claimed = await self._documents.claim_for_processing(document_id, stale_before=stale_before)
         await self._session.commit()
         if claimed is None:
-            logger.info(
-                "processing skipped",
-                extra={
-                    "document_id": str(document_id),
-                    "task_id": task_id,
-                    "reason": "not_claimable",
-                },
-            )
-            return ProcessingOutcome("skipped", "not_claimable")
-
-        context = {"document_id": str(claimed.id), "task_id": task_id, "attempt": claimed.attempts}
+            return self._skipped(document_id, task_id)
+        context = self._context(claimed, task_id)
         logger.info("processing started", extra={**context, "file_type": claimed.file_type})
         if claimed.attempts > self._settings.processing_max_attempts:
             return await self._finish_failed(
                 claimed, ProcessingFailure(FailureReason.RETRIES_EXHAUSTED), context
             )
         started = time.monotonic()
-        try:
-            return await self._run(claimed, started, context)
-        except ProcessingFailure as failure:
-            await self._session.rollback()
-            return await self._handle_failure(claimed, failure, context)
-        except SQLAlchemyError as error:
-            await self._session.rollback()
-            db_failure = ProcessingFailure(
-                FailureReason.DATABASE_ERROR, retryable=True, detail=type(error).__name__
-            )
-            return await self._handle_failure(claimed, db_failure, context)
-        except Exception as error:
-            await self._session.rollback()
-            unexpected = ProcessingFailure(
-                FailureReason.EXTRACTION_FAILED, detail=type(error).__name__
-            )
-            logger.exception("unexpected processing error", extra=context)
-            return await self._handle_failure(claimed, unexpected, context)
+        return await self._guarded(
+            claimed, context, lambda: self._extract_and_chunk(claimed, started, context)
+        )
+
+    async def rechunk(self, document_id: uuid.UUID, *, task_id: str = "-") -> ProcessingOutcome:
+        """Regenerate chunks of a `chunked` document from its stored sections.
+
+        Used when the chunking version or configuration changes; extraction is not repeated.
+        """
+        claimed = await self._documents.claim_for_rechunking(document_id)
+        await self._session.commit()
+        if claimed is None:
+            return self._skipped(document_id, task_id)
+        context = self._context(claimed, task_id)
+        logger.info("re-chunking started", extra=context)
+        deadline = Deadline(self._settings.processing_timeout_seconds)
+        started = time.monotonic()
+        return await self._guarded(
+            claimed, context, lambda: self._chunk(claimed, deadline, started, context)
+        )
 
     async def fail_timed_out(self, document_id: uuid.UUID, *, task_id: str = "-") -> None:
         """Called when the worker's hard/soft time limit interrupted processing."""
@@ -132,28 +135,28 @@ class ProcessingService:
             },
         )
 
-    async def _run(
+    # --- stages ---------------------------------------------------------------------------
+
+    async def _extract_and_chunk(
         self, claimed: ClaimedDocument, started: float, context: dict[str, Any]
     ) -> ProcessingOutcome:
+        deadline = Deadline(self._settings.processing_timeout_seconds)
         data = await self._read(claimed)
         extractor = get_extractor(claimed.file_type)
-        deadline = Deadline(self._settings.processing_timeout_seconds)
         extraction = extractor.extract(data, limits=self._limits, deadline=deadline)
         del data
         sections = self._normalise(extraction, extractor.collapse_inline_spaces, deadline)
         character_count = sum(len(section.text) for section in sections)
-        has_content = character_count > 0 or any(section.heading for section in sections)
-        if not has_content:
+        if character_count == 0 and not any(section.heading for section in sections):
             raise ProcessingFailure(FailureReason.EMPTY_DOCUMENT)
 
         profile = profile_scripts(
             part for section in sections for part in (section.heading or "", section.text)
         )
-        duration_ms = round((time.monotonic() - started) * 1000)
         metadata: dict[str, Any] = {
             "processing_version": PROCESSING_VERSION,
             "extractor": extraction.extractor,
-            "duration_ms": duration_ms,
+            "duration_ms": round((time.monotonic() - started) * 1000),
             "section_count": len(sections),
             **profile.as_dict(),
         }
@@ -162,31 +165,143 @@ class ProcessingService:
             metadata["properties"] = properties
 
         await self._sections.replace_all(claimed.id, sections)
-        saved = await self._documents.complete_processing(
+        saved = await self._documents.complete_extraction(
             claimed.id,
             page_count=extraction.page_count,
             character_count=character_count,
             metadata=metadata,
         )
         if not saved:
-            await self._session.rollback()
-            logger.info(
-                "processing result discarded", extra={**context, "reason": "document_changed"}
-            )
-            return ProcessingOutcome("skipped", "document_changed")
-        await self._session.commit()
+            return await self._discard(context)
+        await self._session.commit()  # text is now durable; the document is visibly `chunking`
         logger.info(
-            "processing completed",
+            "text extracted",
             extra={
                 **context,
                 "extractor": extraction.extractor,
-                "duration_ms": duration_ms,
                 "page_count": extraction.page_count,
                 "character_count": character_count,
                 "primary_script": profile.primary,
             },
         )
-        return ProcessingOutcome("ready")
+        return await self._chunk(claimed, deadline, started, context)
+
+    async def _chunk(
+        self, claimed: ClaimedDocument, deadline: Deadline, started: float, context: dict[str, Any]
+    ) -> ProcessingOutcome:
+        stored = await self._sections.load_for_chunking(claimed.id)
+        paragraph_mode = (
+            ParagraphMode.LINE
+            if claimed.file_type == DocumentType.DOCX
+            else ParagraphMode.BLANK_LINE
+        )
+        inputs = [
+            SectionText(
+                ordinal=row.ordinal,
+                text=row.text,
+                heading=row.heading,
+                heading_level=row.heading_level,
+                page_number=row.page_number,
+                paragraph_mode=paragraph_mode,
+                markdown=claimed.file_type == DocumentType.MD,
+            )
+            for row in stored
+        ]
+        chunk_started = time.monotonic()
+        try:
+            result = self._chunker.chunk(inputs, deadline)
+        except ProcessingFailure:
+            raise
+        except Exception as error:
+            raise ProcessingFailure(
+                FailureReason.CHUNKING_FAILED, detail=type(error).__name__
+            ) from None
+        if not result.chunks:
+            raise ProcessingFailure(FailureReason.EMPTY_DOCUMENT, detail="no chunkable text")
+
+        section_ids = {row.ordinal: row.id for row in stored}
+        await self._chunks.replace_all(
+            claimed.id,
+            self._chunker.version,
+            [ChunkRow(draft, section_ids[draft.section_ordinal]) for draft in result.chunks],
+        )
+        info: dict[str, Any] = {
+            **self._chunker_config_snapshot(),
+            "chunk_count": len(result.chunks),
+            "skipped_sections": result.skipped_sections,
+            "dropped_chunks": result.dropped_chunks,
+            "max_chunk_chars": max(len(draft.text) for draft in result.chunks),
+            "duration_ms": round((time.monotonic() - chunk_started) * 1000),
+        }
+        saved = await self._documents.complete_chunking(
+            claimed.id,
+            chunk_count=len(result.chunks),
+            chunking_version=self._chunker.version,
+            chunking_info=info,
+        )
+        if not saved:
+            return await self._discard(context)
+        await self._session.commit()
+        logger.info(
+            "processing completed",
+            extra={
+                **context,
+                "chunk_count": len(result.chunks),
+                "chunking_version": self._chunker.version,
+                "chunking_duration_ms": info["duration_ms"],
+                "duration_ms": round((time.monotonic() - started) * 1000),
+            },
+        )
+        return ProcessingOutcome("chunked")
+
+    def _chunker_config_snapshot(self) -> dict[str, Any]:
+        config = getattr(self._chunker, "config", None)
+        snapshot = getattr(config, "snapshot", None)
+        return dict(snapshot()) if callable(snapshot) else {"version": self._chunker.version}
+
+    # --- helpers --------------------------------------------------------------------------
+
+    @staticmethod
+    def _context(claimed: ClaimedDocument, task_id: str) -> dict[str, Any]:
+        return {"document_id": str(claimed.id), "task_id": task_id, "attempt": claimed.attempts}
+
+    @staticmethod
+    def _skipped(document_id: uuid.UUID, task_id: str) -> ProcessingOutcome:
+        logger.info(
+            "processing skipped",
+            extra={"document_id": str(document_id), "task_id": task_id, "reason": "not_claimable"},
+        )
+        return ProcessingOutcome("skipped", "not_claimable")
+
+    async def _discard(self, context: dict[str, Any]) -> ProcessingOutcome:
+        await self._session.rollback()
+        logger.info("processing result discarded", extra={**context, "reason": "document_changed"})
+        return ProcessingOutcome("skipped", "document_changed")
+
+    async def _guarded(
+        self,
+        claimed: ClaimedDocument,
+        context: dict[str, Any],
+        stage: Callable[[], Awaitable[ProcessingOutcome]],
+    ) -> ProcessingOutcome:
+        try:
+            return await stage()
+        except ProcessingFailure as failure:
+            await self._session.rollback()
+            return await self._handle_failure(claimed, failure, context)
+        except SQLAlchemyError as error:
+            await self._session.rollback()
+            db_failure = ProcessingFailure(
+                FailureReason.DATABASE_ERROR, retryable=True, detail=type(error).__name__
+            )
+            return await self._handle_failure(claimed, db_failure, context)
+        except Exception as error:
+            await self._session.rollback()
+            unexpected = ProcessingFailure(
+                FailureReason.EXTRACTION_FAILED, detail=type(error).__name__
+            )
+            logger.exception("unexpected processing error", extra=context)
+            return await self._handle_failure(claimed, unexpected, context)
 
     async def _read(self, claimed: ClaimedDocument) -> bytes:
         try:
@@ -261,8 +376,10 @@ class ProcessingService:
         base = self._settings.processing_retry_backoff_seconds
         return int(min(base * 2 ** max(attempts - 1, 0), MAX_BACKOFF_SECONDS))
 
+    # --- recovery -------------------------------------------------------------------------
+
     async def recover(self, enqueue: Callable[[uuid.UUID], None]) -> RecoveryReport:
-        """Release abandoned `parsing` documents and re-queue ones whose message was lost."""
+        """Release abandoned in-progress documents and re-queue ones whose message was lost."""
         settings = self._settings
         now = datetime.now(UTC)
         stale_before = now - timedelta(seconds=settings.processing_stale_after_seconds)

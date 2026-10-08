@@ -57,7 +57,7 @@ def test_pdf_is_processed_into_one_section_per_page_with_bangla_intact(
 
     outcome = process_now(auth_client, doc_id)
 
-    assert outcome.status == "ready"
+    assert outcome.status == "chunked"
     sections = sections_of(migrated_database_url, doc_id)
     assert [(s["kind"], s["page_number"], s["ordinal"]) for s in sections] == [
         ("page", 1, 0), ("page", 2, 1), ("page", 3, 2), ("page", 4, 3),
@@ -81,7 +81,9 @@ def test_document_row_reports_status_counts_and_metadata(
 
     row = row_of(migrated_database_url, doc_id)
     assert (
-        row["status"] == "ready" and row["failure_reason"] is None and row["error_message"] is None
+        row["status"] == "chunked"
+        and row["failure_reason"] is None
+        and row["error_message"] is None
     )
     assert row["page_count"] == 2
     assert row["character_count"] == sum(
@@ -104,7 +106,7 @@ def test_api_exposes_safe_processing_information(auth_client: TestClient) -> Non
 
     data = fetch_document(auth_client, alice, doc_id)
 
-    assert data["status"] == "ready" and data["page_count"] == 2 and data["character_count"] > 0
+    assert data["status"] == "chunked" and data["page_count"] == 2 and data["character_count"] > 0
     assert data["processing_started_at"] and data["processing_completed_at"]
     assert data["failure_reason"] is None and data["error_message"] is None
     assert "metadata" not in data and "processing_attempts" not in data
@@ -123,7 +125,7 @@ def test_docx_is_split_at_headings_and_keeps_bangla(
     )
     doc_id = _upload(auth_client, alice, "notes.docx", data)
 
-    assert process_now(auth_client, doc_id).status == "ready"
+    assert process_now(auth_client, doc_id).status == "chunked"
 
     sections = sections_of(migrated_database_url, doc_id)
     assert [(s["kind"], s["heading"], s["heading_level"]) for s in sections] == [
@@ -144,8 +146,8 @@ def test_text_and_markdown_are_processed(
         auth_client, alice, "guide.md", markdown_bytes("x") + "\n## দ্বিতীয়\nবিষয়বস্তু\n".encode()
     )
 
-    assert process_now(auth_client, txt).status == "ready"
-    assert process_now(auth_client, md).status == "ready"
+    assert process_now(auth_client, txt).status == "chunked"
+    assert process_now(auth_client, md).status == "chunked"
 
     body = sections_of(migrated_database_url, txt)
     assert (
@@ -315,9 +317,9 @@ def test_transient_storage_error_is_retried_and_then_succeeds(
     backoff = auth_client.app.state.settings.processing_retry_backoff_seconds  # type: ignore[attr-defined]
     assert first.status == "retry" and first.retry_in == backoff
     assert after_first["status"] == "pending" and after_first["processing_attempts"] == 1
-    assert second.status == "ready"
+    assert second.status == "chunked"
     final = row_of(migrated_database_url, doc_id)
-    assert final["status"] == "ready" and final["processing_attempts"] == 2
+    assert final["status"] == "chunked" and final["processing_attempts"] == 2
     assert len(sections_of(migrated_database_url, doc_id)) == 1  # no duplicates
 
 
@@ -349,6 +351,8 @@ def test_backoff_grows_exponentially_and_is_capped(auth_client_factory: ClientFa
         session=None,  # type: ignore[arg-type]
         documents=None,  # type: ignore[arg-type]
         sections=None,  # type: ignore[arg-type]
+        chunks=None,  # type: ignore[arg-type]
+        chunker=None,  # type: ignore[arg-type]
         storage=None,  # type: ignore[arg-type]
         settings=client.app.state.settings,  # type: ignore[attr-defined]
     )
@@ -362,10 +366,10 @@ def test_only_pending_documents_can_be_claimed(auth_client: TestClient) -> None:
     doc_id = _upload(auth_client, alice, "t.txt", text_bytes("once"))
 
     first = process_now(auth_client, doc_id)
-    again = process_now(auth_client, doc_id)  # already ready
+    again = process_now(auth_client, doc_id)  # already chunked
     unknown = process_now(auth_client, str(uuid.uuid4()))
 
-    assert (first.status, again.status, unknown.status) == ("ready", "skipped", "skipped")
+    assert (first.status, again.status, unknown.status) == ("chunked", "skipped", "skipped")
 
 
 def test_two_workers_racing_for_one_document_process_it_exactly_once(
@@ -383,7 +387,7 @@ def test_two_workers_racing_for_one_document_process_it_exactly_once(
 
     statuses = asyncio.run(race())
 
-    assert sorted(statuses) == ["ready", "skipped", "skipped", "skipped"]
+    assert sorted(statuses) == ["chunked", "skipped", "skipped", "skipped"]
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 1
     assert len(sections_of(migrated_database_url, doc_id)) == 2
 
@@ -398,7 +402,7 @@ def test_manual_retry_reprocesses_without_duplicating_content(
         migrated_database_url, "UPDATE documents SET status = 'pending' WHERE id = :d", d=doc_id
     )
 
-    assert process_now(auth_client, doc_id).status == "ready"
+    assert process_now(auth_client, doc_id).status == "chunked"
 
     assert len(sections_of(migrated_database_url, doc_id)) == 2
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 2
@@ -416,7 +420,7 @@ def test_abandoned_parsing_document_is_reclaimed_after_the_stale_window(
         d=doc_id,
     )
 
-    assert process_now(auth_client, doc_id).status == "ready"
+    assert process_now(auth_client, doc_id).status == "chunked"
 
 
 def test_fresh_parsing_document_is_not_stolen_from_a_live_worker(
@@ -570,10 +574,13 @@ def test_processing_logs_metadata_but_never_document_content(
     logged = "\n".join(lines)
     assert "TOPSECRET" not in logged and "ওপেন" not in logged
     events = [json.loads(line) for line in lines if '"app.processing"' in line]
+    extracted = next(e for e in events if e["message"] == "text extracted")
+    assert extracted["document_id"] == ok and extracted["task_id"] == "task-ok"
+    assert extracted["extractor"] == "pdf" and extracted["page_count"] == 2
+    assert extracted["character_count"] > 0
     completed = next(e for e in events if e["message"] == "processing completed")
-    assert completed["document_id"] == ok and completed["task_id"] == "task-ok"
-    assert completed["extractor"] == "pdf" and completed["page_count"] == 2
-    assert completed["character_count"] > 0 and completed["duration_ms"] >= 0
+    assert completed["document_id"] == ok and completed["chunk_count"] >= 2
+    assert completed["chunking_version"].startswith("c") and completed["duration_ms"] >= 0
     failed = next(e for e in events if e["message"] == "processing failed")
     assert failed["failure_reason"] == "corrupt_document" and failed["task_id"] == "task-bad"
 

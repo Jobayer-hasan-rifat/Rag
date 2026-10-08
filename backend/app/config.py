@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     processing_sweep_interval_seconds: int = Field(default=60, ge=5)
     processing_pending_requeue_after_seconds: int = Field(default=120, ge=10)
     processing_sweep_batch_size: int = Field(default=100, ge=1, le=1000)
+    chunking_max_chars: int = Field(default=1000, ge=100, le=20_000)
+    chunking_overlap_chars: int = Field(default=150, ge=0)
+    chunking_min_chars: int = Field(default=20, ge=1)
+    chunking_max_chunks: int = Field(default=50_000, ge=1)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -101,6 +105,14 @@ class Settings(BaseSettings):
                 "PROCESSING_STALE_AFTER_SECONDS must exceed the task hard time limit "
                 "(PROCESSING_TIMEOUT_SECONDS + 45)"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _check_chunking_sizes(self) -> "Settings":
+        if self.chunking_overlap_chars * 2 > self.chunking_max_chars:
+            raise ValueError("CHUNKING_OVERLAP_CHARS must be at most half of CHUNKING_MAX_CHARS")
+        if self.chunking_min_chars >= self.chunking_max_chars:
+            raise ValueError("CHUNKING_MIN_CHARS must be smaller than CHUNKING_MAX_CHARS")
         return self
 
     @property

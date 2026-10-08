@@ -71,8 +71,10 @@ logs/
 uploads/
 temp/
 
-# Model weights (if downloaded locally)
-models/
+# Model weights (if downloaded locally). Anchored so the SQLAlchemy package at
+# backend/app/models/ is not ignored.
+/models/
+/backend/models/
 *.bin
 *.pt
 *.pth

@@ -3,13 +3,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import ColumnElement, exists, func, select, update
+from sqlalchemy import ColumnElement, delete, exists, func, select, type_coerce, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.collection import Collection
 from app.models.document import Document, DocumentCollection
+from app.models.document_chunk import DocumentChunk
 
 SortField = Literal["created_at", "filename", "file_size"]
+IN_PROGRESS = ("parsing", "chunking")
 SortOrder = Literal["asc", "desc"]
 
 
@@ -150,7 +153,8 @@ class DocumentRepository:
                 Document.id == document_id,
                 (Document.status == "pending")
                 | (
-                    (Document.status == "parsing") & (Document.processing_started_at < stale_before)
+                    Document.status.in_(IN_PROGRESS)
+                    & (Document.processing_started_at < stale_before)
                 ),
             )
             .values(
@@ -173,7 +177,7 @@ class DocumentRepository:
         row = (await self._session.execute(statement)).first()
         return ClaimedDocument(*row) if row else None
 
-    async def complete_processing(
+    async def complete_extraction(
         self,
         document_id: uuid.UUID,
         *,
@@ -181,18 +185,70 @@ class DocumentRepository:
         character_count: int,
         metadata: dict[str, Any],
     ) -> bool:
-        """parsing -> ready. False if the document was deleted or changed state meanwhile."""
+        """parsing -> chunking once the text is extracted and stored.
+
+        Clears any earlier chunk summary: replacing the sections also cascades away old chunks.
+        """
         result = await self._session.execute(
             update(Document)
             .where(Document.id == document_id, Document.status == "parsing")
             .values(
-                status="ready",
+                status="chunking",
                 page_count=page_count,
                 character_count=character_count,
-                processing_completed_at=func.now(),
+                chunk_count=None,
+                chunking_version=None,
                 processing_metadata=metadata,
                 failure_reason=None,
                 error_message=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(result.rowcount)  # type: ignore[attr-defined]
+
+    async def claim_for_rechunking(self, document_id: uuid.UUID) -> ClaimedDocument | None:
+        """chunked -> chunking, to regenerate chunks from the stored sections."""
+        statement = (
+            update(Document)
+            .where(Document.id == document_id, Document.status == "chunked")
+            .values(
+                status="chunking",
+                processing_started_at=func.now(),
+                processing_completed_at=None,
+                processing_attempts=1,
+            )
+            .returning(
+                Document.id,
+                Document.storage_key,
+                Document.file_type,
+                Document.file_size,
+                Document.processing_attempts,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        row = (await self._session.execute(statement)).first()
+        return ClaimedDocument(*row) if row else None
+
+    async def complete_chunking(
+        self,
+        document_id: uuid.UUID,
+        *,
+        chunk_count: int,
+        chunking_version: str,
+        chunking_info: dict[str, Any],
+    ) -> bool:
+        """chunking -> chunked: chunks stored, document ready for embedding."""
+        result = await self._session.execute(
+            update(Document)
+            .where(Document.id == document_id, Document.status == "chunking")
+            .values(
+                status="chunked",
+                chunk_count=chunk_count,
+                chunking_version=chunking_version,
+                processing_completed_at=func.now(),
+                processing_metadata=Document.processing_metadata.concat(
+                    type_coerce({"chunking": chunking_info}, JSONB)
+                ),
             )
             .execution_options(synchronize_session=False)
         )
@@ -207,7 +263,7 @@ class DocumentRepository:
         started_before: datetime | None = None,
     ) -> bool:
         """parsing -> failed with a safe machine-readable reason and message."""
-        conditions = [Document.id == document_id, Document.status == "parsing"]
+        conditions = [Document.id == document_id, Document.status.in_(IN_PROGRESS)]
         if started_before is not None:
             conditions.append(Document.processing_started_at < started_before)
         result = await self._session.execute(
@@ -218,25 +274,39 @@ class DocumentRepository:
                 failure_reason=reason,
                 error_message=message,
                 processing_completed_at=func.now(),
+                chunk_count=None,
+                chunking_version=None,
             )
             .execution_options(synchronize_session=False)
         )
-        return bool(result.rowcount)  # type: ignore[attr-defined]
+        return await self._after_leaving_chunked(document_id, bool(result.rowcount))  # type: ignore[attr-defined]
 
     async def release_for_retry(
         self, document_id: uuid.UUID, *, started_before: datetime | None = None
     ) -> bool:
         """parsing -> pending, so the document can be claimed again."""
-        conditions = [Document.id == document_id, Document.status == "parsing"]
+        conditions = [Document.id == document_id, Document.status.in_(IN_PROGRESS)]
         if started_before is not None:
             conditions.append(Document.processing_started_at < started_before)
         result = await self._session.execute(
             update(Document)
             .where(*conditions)
-            .values(status="pending")
+            .values(status="pending", chunk_count=None, chunking_version=None)
             .execution_options(synchronize_session=False)
         )
-        return bool(result.rowcount)  # type: ignore[attr-defined]
+        return await self._after_leaving_chunked(document_id, bool(result.rowcount))  # type: ignore[attr-defined]
+
+    async def _after_leaving_chunked(self, document_id: uuid.UUID, applied: bool) -> bool:
+        """Keep the invariant "a document has chunks only while it is chunked or beyond".
+
+        A failed or re-queued document must not keep serving the chunks of an earlier run, so
+        they are removed in the same transaction as the status change.
+        """
+        if applied:
+            await self._session.execute(
+                delete(DocumentChunk).where(DocumentChunk.document_id == document_id)
+            )
+        return applied
 
     async def reset_for_manual_retry(self, document_id: uuid.UUID) -> bool:
         """failed -> pending with a fresh attempt budget."""
@@ -249,6 +319,8 @@ class DocumentRepository:
                 error_message=None,
                 processing_attempts=0,
                 processing_completed_at=None,
+                chunk_count=None,
+                chunking_version=None,
             )
             .execution_options(synchronize_session=False)
         )
@@ -259,7 +331,9 @@ class DocumentRepository:
     ) -> list[tuple[uuid.UUID, int]]:
         result = await self._session.execute(
             select(Document.id, Document.processing_attempts)
-            .where(Document.status == "parsing", Document.processing_started_at < started_before)
+            .where(
+                Document.status.in_(IN_PROGRESS), Document.processing_started_at < started_before
+            )
             .order_by(Document.processing_started_at)
             .limit(limit)
         )

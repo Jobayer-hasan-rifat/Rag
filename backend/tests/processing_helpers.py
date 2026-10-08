@@ -69,4 +69,34 @@ def row_of(db_url: str, document_id: str) -> dict[str, Any]:
     return dict(zip(names, rows[0], strict=True))
 
 
+def chunks_of(db_url: str, document_id: str) -> list[dict[str, Any]]:
+    rows = db_rows(
+        db_url,
+        "SELECT c.chunk_index, c.text, c.char_count, c.text_sha256, c.start_char, c.end_char, "
+        "c.overlap_chars, c.page_number, c.heading, c.heading_level, c.heading_path, "
+        "c.chunking_version, s.ordinal, s.text "
+        "FROM document_chunks c JOIN document_sections s ON s.id = c.section_id "
+        "WHERE c.document_id = :d ORDER BY c.chunk_index",
+        d=document_id,
+    )
+    names = (
+        "chunk_index", "text", "char_count", "text_sha256", "start_char", "end_char",
+        "overlap_chars", "page_number", "heading", "heading_level", "heading_path",
+        "chunking_version", "section_ordinal", "section_text",
+    )  # fmt: skip
+    return [dict(zip(names, row, strict=True)) for row in rows]
+
+
+def rechunk_now(
+    client: TestClient, document_id: str, task_id: str = "test-rechunk", **overrides: Any
+) -> ProcessingOutcome:
+    """Run the re-chunking path in this process, optionally with changed chunking settings."""
+    from app.workers.document_tasks import _rechunk
+
+    settings = client.app.state.settings  # type: ignore[attr-defined]
+    if overrides:
+        settings = settings.model_copy(update=overrides)
+    return asyncio.run(_rechunk(settings, uuid.UUID(document_id), task_id))
+
+
 __all__ = ["bearer"]

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 5: Intelligent Chunking
+
+- Structure-aware, deterministic chunker (`app/core/chunking/`): chunks never cross a page or heading boundary, are exact slices of their section, keep page number, heading and heading path, and respect a configurable size limit; linear-time on adversarial input
+- Paragraph, table and fenced-code awareness; sentence splitting that understands the Bengali danda; conjunct- and ZWJ/ZWNJ-safe hard cuts; overlap only inside oversized blocks
+- `document_chunks` table and `chunk_count` / `chunking_version` on documents (migration `0005`), with idempotent replace-all persistence in batches
+- New `chunked` status ("chunks generated, ready for embedding"); `ready` now means embedded and searchable
+- `GET /api/v1/documents/{id}/chunks` (owner-scoped, paginated) and chunk fields on document responses
+- `rechunk_document` maintenance task to regenerate chunks from stored sections without re-extraction
+- `too_many_chunks` and `chunking_failed` failure reasons, `CHUNKING_*` settings, chunking quality evaluation (`benchmarks/chunking_eval.py`) and baseline (`benchmarks/chunking_baseline.py`)
+
+### Changed
+
+- The processing pipeline now ends in `chunked` instead of `ready`; documents that Phase 4 left in `ready` are returned to `pending` by the migration and reprocessed
+- A failed or re-queued document no longer keeps chunks or counts from an earlier run
+
 ### Added - Phase 4: Document Processing
 
 - Asynchronous processing pipeline: upload queues a Celery task; a worker extracts, normalises and stores each document's text and marks it `ready` (or `failed`)
@@ -224,7 +239,7 @@ This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH 
 | 0.2.0 | Phase 2 Complete | Authentication working |
 | 0.3.0 | Phase 3 Complete | Document management working |
 | 0.4.0 | Phase 4 Complete | Document processing working |
-| 0.5.0 | Phase 5 Complete | Vector search working |
+| 0.5.0 | Phase 5 Complete | Document chunking working (vector search follows) |
 | 0.6.0 | Phase 6 Complete | Hybrid search working |
 | 0.7.0 | Phase 7 Complete | Reranking working |
 | 0.8.0 | Phase 8 Complete | RAG working |

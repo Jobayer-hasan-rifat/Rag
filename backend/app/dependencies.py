@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.config import Settings
+from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
 from app.db.repositories.document_repository import DocumentRepository
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
@@ -181,6 +182,7 @@ def get_document_service(
         session=session,
         documents=DocumentRepository(session),
         collections=CollectionRepository(session),
+        chunks=ChunkRepository(session),
         storage=storage,
         processing_queue=processing_queue,
         settings=settings,

@@ -1,7 +1,7 @@
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import delete, insert
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.document_section import DocumentSection
@@ -45,3 +45,12 @@ class SectionRepository:
                     for offset, section in enumerate(batch)
                 ],
             )
+
+    async def load_for_chunking(self, document_id: uuid.UUID) -> list[DocumentSection]:
+        """All sections of a document in reading order."""
+        result = await self._session.execute(
+            select(DocumentSection)
+            .where(DocumentSection.document_id == document_id)
+            .order_by(DocumentSection.ordinal)
+        )
+        return list(result.scalars().all())

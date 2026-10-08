@@ -272,9 +272,9 @@ All endpoints require authentication and enforce ownership server-side. Response
 keys, filesystem paths or owner IDs. A document that is missing and one that belongs to someone else both
 return 404 (administrators may access any document by ID, but `GET /documents` only lists the caller's own).
 
-Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "failure_reason", "processing_started_at", "processing_completed_at", "page_count", "character_count", "collections": [{"id","name"}], "created_at", "updated_at"}`
+Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "failure_reason", "processing_started_at", "processing_completed_at", "page_count", "character_count", "chunk_count", "chunking_version", "collections": [{"id","name"}], "created_at", "updated_at"}`
 
-**Processing state**: uploads start as `pending` and are processed asynchronously. `status` moves `pending -> parsing -> ready` (or `failed`); `page_count` is set for PDFs and `character_count` once text is stored. For `failed` documents `failure_reason` is a stable code (`corrupt_document`, `encrypted_document`, `empty_document`, `too_many_pages`, `content_too_large`, `timeout`, `storage_missing`, `storage_unavailable`, `extraction_failed`, `database_error`, `retries_exhausted`) and `error_message` a fixed, safe sentence. Stack traces, paths and exception text are never returned. Poll `GET /documents/{id}` for progress.
+**Processing state**: uploads start as `pending` and are processed asynchronously. `status` moves `pending -> parsing -> chunking -> chunked` (or `failed`); `chunked` means the text was extracted and split into chunks and the document awaits embedding (`ready` is reserved for searchable documents and is not reached yet). `page_count` is set for PDFs, `character_count` once text is stored, and `chunk_count` and `chunking_version` once chunks are stored (otherwise `null`). For `failed` documents `failure_reason` is a stable code (`corrupt_document`, `encrypted_document`, `empty_document`, `too_many_pages`, `content_too_large`, `too_many_chunks`, `chunking_failed`, `timeout`, `storage_missing`, `storage_unavailable`, `extraction_failed`, `database_error`, `retries_exhausted`) and `error_message` a fixed, safe sentence. Stack traces, paths and exception text are never returned. Poll `GET /documents/{id}` for progress.
 
 ### GET /documents
 
@@ -318,6 +318,18 @@ Metadata for one document. **Errors**: 404.
 
 Rename the display name: `{"filename": "New name.pdf"}`. The name is sanitised and its extension must match the
 document's type (415 otherwise). The stored file is untouched. **Errors**: 404, 415, 422.
+
+### GET /documents/{id}/chunks
+
+Inspect a document's chunks in reading order (for debugging and for verifying how a document was split). Only the
+owner can read them (administrators may, per the document access policy); another user's document and a missing one
+both return 404.
+
+**Query parameters**: `page` (default 1), `page_size` (default 20, max 100).
+
+**Response** (200): a paginated list of `{"id", "chunk_index", "text", "char_count", "section_ordinal", "page_number", "heading", "heading_level", "heading_path": [..], "start_char", "end_char", "overlap_chars"}`. `start_char` and `end_char` are offsets into the source section and `end_char - start_char == char_count`. A document without chunks returns an empty list. Storage keys, section/document IDs and owner IDs are never returned.
+
+**Errors**: 401; 404 (missing or not yours); 422 (invalid pagination or ID).
 
 ### POST /documents/{id}/retry
 

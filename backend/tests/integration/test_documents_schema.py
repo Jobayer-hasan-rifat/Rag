@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import Settings
 from app.core.documents.lifecycle import DocumentStatus
+from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
 from app.db.repositories.document_repository import DocumentRepository
 from app.exceptions import InvalidStatusTransitionError
@@ -266,6 +267,7 @@ async def lifecycle_env(
             session=session,
             documents=DocumentRepository(session),
             collections=CollectionRepository(session),
+            chunks=ChunkRepository(session),
             storage=LocalStorageProvider(tmp_path / "s"),
             processing_queue=RecordingQueue(),
             settings=settings,
@@ -279,8 +281,9 @@ async def test_status_moves_through_the_pipeline_and_is_persisted(
 ) -> None:
     service, document, _ = lifecycle_env
 
-    for stage in (DocumentStatus.PARSING, DocumentStatus.CHUNKING, DocumentStatus.EMBEDDING,
-                  DocumentStatus.INDEXING, DocumentStatus.READY):  # fmt: skip
+    for stage in (DocumentStatus.PARSING, DocumentStatus.CHUNKING, DocumentStatus.CHUNKED,
+                  DocumentStatus.EMBEDDING, DocumentStatus.INDEXING,
+                  DocumentStatus.READY):  # fmt: skip
         await service.change_status(document, stage)
 
     assert (

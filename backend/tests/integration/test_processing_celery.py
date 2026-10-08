@@ -32,7 +32,7 @@ def _upload(client: TestClient, headers: dict[str, str], name: str, data: bytes)
     return str(upload_ok(client, headers, filename=name, content=data, content_type=None)["id"])
 
 
-def test_upload_is_queued_processed_by_a_real_worker_and_becomes_ready(
+def test_upload_is_queued_processed_by_a_real_worker_and_becomes_chunked(
     pipeline_client_factory: ClientFactory, migrated_database_url: str
 ) -> None:
     client = pipeline_client_factory()
@@ -47,9 +47,9 @@ def test_upload_is_queued_processed_by_a_real_worker_and_becomes_ready(
     )
     assert uploaded["status"] == "pending"  # the request itself did no processing
 
-    done = wait_for_status(client, alice, uploaded["id"], {"ready", "failed"})
+    done = wait_for_status(client, alice, uploaded["id"], {"chunked", "failed"})
 
-    assert done["status"] == "ready" and done["page_count"] == 2 and done["character_count"] > 0
+    assert done["status"] == "chunked" and done["page_count"] == 2 and done["character_count"] > 0
     assert done["processing_started_at"] and done["processing_completed_at"]
     sections = sections_of(migrated_database_url, uploaded["id"])
     assert [s["page_number"] for s in sections] == [1, 2] and BANGLA in sections[0]["text"]
@@ -77,9 +77,9 @@ def test_all_formats_flow_through_the_queue(
         _upload(client, alice, "d.md", markdown_bytes("md")),
     ]
 
-    results = [wait_for_status(client, alice, doc_id, {"ready", "failed"}) for doc_id in ids]
+    results = [wait_for_status(client, alice, doc_id, {"chunked", "failed"}) for doc_id in ids]
 
-    assert [r["status"] for r in results] == ["ready"] * 4
+    assert [r["status"] for r in results] == ["chunked"] * 4
     assert sections_of(migrated_database_url, ids[1])[0]["heading"] == "শিরোনাম"
 
 
@@ -91,11 +91,11 @@ def test_a_failing_document_ends_up_failed_and_does_not_block_others(
     bad = _upload(client, alice, "bad.pdf", b"%PDF-1.4\ngarbage\n%%EOF\n")
     good = _upload(client, alice, "good.txt", text_bytes("fine"))
 
-    bad_done = wait_for_status(client, alice, bad, {"ready", "failed"})
-    good_done = wait_for_status(client, alice, good, {"ready", "failed"})
+    bad_done = wait_for_status(client, alice, bad, {"chunked", "failed"})
+    good_done = wait_for_status(client, alice, good, {"chunked", "failed"})
 
     assert bad_done["status"] == "failed" and bad_done["failure_reason"] == "corrupt_document"
-    assert good_done["status"] == "ready"
+    assert good_done["status"] == "chunked"
 
 
 def test_manual_retry_goes_through_the_queue_again(
@@ -104,7 +104,7 @@ def test_manual_retry_goes_through_the_queue_again(
     client = pipeline_client_factory()
     alice = make_user(client, "alice@example.com")
     doc_id = _upload(client, alice, "t.txt", text_bytes("retry through the queue"))
-    wait_for_status(client, alice, doc_id, {"ready"})
+    wait_for_status(client, alice, doc_id, {"chunked"})
     db_execute(
         migrated_database_url,
         "UPDATE documents SET status='failed', failure_reason='extraction_failed', "
@@ -115,8 +115,8 @@ def test_manual_retry_goes_through_the_queue_again(
     response = client.post(f"{DOCS}/{doc_id}/retry", headers=alice)
 
     assert response.status_code == 202 and response.json()["data"]["status"] == "pending"
-    done = wait_for_status(client, alice, doc_id, {"ready", "failed"})
-    assert done["status"] == "ready" and done["failure_reason"] is None
+    done = wait_for_status(client, alice, doc_id, {"chunked", "failed"})
+    assert done["status"] == "chunked" and done["failure_reason"] is None
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 1  # fresh budget
     assert len(sections_of(migrated_database_url, doc_id)) == 1
 
@@ -127,7 +127,7 @@ def test_recovery_sweep_task_rescues_documents_lost_by_the_queue(
     client = pipeline_client_factory()
     alice = make_user(client, "alice@example.com")
     doc_id = _upload(client, alice, "t.txt", text_bytes("rescued by the sweep"))
-    wait_for_status(client, alice, doc_id, {"ready"})
+    wait_for_status(client, alice, doc_id, {"chunked"})
     db_execute(
         migrated_database_url,
         "UPDATE documents SET status='pending', "
@@ -141,7 +141,7 @@ def test_recovery_sweep_task_rescues_documents_lost_by_the_queue(
     report = _result_of(sweep)
 
     assert report["requeued"] == 1
-    assert wait_for_status(client, alice, doc_id, {"ready"})["status"] == "ready"
+    assert wait_for_status(client, alice, doc_id, {"chunked"})["status"] == "chunked"
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 2
 
 
@@ -177,7 +177,7 @@ def test_upload_response_is_not_blocked_by_processing(
 
     assert doc["status"] == "pending" and doc["page_count"] is None
     assert request_seconds < 5
-    assert wait_for_status(client, alice, doc["id"], {"ready"})["page_count"] == 60
+    assert wait_for_status(client, alice, doc["id"], {"chunked"})["page_count"] == 60
 
 
 def test_worker_tasks_carry_a_correlation_id_and_skip_invalid_ids(
@@ -217,8 +217,36 @@ def test_celery_retries_a_transient_failure_until_it_succeeds(
     alice = make_user(client, "alice@example.com")
     doc_id = _upload(client, alice, "t.txt", text_bytes("flaky storage"))
 
-    done = wait_for_status(client, alice, doc_id, {"ready", "failed"})
+    done = wait_for_status(client, alice, doc_id, {"chunked", "failed"})
 
-    assert done["status"] == "ready"
+    assert done["status"] == "chunked"
     assert row_of(migrated_database_url, doc_id)["processing_attempts"] == 2
     assert len(sections_of(migrated_database_url, doc_id)) == 1
+
+
+def test_rechunk_task_regenerates_chunks_through_the_worker(
+    pipeline_client_factory: ClientFactory, migrated_database_url: str
+) -> None:
+    from app.workers.celery_app import create_celery_app
+    from tests.helpers import db_rows
+
+    client = pipeline_client_factory()
+    alice = make_user(client, "alice@example.com")
+    body = ("A reasonably long sentence for the rechunk task. " * 80).encode()
+    doc_id = _upload(client, alice, "r.txt", body)
+    wait_for_status(client, alice, doc_id, {"chunked", "failed"})
+    query = "SELECT id::text, text FROM document_chunks WHERE document_id = :d ORDER BY chunk_index"
+    before = db_rows(migrated_database_url, query, d=doc_id)
+    app = create_celery_app(client.app.state.settings, configure_logs=False)  # type: ignore[attr-defined]
+
+    for arg in ("not-a-uuid", str(uuid.uuid4()), doc_id):
+        app.send_task("app.workers.document_tasks.rechunk_document", args=[arg], ignore_result=True)
+
+    deadline = time.monotonic() + 30
+    after = before
+    while time.monotonic() < deadline and after[0][0] == before[0][0]:
+        time.sleep(0.2)
+        after = db_rows(migrated_database_url, query, d=doc_id)
+    assert after[0][0] != before[0][0]  # rows were replaced...
+    assert [r[1] for r in after] == [r[1] for r in before]  # ...with identical content
+    assert fetch_document(client, alice, doc_id)["status"] == "chunked"

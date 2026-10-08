@@ -446,22 +446,32 @@ implemented; an S3-compatible backend only needs to implement the same five meth
 stateDiagram-v2
     [*] --> pending: upload accepted
     pending --> parsing: worker claims it
-    parsing --> ready: text extracted and stored
+    parsing --> chunking: text extracted and stored
+    chunking --> chunked: chunks stored
     parsing --> pending: transient failure, retry
+    chunking --> pending: transient failure, retry
     parsing --> failed: permanent failure or retries exhausted
+    chunking --> failed: permanent failure or retries exhausted
     pending --> failed
+    chunked --> chunking: re-chunk (maintenance task)
+    chunked --> pending: re-process
+    chunked --> embedding: embeddings (later phase)
+    embedding --> indexing
+    indexing --> ready: searchable (later phase)
     ready --> pending: re-process
     failed --> pending: manual retry
     pending --> [*]: delete
     parsing --> [*]: delete
+    chunking --> [*]: delete
+    chunked --> [*]: delete
     ready --> [*]: delete
     failed --> [*]: delete
 ```
 
-In the current pipeline `pending` means *uploaded and queued* and `parsing` means *being processed*
-(extract, normalise, persist). `ready` means the document's text has been extracted and stored; it does not yet mean
-searchable. The `chunking`, `embedding` and `indexing` states remain defined for later phases, and the
-temporary `parsing -> ready` shortcut will be replaced by `parsing -> chunking` when they arrive.
+In the current pipeline `pending` means *uploaded and queued*, `parsing` means *extracting and normalising text*,
+`chunking` means *text is stored and chunks are being generated*, and `chunked` means *chunks are stored and the
+document is ready for embedding*. `ready` is reserved for documents that are embedded and indexed, that is,
+searchable; no document reaches it until the embedding and indexing stages exist, so `ready` is never ambiguous.
 Transitions are enforced by `ensure_transition` (`app/core/documents/lifecycle.py`) and, for the worker,
 by guarded `UPDATE ... WHERE status = ...` statements. `error_message` and `failure_reason` are only allowed
 while `failed` (database CHECK). Deletion is a hard delete, so there is no `deleted` status.
@@ -511,7 +521,9 @@ sequenceDiagram
         W->>S: read stored file (size verified)
         W->>W: extract (PyMuPDF / python-docx / text), enforcing limits
         W->>W: normalise Unicode and whitespace per section
-        W->>DB: replace sections, set counts and metadata, status=ready
+        W->>DB: replace sections, set counts and metadata, status=chunking (committed)
+        W->>W: chunk sections (structure-aware, deterministic)
+        W->>DB: replace chunks in one transaction, status=chunked
         alt transient failure and attempts remain
             W->>DB: status=pending, retry after backoff
         else permanent failure
@@ -558,7 +570,35 @@ Processed text lives in `document_sections` (one row per page or section: `ordin
 reads sections in order and can attach each chunk to a page or heading, so citations keep their source location.
 Per-document counts, timestamps and metadata sit on `documents` (`page_count`, `character_count`,
 `processing_started_at`, `processing_completed_at`, `processing_metadata` with extractor, processing version, duration, script profile and sanitised file properties).
-Re-processing replaces a document's sections inside the same transaction that marks it `ready`, so retries never duplicate content.
+Re-processing replaces a document's sections inside the same transaction that moves it to `chunking`, so retries never duplicate content.
+
+### Chunking
+
+Chunks (`document_chunks`) are the unit later phases embed and retrieve. They are produced by
+`StructureAwareChunker` (`app/core/chunking/`), a pure, deterministic function of the stored sections and the
+chunking configuration, so it is tested without a database or a queue. Properties:
+
+- **Traceable**: a chunk never crosses a section (page or heading) boundary and its text is exactly
+  `section.text[start_char:end_char]`, so page, heading path and character offsets are exact and a citation can
+  be re-derived from the database. The heading is stored beside the text (not prepended) so later phases decide how to use it.
+- **Structure-aware**: a section is split into paragraph, table and fenced-code blocks; whole blocks are packed up
+  to `CHUNKING_MAX_CHARS`. An oversized block is split at progressively finer boundaries (lines for tables and code,
+  sentences including the Bengali danda, words) and only as a last resort cut at a limit that never separates a
+  base letter from its marks, a virama conjunct or a ZWJ/ZWNJ. Overlap (`CHUNKING_OVERLAP_CHARS`) is applied only
+  between consecutive pieces of one oversized block, never across natural paragraph boundaries.
+- **Deterministic and versioned**: the same input and configuration always give the same chunks. `CHUNKING_VERSION`
+  and the configuration used are recorded on the document, so a later algorithm change is detectable.
+- **Idempotent**: chunks are replaced as a set in one transaction, and `(document_id, chunking_version, chunk_index)`
+  is unique, so retries, redelivery and re-chunking never leave duplicates or partial results.
+- **Bounded**: a document that would produce more than `CHUNKING_MAX_CHUNKS` fails with `too_many_chunks`; the
+  chunker checks the processing deadline and runs in linear time on pathological text (long runs of punctuation,
+  combining marks or no whitespace).
+- **Consistent**: a document has chunks only while it is `chunked` or beyond; a failed or re-queued document loses
+  them in the same transaction as the status change.
+
+Size is measured in characters through a `SizeMeasure` abstraction, so a token-aware measure can replace it when
+embeddings arrive. A document is re-chunked from its stored sections (no re-extraction) by the
+`rechunk_document` maintenance task.
 
 ### Failure Handling and Recovery
 

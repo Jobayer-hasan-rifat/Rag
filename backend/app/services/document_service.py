@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.documents.lifecycle import DocumentStatus, ensure_transition
+from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
 from app.db.repositories.document_repository import (
     CollectionRef,
@@ -27,6 +28,7 @@ from app.exceptions import (
     UnsupportedFileTypeError,
 )
 from app.models.document import Document
+from app.models.document_chunk import DocumentChunk
 from app.models.user import User
 from app.observability.logging import get_logger
 from app.security.authorization import can_access_owned_resource
@@ -74,6 +76,7 @@ class DocumentService:
         session: AsyncSession,
         documents: DocumentRepository,
         collections: CollectionRepository,
+        chunks: ChunkRepository,
         storage: StorageProvider,
         processing_queue: ProcessingQueue,
         settings: Settings,
@@ -81,6 +84,7 @@ class DocumentService:
         self._session = session
         self._documents = documents
         self._collections = collections
+        self._chunks = chunks
         self._storage = storage
         self._processing_queue = processing_queue
         self._max_upload_bytes = settings.max_upload_bytes
@@ -170,6 +174,13 @@ class DocumentService:
 
     async def get(self, actor: User, document_id: uuid.UUID) -> DocumentView:
         return await self._view(await self._accessible(actor, document_id))
+
+    async def list_chunks(
+        self, actor: User, document_id: uuid.UUID, *, page: int, page_size: int
+    ) -> tuple[list[tuple[DocumentChunk, int]], int]:
+        """Chunks of an accessible document, in reading order (404 for anyone else's)."""
+        document = await self._accessible(actor, document_id)
+        return await self._chunks.list_page(document.id, page=page, page_size=page_size)
 
     async def rename(self, actor: User, document_id: uuid.UUID, new_filename: str) -> DocumentView:
         document = await self._accessible(actor, document_id)

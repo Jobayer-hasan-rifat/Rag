@@ -9,7 +9,7 @@ from app.exceptions import InvalidStatusTransitionError
 from app.schemas.collection import CollectionCreate, CollectionUpdate
 
 S = DocumentStatus
-PIPELINE = [S.PENDING, S.PARSING, S.CHUNKING, S.EMBEDDING, S.INDEXING, S.READY]
+PIPELINE = [S.PENDING, S.PARSING, S.CHUNKING, S.CHUNKED, S.EMBEDDING, S.INDEXING, S.READY]
 
 
 @pytest.mark.parametrize(("current", "target"), list(pairwise(PIPELINE)))
@@ -38,6 +38,14 @@ def test_finished_documents_can_be_requeued(finished: S) -> None:
         (S.FAILED, S.FAILED),
         (S.READY, S.READY),
         (S.INDEXING, S.PARSING),
+        (S.PARSING, S.READY),  # the Phase 4 shortcut no longer exists
+        (S.PARSING, S.CHUNKED),
+        (S.CHUNKING, S.READY),
+        (S.CHUNKING, S.EMBEDDING),
+        (S.CHUNKED, S.READY),
+        (S.CHUNKED, S.FAILED),
+        (S.CHUNKED, S.PARSING),
+        (S.PENDING, S.CHUNKED),
     ],
 )
 def test_invalid_transitions_are_rejected(current: S, target: S) -> None:
@@ -92,3 +100,20 @@ def test_collection_update_requires_a_change_and_forbids_unknown_fields() -> Non
         CollectionUpdate(user_id="x")  # type: ignore[call-arg]
     with pytest.raises(ValidationError):
         CollectionUpdate(name=None)
+
+
+@pytest.mark.parametrize("stage", [S.PARSING, S.CHUNKING])
+def test_in_progress_stages_can_be_released_for_a_retry(stage: S) -> None:
+    ensure_transition(stage, S.PENDING)
+
+
+def test_chunked_documents_can_be_rechunked_in_place_or_fully_reprocessed() -> None:
+    ensure_transition(S.CHUNKED, S.CHUNKING)
+    ensure_transition(S.CHUNKED, S.PENDING)
+
+
+def test_only_the_embedding_stage_follows_chunked_and_ready_is_last() -> None:
+    assert ALLOWED_TRANSITIONS[S.CHUNKED] == {S.EMBEDDING, S.CHUNKING, S.PENDING}
+    assert S.READY not in {
+        t for s, targets in ALLOWED_TRANSITIONS.items() if s is not S.INDEXING for t in targets
+    }

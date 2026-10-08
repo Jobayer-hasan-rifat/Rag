@@ -6,6 +6,7 @@ from app.observability.logging import configure_logging
 PROCESSING_QUEUE = "processing"
 PROCESS_TASK = "app.workers.document_tasks.process_document"
 RECOVER_TASK = "app.workers.document_tasks.recover_stalled_documents"
+RECHUNK_TASK = "app.workers.document_tasks.rechunk_document"
 
 
 def create_celery_app(settings: Settings | None = None, *, configure_logs: bool = True) -> Celery:
@@ -53,6 +54,10 @@ def create_celery_app(settings: Settings | None = None, *, configure_logs: bool 
                 "soft_time_limit": settings.processing_soft_time_limit_seconds,
                 "time_limit": settings.processing_hard_time_limit_seconds,
                 "max_retries": settings.processing_max_attempts,
+            },
+            RECHUNK_TASK: {
+                "soft_time_limit": settings.processing_soft_time_limit_seconds,
+                "time_limit": settings.processing_hard_time_limit_seconds,
             },
             RECOVER_TASK: {"soft_time_limit": 60, "time_limit": 90},
         },

@@ -20,6 +20,8 @@ class FailureReason(StrEnum):
     TIMEOUT = "timeout"
     EXTRACTION_FAILED = "extraction_failed"
     DATABASE_ERROR = "database_error"
+    TOO_MANY_CHUNKS = "too_many_chunks"
+    CHUNKING_FAILED = "chunking_failed"
     RETRIES_EXHAUSTED = "retries_exhausted"
 
 
@@ -38,6 +40,10 @@ SAFE_MESSAGES: dict[FailureReason, str] = {
     FailureReason.TIMEOUT: "Processing took too long and was stopped.",
     FailureReason.EXTRACTION_FAILED: "Text extraction failed unexpectedly.",
     FailureReason.DATABASE_ERROR: "Processing results could not be saved.",
+    FailureReason.TOO_MANY_CHUNKS: (
+        "The document would produce more chunks than the processing limit."
+    ),
+    FailureReason.CHUNKING_FAILED: "The extracted text could not be split into chunks.",
     FailureReason.RETRIES_EXHAUSTED: "Processing was interrupted repeatedly and was abandoned.",
 }
 
