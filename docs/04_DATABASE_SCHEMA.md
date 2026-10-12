@@ -714,3 +714,21 @@ All schema changes through Alembic migrations:
 ---
 
 *This schema is designed for the Phase 0-16 scope. Future enhancements may require additional tables or modifications.*
+
+## Lexical Search Columns (Phase 7, migration `0007`)
+
+| Column on `document_chunks` | Type | Purpose |
+|---|---|---|
+| `user_id` | `uuid NOT NULL` | Owner of the chunk's document, denormalised so one index can serve "this user's chunks". Filled by a `BEFORE INSERT` trigger when not supplied; backfilled for existing rows. |
+| `search_vector` | `tsvector`, generated and stored | `to_tsvector('simple', text)`: lowercased words, no stemming, no stop words |
+
+- Foreign key `fk_document_chunks_owner (document_id, user_id) -> documents (id, user_id) ON DELETE CASCADE`: the
+  database refuses a chunk whose `user_id` differs from its document's owner, so the copy cannot drift.
+- Index `ix_document_chunks_search` on `(user_id, search_vector)` using GIN (needs the `btree_gin` extension). A plain
+  GIN index on `search_vector` joined to `documents` was measured at 261 ms for 100,000 chunks against 5.7 ms for the
+  composite index.
+- The migration checks that the database's default text search parser keeps Bengali words whole (it depends on the
+  database locale) and fails with a clear message otherwise. `downgrade` removes the columns, trigger, function and
+  index; the extension is left installed.
+- Storage: the generated column and index add roughly 11% of the chunk table size at 100,000 chunks (11 MB index
+  beside a 98 MB table), plus the stored vectors.

@@ -863,6 +863,90 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 ---
 
+### DEC-045: Sparse Retrieval Uses PostgreSQL Full-Text Search with the `simple` Configuration
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: a generated `tsvector` column (`to_tsvector('simple', text)`) on `document_chunks`.
+
+**Alternatives**: an external search engine (another service to secure and keep consistent), a BM25 extension (not available in the stock image), the `english` configuration (stems English only and would corrupt Bengali handling).
+
+**Reason**: PostgreSQL ships no Bengali dictionary, so `simple` (lowercase, no stemming, no stop words) is the only configuration that treats Bengali and English alike; measured, its default parser keeps Bengali words and conjuncts whole under a UTF-8 locale (the migration verifies this). The honest consequence is that inflected Bengali forms (`বাংলাদেশ` / `বাংলাদেশের`) do not match lexically; the dense retriever covers them.
+
+**Consequences**: no stemming or synonyms; identifiers such as `ERR-4721` are indexed as `err` and `-4721`, so exact identifiers rank correctly while a spaced `ERR 4721` cannot tell near codes apart.
+
+---
+
+### DEC-046: Per-Owner Composite GIN Index Through a Denormalised `user_id`
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: add `document_chunks.user_id` (trigger-filled, composite foreign key to `documents (id, user_id)`) and index `(user_id, search_vector)` with GIN through `btree_gin`.
+
+**Alternatives**: a plain GIN index joined to `documents` for the owner filter; no index.
+
+**Reason**: measured with 100,000 chunks (`benchmarks/sparse_index_probe.py`): composite index 5.7 ms, plain GIN plus join 261 ms (worse than the 112 ms sequential scan), no index 112 ms. The same `user_id` copy pattern is already used for `chunk_embeddings`; the foreign key makes the copy impossible to get wrong.
+
+**Consequences**: one extra column and a trigger; inserts that do not name the owner keep working.
+
+---
+
+### DEC-047: Lexical Scoring Weights Terms by Inverse Document Frequency in the Caller's Own Corpus
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: score a chunk by the sum of the inverse document frequencies of the matched query terms (computed in SQL over the caller's own `ready` chunks), using the rarest `SPARSE_MAX_TERMS` terms and phrases through `phraseto_tsquery`.
+
+**Alternatives**: `ts_rank` / `ts_rank_cd` (no inverse document frequency, so common words outweigh a rare identifier).
+
+**Reason**: a rare identifier must outrank a chunk full of common words; `ts_rank` cannot do that. Computing frequencies inside the caller's corpus also keeps scores independent of other users' data, which is a security property and not only a ranking one.
+
+---
+
+### DEC-048: Reciprocal Rank Fusion with `k = 60` and Equal Weights, Not Tuned
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: fuse the two rankings with Reciprocal Rank Fusion (`score = sum of weight / (k + rank)`), `k = 60`, weights 1.0, 50 candidates from each retriever; all configurable.
+
+**Alternatives**: weighted score combination (requires normalising cosine similarity and a lexical score onto one scale, which is fragile), learned fusion (no training data).
+
+**Reason**: rank-based fusion needs no calibration. The defaults are the published ones. A sweep over `k` and weights on the evaluation set (reported in the benchmarks) showed that a dense-heavy weighting looked slightly better, but the sweep ran on the same 77 answerable queries it would be tuned on, so the neutral defaults were kept; the sweep is evidence for a future larger evaluation, not a basis for a change today.
+
+**Consequences**: on the evaluation set hybrid retrieval did **not** beat dense retrieval overall (MRR 0.919 against 0.940); it was better on queries that need exact words or phrases and worse on some paraphrase and cross-language queries. The numbers and their limits are recorded with the benchmarks.
+
+---
+
+### DEC-049: Function Words Are Dropped From the Lexical Query
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: English and Bengali function words (`the`, `is`, `কী`, `কেন`, ...) are removed from the free words of the lexical query (not from quoted phrases, and never from the index); `SPARSE_REMOVE_STOPWORDS=false` restores plain matching.
+
+**Reason**: the first evaluation run showed the lexical retriever matching questions on `what`, `is`, `the` and similar words, filling its candidate list with noise that Reciprocal Rank Fusion then placed above correct dense results (cross-language queries fell from 0.71 to 0.03 MRR). Removing function words recovered most of the loss (hybrid MRR 0.874 to 0.919). The lists are short, conventional lists, not derived from the evaluation queries, but the change was motivated by looking at the evaluation, so the post-change numbers are slightly optimistic; both runs are kept.
+
+**Consequences**: a query made only of function words has no lexical candidates (quote it to force a phrase match).
+
+---
+
+### DEC-050: Hybrid Endpoint Shape and Partial Failure
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: a new endpoint `POST /api/v1/search/hybrid` next to the unchanged semantic endpoint. The response reports each result's rank in each retriever, diagnostics (candidate counts, overlap), and which retriever was degraded. If one retriever fails the other answers; both failing is a 503.
+
+**Alternatives**: a `mode` parameter on the semantic endpoint (changes its contract and score meaning), failing the request when either retriever fails (less available).
+
+**Reason**: clients of `/search/semantic` keep a stable contract and score meaning; retrieval stays useful when the model is unavailable.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

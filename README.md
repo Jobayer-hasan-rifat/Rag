@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 6 complete (Embeddings and semantic search). Hybrid search, reranking and RAG answers are not implemented yet.
+> **Status**: 🚧 In Development - Phase 7 complete (Hybrid retrieval: semantic + full-text search fused with Reciprocal Rank Fusion). Reranking and RAG answers are not implemented yet.
 
 ## Overview
 
@@ -20,6 +20,8 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
+
+**Phase 7 (hybrid retrieval)**: `POST /api/v1/search/hybrid` runs the vector retriever and a PostgreSQL full-text retriever and fuses their rankings with Reciprocal Rank Fusion. Exact words, identifiers (`ERR-4721`) and quoted phrases are found even when the embedding model misses them; each result reports its rank in each retriever; if one retriever fails the other still answers. Lexical matching is exact (no stemming: PostgreSQL has no Bengali dictionary), terms are weighted by rarity inside the caller's own documents, and every query is owner-scoped. On the bundled synthetic evaluation hybrid retrieval did **not** beat semantic search overall (MRR 0.919 against 0.940): it won where exact words or phrases matter and lost on some paraphrase and cross-language queries (see below).
 Infrastructure, authentication, secure document management, asynchronous text extraction, structure-aware chunking, multilingual embeddings and owner-scoped semantic search; documents are processed into traceable chunks and vectors that can be searched in Bangla, English and mixed text, but no answers are generated yet (no hybrid search, reranking or RAG).
 
 - Local multilingual embeddings (`intfloat/multilingual-e5-small`: 384 dimensions, MIT, 94 documented languages including Bengali, CPU-friendly, about 0.5 GB), behind a provider interface; the model revision is pinned, weights load from safetensors only, and nothing is downloaded into the image
@@ -225,7 +227,7 @@ npm run typecheck && npm run build
 | 4 | Document Processing | ✅ Complete |
 | 5 | Intelligent Chunking | ✅ Complete |
 | 6 | Embeddings & Semantic Search | ✅ Complete |
-| 7 | Hybrid Retrieval | ⏳ Planned |
+| 7 | Hybrid Retrieval | ✅ Complete |
 | 8 | Reranking | ⏳ Planned |
 | 9 | RAG | ⏳ Planned |
 | 10 | Conversations | ⏳ Planned |
@@ -264,7 +266,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 6): 1112 tests passing and 12 skipped on Windows (11 opt-in tests that load the real embedding model, run with `RAG_REAL_MODEL_TESTS=1`, and 1 POSIX-only test), about 99% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
+Current state (Phase 7): 1258 tests passing and 12 skipped on Windows (11 opt-in tests that load the real embedding model, run with `RAG_REAL_MODEL_TESTS=1`, and 1 POSIX-only test), about 98% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
 
@@ -291,6 +293,20 @@ This platform includes systematic evaluation of RAG quality:
 | MRR@10 / nDCG@10 | 0.942 / 0.957 |
 | Bangla queries (12) Recall@1 / @3 | 0.917 / 1.000 |
 | Cross-lingual queries (4) Recall@1 | 0.750 |
+
+### Hybrid retrieval evaluation (Phase 7)
+
+`python -m evaluation.hybrid_eval` loads the Phase 6 dataset plus a lexical companion (`evaluation/retrieval_lexical/`: identifiers, quoted phrases, names, Bangla inflection, paraphrase and unanswerable queries; 72 passages and 87 queries in all, 77 answerable) into PostgreSQL, embeds them with the real model and answers every query three ways through the real service. Same machine as above.
+
+| Retrieval | Recall@1 | Recall@10 | MRR@10 | nDCG@10 |
+|-----------|---------:|----------:|-------:|--------:|
+| Dense only | 0.896 | 1.000 | 0.940 | 0.955 |
+| Lexical only | 0.766 | 0.857 | 0.810 | 0.822 |
+| Hybrid (RRF, k=60, equal weights) | 0.870 | 1.000 | 0.919 | 0.939 |
+| Hybrid on the lexical companion alone (31 queries) | 0.968 | 1.000 | 0.984 | 0.988 |
+| Dense on the lexical companion alone | 0.935 | 1.000 | 0.953 | 0.964 |
+
+Hybrid retrieval was better for quoted phrases (MRR 1.00 against 0.63 for dense) and Bangla questions with exact words (1.00 against 0.96), equal for identifiers and mixed-script queries, and worse for cross-language queries (0.52 against 0.71) and confusable wording (0.61 against 0.88): a lexical match on the wrong passage can outrank a correct semantic one. The default fusion settings were not tuned (a dense-heavy weighting looked slightly better on this data but the data is too small to justify it). Caveats: 77 answerable queries; written by the author; the function-word filter was added after the first run exposed noisy lexical matches (hybrid MRR was 0.874 before it; both result files are kept in `evaluation/results/`).
 
 The same dataset shows why the model was chosen: a multilingual model that does not list Bengali among its languages reached Bangla Recall@1 of 0.42 against 0.92 here (see DEC-037 in the [decision log](docs/18_DECISION_LOG.md)). **Read these numbers carefully:** the dataset is small (one query is about 2 points), synthetic, written by one author, uses short passages, and the model was selected on it, so the results show that the pipeline separates these passages, not that Bangla retrieval is strong in general. A larger evaluation on real documents is planned.
 
@@ -345,6 +361,15 @@ Embedding and search baseline (Phase 6; `python -m benchmarks.embedding_baseline
 | Search over HTTP in the Docker stack (4 documents, p50 / p95) | 26 / 29 ms |
 
 On CPU, small batches were fastest (batch 4-8; throughput falls as the batch grows), so the default batch size is 8. **GPU throughput was not measured: no GPU was available.** Search is exact by default (no ANN index): per-user exact scans matched an HNSW index on speed with perfect recall in the multi-user case (details and thresholds in DEC-039). Numbers come from one desktop machine and synthetic vectors.
+
+Hybrid search baseline (Phase 7; `python -m benchmarks.hybrid_search_baseline`, real schema, repositories timed without the model, synthetic Zipf-like text, 20 users):
+
+| Chunks in table | Dense p50 / p95 | Lexical p50 / p95 | Whole hybrid p50 / p95 |
+|----------------:|----------------:|------------------:|-----------------------:|
+| 10,000 | 2.5 / 3.0 ms | 2.8 / 6.5 ms | 6.7 / 10.6 ms |
+| 100,000 | 17.4 / 22.4 ms | 5.1 / 23.8 ms | 24.4 / 44.4 ms |
+
+Hybrid over HTTP in the Docker stack (4 documents, real model): p50 28.5 ms, p95 31.1 ms; the first request after a restart loads the model in the API process (about 9 s). The lexical index adds about 11% to the chunk table size.
 
 These exclude storage reads, database writes (except the chunk insert figures above) and queueing. Remaining benchmarks are planned for Phase 14:
 

@@ -3,9 +3,18 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 
 from app.api.responses import envelope
-from app.dependencies import CurrentUser, SearchServiceDep, enforce_search_rate_limit
+from app.dependencies import (
+    CurrentUser,
+    HybridSearchServiceDep,
+    SearchServiceDep,
+    enforce_search_rate_limit,
+)
 from app.schemas.common import ErrorResponse, ResponseEnvelope
 from app.schemas.search import (
+    HybridHitResponse,
+    HybridSearchInfo,
+    HybridSearchRequest,
+    HybridSearchResponse,
     SearchHitResponse,
     SearchInfo,
     SemanticSearchRequest,
@@ -78,3 +87,69 @@ async def semantic_search(
         latency_ms=outcome.latency_ms,
     )
     return envelope(request, SemanticSearchResponse(results=results, search=info))
+
+
+@router.post(
+    "/hybrid",
+    summary="Hybrid (semantic plus keyword) search over your documents",
+    description=(
+        "Runs semantic (vector) and lexical (PostgreSQL full-text) retrieval over your own "
+        "searchable documents and fuses the two rankings with Reciprocal Rank Fusion. `score` "
+        "orders results for this query; it is not a probability or a cosine similarity. "
+        "`dense_rank` and `sparse_rank` show where each retriever placed a result. If one "
+        "retriever is unavailable the other still answers and `degraded` says so. The query is "
+        "sent in the body so it never appears in URLs or access logs."
+    ),
+    responses=_ERRORS,
+    dependencies=[Depends(enforce_search_rate_limit)],
+)
+async def hybrid_search(
+    body: HybridSearchRequest,
+    request: Request,
+    user: CurrentUser,
+    service: HybridSearchServiceDep,
+) -> ResponseEnvelope[HybridSearchResponse]:
+    outcome = await service.search(
+        user,
+        query=body.query,
+        top_k=body.top_k,
+        document_ids=body.document_ids,
+        collection_id=body.collection_id,
+    )
+    results = [
+        HybridHitResponse(
+            rank=item.rank,
+            chunk_id=item.record.chunk_id,
+            document_id=item.record.document_id,
+            document_name=item.record.document_name,
+            chunk_index=item.record.chunk_index,
+            section_ordinal=item.record.section_ordinal,
+            page_number=item.record.page_number,
+            heading=item.record.heading,
+            heading_level=item.record.heading_level,
+            heading_path=list(item.record.heading_path),
+            text=item.record.text,
+            start_char=item.record.start_char,
+            end_char=item.record.end_char,
+            score=round(item.score, 8),
+            dense_rank=item.dense_rank,
+            sparse_rank=item.sparse_rank,
+            dense_score=None if item.dense_score is None else round(item.dense_score, 6),
+        )
+        for item in outcome.results
+    ]
+    diagnostics = outcome.diagnostics
+    info = HybridSearchInfo(
+        rrf_k=outcome.rrf_k,
+        top_k=outcome.top_k,
+        returned=len(results),
+        dense_candidates=diagnostics.dense_candidates,
+        sparse_candidates=diagnostics.sparse_candidates,
+        overlap=diagnostics.overlap,
+        retrievers_used=list(diagnostics.retrievers_used),
+        degraded=list(diagnostics.degraded),
+        embedding_model=outcome.config.model,
+        model_revision=outcome.config.revision,
+        latency_ms=outcome.latency_ms,
+    )
+    return envelope(request, HybridSearchResponse(results=results, search=info))

@@ -652,3 +652,14 @@ All tests must pass:
 ---
 
 *Testing is not optional. Tests verify behavior, not just code coverage.*
+
+**Phase 7 additions (2026-10-13)**: unit tests for rank fusion (formula, ties, determinism, brute-force comparison on
+random input, invalid parameters), the query parser and the function-word lists; integration tests of the lexical
+retriever against a real PostgreSQL (words, Bengali conjuncts and no-stemming behaviour, identifiers, inverse-document-
+frequency weighting, phrases, hostile strings, limits, isolation and score independence from other tenants, `ready`-only,
+deletion, filters, trigger and composite foreign key, generated column, index usability); migration `0007` upgrade,
+backfill and downgrade tests; and API tests for the hybrid endpoint (contract, ranks, filters, 404 equivalence,
+degraded modes for each retriever and both, status changes and a mid-request status change, limits, rate limit, body cap,
+log hygiene, and that the semantic endpoint did not change).
+
+**Phase 7 results (2026-10-13)**: 1270 tests (1258 pass; 11 opt-in real-model tests and 1 POSIX-permissions test are skipped by default), about 98% line coverage; ruff, black and mypy clean; pip-audit reports no known vulnerabilities.

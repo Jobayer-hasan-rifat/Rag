@@ -1,0 +1,861 @@
+{
+  "model": "intfloat/multilingual-e5-small",
+  "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "dimension": 384,
+  "device": "cpu",
+  "passages": 72,
+  "queries": 87,
+  "lexical_queries": 35,
+  "unanswerable": 10,
+  "embed_seconds": 2.03,
+  "embedding_failures": 0,
+  "sparse_remove_stopwords": true,
+  "fusion": {
+    "method": "rrf",
+    "k": 60,
+    "weights": [
+      1.0,
+      1.0
+    ],
+    "candidates": [
+      50,
+      50
+    ]
+  },
+  "modes": {
+    "dense": {
+      "overall": {
+        "queries": 77,
+        "recall_at_1": 0.8961038961038961,
+        "recall_at_3": 0.987012987012987,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.9398268398268398,
+        "ndcg_at_10": 0.9550844360401536
+      },
+      "base_set": {
+        "queries": 46,
+        "recall_at_1": 0.8695652173913043,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.9311594202898551,
+        "ndcg_at_10": 0.9490141036490715
+      },
+      "lexical_set": {
+        "queries": 31,
+        "recall_at_1": 0.9354838709677419,
+        "recall_at_3": 0.967741935483871,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.9526881720430108,
+        "ndcg_at_10": 0.9640920260398239
+      },
+      "by_language": {
+        "bn": {
+          "queries": 24,
+          "recall_at_1": 0.9166666666666666,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9583333333333334,
+          "ndcg_at_10": 0.9692441461309548
+        },
+        "en": {
+          "queries": 38,
+          "recall_at_1": 0.868421052631579,
+          "recall_at_3": 0.9736842105263158,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9175438596491228,
+          "ndcg_at_10": 0.938124008273091
+        },
+        "mixed": {
+          "queries": 15,
+          "recall_at_1": 0.9333333333333333,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9666666666666667,
+          "ndcg_at_10": 0.9753953169047639
+        }
+      },
+      "by_category": {
+        "bangla": {
+          "queries": 12,
+          "recall_at_1": 0.9166666666666666,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9583333333333334,
+          "ndcg_at_10": 0.9692441461309548
+        },
+        "bangla_inflection": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "bangla_name": {
+          "queries": 2,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "confusable": {
+          "queries": 4,
+          "recall_at_1": 0.75,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.875,
+          "ndcg_at_10": 0.9077324383928644
+        },
+        "cross_lingual": {
+          "queries": 4,
+          "recall_at_1": 0.5,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.7083333333333334,
+          "ndcg_at_10": 0.7827324383928644
+        },
+        "english": {
+          "queries": 10,
+          "recall_at_1": 0.9,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.9630929753571458
+        },
+        "identifier": {
+          "queries": 11,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 10,
+          "recall_at_1": 0.9,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.9630929753571458
+        },
+        "paraphrase": {
+          "queries": 8,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "phrase": {
+          "queries": 4,
+          "recall_at_1": 0.5,
+          "recall_at_3": 0.75,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.6333333333333333,
+          "ndcg_at_10": 0.7217132018086354
+        },
+        "punctuation_unicode": {
+          "queries": 6,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "rare_term": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "latency_ms": {
+        "median": 23.7,
+        "p95": 29.3
+      }
+    },
+    "sparse": {
+      "overall": {
+        "queries": 77,
+        "recall_at_1": 0.7662337662337663,
+        "recall_at_3": 0.8571428571428571,
+        "recall_at_5": 0.8571428571428571,
+        "recall_at_10": 0.8571428571428571,
+        "mrr_at_10": 0.8095238095238095,
+        "ndcg_at_10": 0.8218906301484252
+      },
+      "base_set": {
+        "queries": 46,
+        "recall_at_1": 0.6956521739130435,
+        "recall_at_3": 0.8260869565217391,
+        "recall_at_5": 0.8260869565217391,
+        "recall_at_10": 0.8260869565217391,
+        "mrr_at_10": 0.7572463768115942,
+        "ndcg_at_10": 0.7751010601708106
+      },
+      "lexical_set": {
+        "queries": 31,
+        "recall_at_1": 0.8709677419354839,
+        "recall_at_3": 0.9032258064516129,
+        "recall_at_5": 0.9032258064516129,
+        "recall_at_10": 0.9032258064516129,
+        "mrr_at_10": 0.8870967741935484,
+        "ndcg_at_10": 0.8913203146313373
+      },
+      "by_language": {
+        "bn": {
+          "queries": 24,
+          "recall_at_1": 0.7083333333333334,
+          "recall_at_3": 0.7916666666666666,
+          "recall_at_5": 0.7916666666666666,
+          "recall_at_10": 0.7916666666666666,
+          "mrr_at_10": 0.75,
+          "ndcg_at_10": 0.7609108127976215
+        },
+        "en": {
+          "queries": 38,
+          "recall_at_1": 0.7894736842105263,
+          "recall_at_3": 0.868421052631579,
+          "recall_at_5": 0.868421052631579,
+          "recall_at_10": 0.868421052631579,
+          "mrr_at_10": 0.8289473684210527,
+          "ndcg_at_10": 0.8392839279135361
+        },
+        "mixed": {
+          "queries": 15,
+          "recall_at_1": 0.8,
+          "recall_at_3": 0.9333333333333333,
+          "recall_at_5": 0.9333333333333333,
+          "recall_at_10": 0.9333333333333333,
+          "mrr_at_10": 0.8555555555555556,
+          "ndcg_at_10": 0.8753953169047638
+        }
+      },
+      "by_category": {
+        "bangla": {
+          "queries": 12,
+          "recall_at_1": 0.8333333333333334,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9166666666666666,
+          "ndcg_at_10": 0.9384882922619097
+        },
+        "bangla_inflection": {
+          "queries": 3,
+          "recall_at_1": 0.6666666666666666,
+          "recall_at_3": 0.6666666666666666,
+          "recall_at_5": 0.6666666666666666,
+          "recall_at_10": 0.6666666666666666,
+          "mrr_at_10": 0.6666666666666666,
+          "ndcg_at_10": 0.6666666666666666
+        },
+        "bangla_name": {
+          "queries": 2,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "confusable": {
+          "queries": 4,
+          "recall_at_1": 0.5,
+          "recall_at_3": 0.5,
+          "recall_at_5": 0.5,
+          "recall_at_10": 0.5,
+          "mrr_at_10": 0.5,
+          "ndcg_at_10": 0.5
+        },
+        "cross_lingual": {
+          "queries": 4,
+          "recall_at_1": 0.0,
+          "recall_at_3": 0.0,
+          "recall_at_5": 0.0,
+          "recall_at_10": 0.0,
+          "mrr_at_10": 0.0,
+          "ndcg_at_10": 0.0
+        },
+        "english": {
+          "queries": 10,
+          "recall_at_1": 0.9,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.9630929753571458
+        },
+        "identifier": {
+          "queries": 11,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 10,
+          "recall_at_1": 0.7,
+          "recall_at_3": 0.9,
+          "recall_at_5": 0.9,
+          "recall_at_10": 0.9,
+          "mrr_at_10": 0.7833333333333333,
+          "ndcg_at_10": 0.8130929753571458
+        },
+        "paraphrase": {
+          "queries": 8,
+          "recall_at_1": 0.625,
+          "recall_at_3": 0.75,
+          "recall_at_5": 0.75,
+          "recall_at_10": 0.75,
+          "mrr_at_10": 0.6875,
+          "ndcg_at_10": 0.7038662191964322
+        },
+        "phrase": {
+          "queries": 4,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "punctuation_unicode": {
+          "queries": 6,
+          "recall_at_1": 0.6666666666666666,
+          "recall_at_3": 0.8333333333333334,
+          "recall_at_5": 0.8333333333333334,
+          "recall_at_10": 0.8333333333333334,
+          "mrr_at_10": 0.75,
+          "ndcg_at_10": 0.7718216255952429
+        },
+        "rare_term": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "latency_ms": {
+        "median": 6.1,
+        "p95": 8.2
+      }
+    },
+    "hybrid": {
+      "overall": {
+        "queries": 77,
+        "recall_at_1": 0.8701298701298701,
+        "recall_at_3": 0.948051948051948,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.9192640692640692,
+        "ndcg_at_10": 0.9393965097313247
+      },
+      "base_set": {
+        "queries": 46,
+        "recall_at_1": 0.8043478260869565,
+        "recall_at_3": 0.9130434782608695,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.8757246376811594,
+        "ndcg_at_10": 0.9065782933856642
+      },
+      "lexical_set": {
+        "queries": 31,
+        "recall_at_1": 0.967741935483871,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.9838709677419355,
+        "ndcg_at_10": 0.9880945081797244
+      },
+      "by_language": {
+        "bn": {
+          "queries": 24,
+          "recall_at_1": 0.875,
+          "recall_at_3": 0.9583333333333334,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9201388888888888,
+          "ndcg_at_10": 0.9400669296518688
+        },
+        "en": {
+          "queries": 38,
+          "recall_at_1": 0.8421052631578947,
+          "recall_at_3": 0.9210526315789473,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9,
+          "ndcg_at_10": 0.9247630311604131
+        },
+        "mixed": {
+          "queries": 15,
+          "recall_at_1": 0.9333333333333333,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9666666666666667,
+          "ndcg_at_10": 0.9753953169047639
+        }
+      },
+      "by_category": {
+        "bangla": {
+          "queries": 12,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "bangla_inflection": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "bangla_name": {
+          "queries": 2,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "confusable": {
+          "queries": 4,
+          "recall_at_1": 0.5,
+          "recall_at_3": 0.5,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.6125,
+          "ndcg_at_10": 0.7043823413269836
+        },
+        "cross_lingual": {
+          "queries": 4,
+          "recall_at_1": 0.25,
+          "recall_at_3": 0.75,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.5208333333333334,
+          "ndcg_at_10": 0.6404015779112127
+        },
+        "english": {
+          "queries": 10,
+          "recall_at_1": 0.9,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.9630929753571458
+        },
+        "identifier": {
+          "queries": 11,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 10,
+          "recall_at_1": 0.9,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.95,
+          "ndcg_at_10": 0.9630929753571458
+        },
+        "paraphrase": {
+          "queries": 8,
+          "recall_at_1": 0.875,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9375,
+          "ndcg_at_10": 0.9538662191964322
+        },
+        "phrase": {
+          "queries": 4,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "punctuation_unicode": {
+          "queries": 6,
+          "recall_at_1": 0.6666666666666666,
+          "recall_at_3": 0.8333333333333334,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.7916666666666666,
+          "ndcg_at_10": 0.8436010519408085
+        },
+        "rare_term": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "latency_ms": {
+        "median": 26.8,
+        "p95": 31.3
+      }
+    }
+  },
+  "hybrid_stage_ms_median": {
+    "embed_ms": 16,
+    "dense_ms": 0,
+    "sparse_ms": 0,
+    "fuse_ms": 0
+  },
+  "mean_dense_sparse_overlap": 2.32,
+  "queries_with_no_lexical_candidates": 8,
+  "comparison": {
+    "top1_hits": {
+      "dense": 69,
+      "sparse": 59,
+      "hybrid": 67
+    },
+    "hybrid_top1_but_dense_not": [
+      "bn-01",
+      "mx-01",
+      "ph-03",
+      "ph-04"
+    ],
+    "dense_top1_but_hybrid_not": [
+      "mx-08",
+      "pu-02",
+      "pu-04",
+      "xl-01",
+      "cf-03",
+      "pa-06"
+    ],
+    "hybrid_top1_but_sparse_not": [
+      "en-07",
+      "bn-08",
+      "bn-10",
+      "mx-01",
+      "mx-05",
+      "xl-02",
+      "bi-01",
+      "pa-07",
+      "pa-08"
+    ],
+    "sparse_top1_but_hybrid_not": [
+      "en-06"
+    ],
+    "dense_candidate_overlap_with_sparse_top10": 1.92
+  },
+  "sweep": [
+    {
+      "k": 10,
+      "dense_weight": 1.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.926,
+      "ndcg_at_10": 0.944,
+      "base_mrr": 0.876,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 10,
+      "dense_weight": 1.0,
+      "sparse_weight": 0.5,
+      "recall_at_1": 0.935,
+      "mrr_at_10": 0.962,
+      "ndcg_at_10": 0.972,
+      "base_mrr": 0.937,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 10,
+      "dense_weight": 0.5,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 10,
+      "dense_weight": 1.0,
+      "sparse_weight": 2.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 10,
+      "dense_weight": 2.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.935,
+      "mrr_at_10": 0.962,
+      "ndcg_at_10": 0.972,
+      "base_mrr": 0.937,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 30,
+      "dense_weight": 1.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.926,
+      "ndcg_at_10": 0.944,
+      "base_mrr": 0.876,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 30,
+      "dense_weight": 1.0,
+      "sparse_weight": 0.5,
+      "recall_at_1": 0.909,
+      "mrr_at_10": 0.943,
+      "ndcg_at_10": 0.957,
+      "base_mrr": 0.904,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 30,
+      "dense_weight": 0.5,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 30,
+      "dense_weight": 1.0,
+      "sparse_weight": 2.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 30,
+      "dense_weight": 2.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.909,
+      "mrr_at_10": 0.943,
+      "ndcg_at_10": 0.957,
+      "base_mrr": 0.904,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 60,
+      "dense_weight": 1.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.926,
+      "ndcg_at_10": 0.944,
+      "base_mrr": 0.876,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 60,
+      "dense_weight": 1.0,
+      "sparse_weight": 0.5,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.934,
+      "ndcg_at_10": 0.951,
+      "base_mrr": 0.89,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 60,
+      "dense_weight": 0.5,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 60,
+      "dense_weight": 1.0,
+      "sparse_weight": 2.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 60,
+      "dense_weight": 2.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.934,
+      "ndcg_at_10": 0.951,
+      "base_mrr": 0.89,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 100,
+      "dense_weight": 1.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.926,
+      "ndcg_at_10": 0.944,
+      "base_mrr": 0.876,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 100,
+      "dense_weight": 1.0,
+      "sparse_weight": 0.5,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.934,
+      "ndcg_at_10": 0.951,
+      "base_mrr": 0.89,
+      "lexical_mrr": 1.0
+    },
+    {
+      "k": 100,
+      "dense_weight": 0.5,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 100,
+      "dense_weight": 1.0,
+      "sparse_weight": 2.0,
+      "recall_at_1": 0.818,
+      "mrr_at_10": 0.892,
+      "ndcg_at_10": 0.919,
+      "base_mrr": 0.829,
+      "lexical_mrr": 0.984
+    },
+    {
+      "k": 100,
+      "dense_weight": 2.0,
+      "sparse_weight": 1.0,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.934,
+      "ndcg_at_10": 0.951,
+      "base_mrr": 0.89,
+      "lexical_mrr": 1.0
+    }
+  ],
+  "failures": [
+    {
+      "query": "en-06",
+      "category": "english",
+      "text": "Which symptoms mean severe dengue and need a hospital?",
+      "top1": "en3-2",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "mx-08",
+      "category": "mixed",
+      "text": "WFH করতে কার permission লাগে?",
+      "top1": "mx2-4",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "pu-02",
+      "category": "punctuation_unicode",
+      "text": "“Aman” rice: when is harvest (Nov/Dec)?",
+      "top1": "en1-1",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "pu-04",
+      "category": "punctuation_unicode",
+      "text": "pin number কাউকে দেওয়া যাবে কি???",
+      "top1": "en4-3",
+      "rank_of_relevant": 4
+    },
+    {
+      "query": "xl-01",
+      "category": "cross_lingual",
+      "text": "What is the national fish of Bangladesh?",
+      "top1": "lx6-2",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "xl-03",
+      "category": "cross_lingual",
+      "text": "ডেঙ্গু প্রতিরোধে বাসায় কী করা উচিত?",
+      "top1": "bn4-2",
+      "rank_of_relevant": 4
+    },
+    {
+      "query": "xl-04",
+      "category": "cross_lingual",
+      "text": "How does the hilsa fishing ban work?",
+      "top1": "lx3-1",
+      "rank_of_relevant": 3
+    },
+    {
+      "query": "cf-03",
+      "category": "confusable",
+      "text": "নদীভাঙনে ঘরবাড়ি সরিয়ে নিতে হয় কেন?",
+      "top1": "bn4-3",
+      "rank_of_relevant": 5
+    },
+    {
+      "query": "cf-04",
+      "category": "confusable",
+      "text": "ব্যাংকে টাকা জমালে সুদ পাওয়া যায়?",
+      "top1": "bn4-1",
+      "rank_of_relevant": 4
+    },
+    {
+      "query": "pa-06",
+      "category": "paraphrase",
+      "text": "What happens if I skip team meetings?",
+      "top1": "mx4-2",
+      "rank_of_relevant": 2
+    }
+  ]
+}

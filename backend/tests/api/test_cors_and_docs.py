@@ -50,6 +50,7 @@ def test_openapi_documents_versioned_routes_only(offline_client: TestClient) -> 
         "/api/v1/documents/{document_id}/retry",
         "/api/v1/documents/{document_id}/chunks",
         "/api/v1/search/semantic",
+        "/api/v1/search/hybrid",
     }
 
 

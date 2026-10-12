@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent / "retrieval"
+LEXICAL_DIR = Path(__file__).resolve().parent / "retrieval_lexical"
 
 
 @dataclass(frozen=True)
@@ -100,3 +101,16 @@ def validate(dataset: Dataset) -> None:
             raise ValueError(f"query {q.id} lists a passage as both relevant and neutral")
         if not q.query.strip():
             raise ValueError(f"query {q.id} is empty")
+
+
+def load_combined() -> tuple[Dataset, frozenset[str]]:
+    """The base dataset plus the lexical companion, searched as one corpus.
+
+    Returns the merged dataset and the ids of the queries that come from the lexical set.
+    """
+    base, lexical = load_dataset(DATA_DIR), load_dataset(LEXICAL_DIR)
+    merged = Dataset(
+        documents=base.documents + lexical.documents, queries=base.queries + lexical.queries
+    )
+    validate(merged)
+    return merged, frozenset(q.id for q in lexical.queries)

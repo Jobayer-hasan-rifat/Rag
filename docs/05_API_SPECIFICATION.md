@@ -497,23 +497,25 @@ Keyword search using PostgreSQL full-text search.
 
 ### POST /search/hybrid
 
-Hybrid search combining semantic and keyword.
+Hybrid search: dense (vector) retrieval and lexical (PostgreSQL full-text) retrieval, fused with Reciprocal Rank
+Fusion. Implemented in Phase 7; `POST /search/semantic` is unchanged.
 
-**Authentication**: Required
+**Authentication**: Required. Rate limited with the same per-user search budget as `/search/semantic`.
 
 **Request Body**:
 ```json
 {
-  "query": "machine learning algorithms",
+  "query": "ERR-4721 payment worker",
   "top_k": 10,
-  "semantic_weight": 0.6,
-  "keyword_weight": 0.4,
-  "filters": {
-    "document_ids": ["uuid1"],
-    "collection_ids": ["uuid2"]
-  }
+  "document_ids": ["uuid1"],
+  "collection_id": "uuid2"
 }
 ```
+
+`query` is required (at most `SEARCH_MAX_QUERY_CHARS` characters after whitespace normalisation). `top_k` defaults to
+`SEARCH_DEFAULT_TOP_K` and is at most `SEARCH_MAX_TOP_K`. `document_ids` and `collection_id` restrict both retrievers; a
+document or collection that is not yours is a 404, identical to one that does not exist. Wrap words in double quotes
+(`"queue connection"`) to require them as an adjacent phrase. The body is capped at 128 KiB.
 
 **Response** (200):
 ```json
@@ -521,26 +523,66 @@ Hybrid search combining semantic and keyword.
   "data": {
     "results": [
       {
+        "rank": 1,
         "chunk_id": "uuid",
         "document_id": "uuid",
-        "document_name": "research_paper.pdf",
-        "content": "Machine learning algorithms are...",
-        "page_number": 5,
-        "semantic_score": 0.89,
-        "keyword_score": 0.45,
-        "combined_score": 0.73,
-        "metadata": {}
+        "document_name": "runbook.md",
+        "chunk_index": 3,
+        "section_ordinal": 2,
+        "page_number": null,
+        "heading": "Payments",
+        "heading_level": 2,
+        "heading_path": ["Incident Runbook", "Payments"],
+        "text": "Error ERR-4721 means the payment worker lost its queue connection...",
+        "start_char": 0,
+        "end_char": 160,
+        "score": 0.03279,
+        "dense_rank": 1,
+        "sparse_rank": 1,
+        "dense_score": 0.874
       }
     ],
-    "total_results": 10,
-    "query_time_ms": 58
+    "search": {
+      "mode": "hybrid",
+      "fusion": "rrf",
+      "rrf_k": 60,
+      "top_k": 10,
+      "returned": 1,
+      "dense_candidates": 50,
+      "sparse_candidates": 12,
+      "overlap": 8,
+      "retrievers_used": ["dense", "sparse"],
+      "degraded": [],
+      "embedding_model": "intfloat/multilingual-e5-small",
+      "model_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+      "searched_documents": "own, ready",
+      "latency_ms": 31
+    }
   },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-13T00:00:00Z"}
 }
 ```
+
+**Score semantics.** `score` is the Reciprocal Rank Fusion score, the sum over the retrievers that returned the chunk
+of `weight / (k + rank)` (default `k = 60`, weights 1.0). It depends only on ranks: it is **not** a probability, not a
+cosine similarity, and not comparable between queries. Its maximum with two retrievers is `2 / (k + 1)`. `dense_rank`
+and `sparse_rank` are the chunk's position in each retriever (`null` when that retriever did not return it);
+`dense_score` is the cosine similarity of the dense retriever and is the only value here with a similarity meaning.
+Ties are broken deterministically.
+
+**Lexical retrieval.** Words are matched exactly after case folding: PostgreSQL has no Bengali dictionary, so there is
+no stemming (`বাংলাদেশ` does not match `বাংলাদেশের`) and no synonyms. English and Bengali function words are ignored in
+the free words (not in quoted phrases). Query terms are weighted by how rare they are in the caller's own documents,
+and at most `SPARSE_MAX_TERMS` of the rarest are used; the lexical statement is cancelled after `SPARSE_STATEMENT_TIMEOUT_MS` (that retriever is then reported as degraded). A query with no distinctive word contributes no lexical
+candidates; the dense retriever still answers.
+
+**Partial failure.** If one retriever fails (the embedding model is unavailable, or the lexical query fails) the other
+still answers and `degraded` names the one that failed; `retrievers_used` lists those that did. If both fail the
+response is 503. Documents that are not `ready` are never searched, and only the caller's own documents are searched,
+administrators included.
+
+**Errors**: 401, 404 (foreign or missing filter), 413 (body over 128 KiB), 422 (invalid query, `top_k` or filters), 429
+(rate limit), 503 (no retriever available).
 
 ---
 

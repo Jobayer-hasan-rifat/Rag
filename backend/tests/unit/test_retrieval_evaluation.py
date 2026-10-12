@@ -206,3 +206,14 @@ def test_the_memory_runner_scores_a_lexical_provider_sensibly() -> None:
     assert math.isfinite(report.answerability_auroc or 0.0)
     assert set(report.by_category) >= {"english", "bangla", "mixed", "cross_lingual"}
     assert isinstance(np.float32(report.query_ms_median), np.float32)
+
+
+def test_the_lexical_companion_dataset_is_valid_and_merges_without_id_clashes() -> None:
+    from evaluation.dataset import load_combined
+
+    dataset, lexical_ids = load_combined()
+
+    assert lexical_ids and lexical_ids < {q.id for q in dataset.queries}
+    assert len({p.id for p in dataset.passages}) == len(dataset.passages)
+    categories = {q.category for q in dataset.queries if q.id in lexical_ids}
+    assert {"identifier", "phrase", "paraphrase", "bangla_inflection", "no_answer"} <= categories

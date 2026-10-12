@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKeyConstraint,
     Index,
@@ -14,7 +15,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import text as sql_text
-from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -45,6 +46,16 @@ class DocumentChunk(Base):
             name="fk_document_chunks_document_id_documents",
             ondelete="CASCADE",
         ),
+        # the owner copy: a trigger fills it from the document; this key makes any other value
+        # impossible, so lexical search can filter on it directly
+        ForeignKeyConstraint(
+            ["document_id", "user_id"],
+            ["documents.id", "documents.user_id"],
+            name="fk_document_chunks_owner",
+            ondelete="CASCADE",
+        ),
+        # lexical search: the owner is part of the index scan
+        Index("ix_document_chunks_search", "user_id", "search_vector", postgresql_using="gin"),
         # target of the composite foreign key from chunk_embeddings (a vector's chunk and document)
         UniqueConstraint("id", "document_id", name="uq_document_chunks_id_document"),
         CheckConstraint("chunk_index >= 0", name="index_non_negative"),
@@ -68,10 +79,16 @@ class DocumentChunk(Base):
         server_default=sql_text("gen_random_uuid()"),
     )
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    # set by the database from the document (trigger); never trusted from application code
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     section_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     chunking_version: Mapped[str] = mapped_column(String(20), nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # tokens of `text` for full-text search; the text itself is never altered for this
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('simple', text)", persisted=True)
+    )
     char_count: Mapped[int] = mapped_column(Integer, nullable=False)
     text_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     start_char: Mapped[int] = mapped_column(Integer, nullable=False)

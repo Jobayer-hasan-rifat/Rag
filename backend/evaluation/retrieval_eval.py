@@ -28,7 +28,7 @@ from typing import Any
 
 import numpy as np
 from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db.repositories.collection_repository import CollectionRepository
@@ -40,6 +40,7 @@ from app.embeddings.types import EmbeddingProvider
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
 from app.models.document_section import DocumentSection
+from app.models.user import User
 from app.services.embedding_service import EmbeddingService
 from app.services.search_service import SearchService
 from evaluation.dataset import Dataset, load_dataset
@@ -172,69 +173,81 @@ def _base_report(
 # --- database mode -------------------------------------------------------------------------
 
 
+async def load_and_embed(
+    settings: Settings,
+    provider: EmbeddingProvider,
+    factory: async_sessionmaker[AsyncSession],
+    dataset: Dataset,
+    user_id: uuid.UUID,
+) -> tuple[dict[uuid.UUID, str], float, int]:
+    """Insert the dataset as chunked documents and embed them with the real EmbeddingService."""
+    chunk_to_passage: dict[uuid.UUID, str] = {}
+    document_ids: list[uuid.UUID] = []
+    async with factory() as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        for document in dataset.documents:
+            doc_id = uuid.uuid4()
+            document_ids.append(doc_id)
+            session.add(
+                Document(
+                    id=doc_id, user_id=user_id, filename=f"{document.id}.md",
+                    storage_key=f"documents/ev/{uuid.uuid4().hex}", file_type="md",
+                    content_type="text/markdown", file_size=1,
+                    checksum_sha256=uuid.uuid4().hex * 2, status="chunked",
+                    chunk_count=len(document.passages), chunking_version="eval",
+                )
+            )  # fmt: skip
+            await session.flush()
+            for ordinal, passage in enumerate(document.passages):
+                section_id, chunk_id = uuid.uuid4(), uuid.uuid4()
+                session.add(
+                    DocumentSection(
+                        id=section_id, document_id=doc_id, ordinal=ordinal, kind="section",
+                        heading=passage.heading, heading_level=2, text=passage.text,
+                        char_count=len(passage.text),
+                    )
+                )  # fmt: skip
+                await session.flush()
+                import hashlib
+
+                session.add(
+                    DocumentChunk(
+                        id=chunk_id, document_id=doc_id, section_id=section_id,
+                        chunking_version="eval", chunk_index=ordinal, text=passage.text,
+                        char_count=len(passage.text),
+                        text_sha256=hashlib.sha256(passage.text.encode()).hexdigest(),
+                        start_char=0, end_char=len(passage.text), overlap_chars=0,
+                        heading=passage.heading, heading_level=2,
+                        heading_path=[document.title, passage.heading],
+                    )
+                )  # fmt: skip
+                chunk_to_passage[chunk_id] = passage.id
+        await session.commit()
+
+    embed_started = time.perf_counter()
+    failures = 0
+    for doc_id in document_ids:
+        async with factory() as session:
+            service = EmbeddingService(
+                session=session, documents=DocumentRepository(session),
+                embeddings=EmbeddingRepository(session), provider=provider, settings=settings,
+            )  # fmt: skip
+            outcome = await service.embed(doc_id, task_id="eval")
+            failures += outcome.status != "ready"
+    embed_seconds = time.perf_counter() - embed_started
+    return chunk_to_passage, embed_seconds, failures
+
+
 async def evaluate_database(settings: Settings, dataset: Dataset, user_id: uuid.UUID) -> EvalReport:
     engine = create_engine(settings)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     provider = get_provider(settings)
     provider.warmup()
     try:
-        chunk_to_passage: dict[uuid.UUID, str] = {}
-        document_ids: list[uuid.UUID] = []
-        async with factory() as session:
-            from app.models.user import User
-
-            user = await session.get(User, user_id)
-            assert user is not None
-            for document in dataset.documents:
-                doc_id = uuid.uuid4()
-                document_ids.append(doc_id)
-                session.add(
-                    Document(
-                        id=doc_id, user_id=user_id, filename=f"{document.id}.md",
-                        storage_key=f"documents/ev/{uuid.uuid4().hex}", file_type="md",
-                        content_type="text/markdown", file_size=1,
-                        checksum_sha256=uuid.uuid4().hex * 2, status="chunked",
-                        chunk_count=len(document.passages), chunking_version="eval",
-                    )
-                )  # fmt: skip
-                await session.flush()
-                for ordinal, passage in enumerate(document.passages):
-                    section_id, chunk_id = uuid.uuid4(), uuid.uuid4()
-                    session.add(
-                        DocumentSection(
-                            id=section_id, document_id=doc_id, ordinal=ordinal, kind="section",
-                            heading=passage.heading, heading_level=2, text=passage.text,
-                            char_count=len(passage.text),
-                        )
-                    )  # fmt: skip
-                    await session.flush()
-                    import hashlib
-
-                    session.add(
-                        DocumentChunk(
-                            id=chunk_id, document_id=doc_id, section_id=section_id,
-                            chunking_version="eval", chunk_index=ordinal, text=passage.text,
-                            char_count=len(passage.text),
-                            text_sha256=hashlib.sha256(passage.text.encode()).hexdigest(),
-                            start_char=0, end_char=len(passage.text), overlap_chars=0,
-                            heading=passage.heading, heading_level=2,
-                            heading_path=[document.title, passage.heading],
-                        )
-                    )  # fmt: skip
-                    chunk_to_passage[chunk_id] = passage.id
-            await session.commit()
-
-        embed_started = time.perf_counter()
-        failures = 0
-        for doc_id in document_ids:
-            async with factory() as session:
-                service = EmbeddingService(
-                    session=session, documents=DocumentRepository(session),
-                    embeddings=EmbeddingRepository(session), provider=provider, settings=settings,
-                )  # fmt: skip
-                outcome = await service.embed(doc_id, task_id="eval")
-                failures += outcome.status != "ready"
-        embed_seconds = time.perf_counter() - embed_started
+        chunk_to_passage, embed_seconds, failures = await load_and_embed(
+            settings, provider, factory, dataset, user_id
+        )
 
         results: list[QueryResult] = []
         latencies: list[float] = []

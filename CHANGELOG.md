@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 7: Hybrid Retrieval
+
+- Lexical (full-text) retrieval over `document_chunks`: a generated `tsvector` (`simple` configuration, no stemming, safe for Bengali) and a composite GIN index `(user_id, search_vector)` with a trigger-filled, foreign-key-protected owner column (migration `0007`, needs the `btree_gin` extension)
+- Inverse-document-frequency term weighting computed inside the caller's own corpus, quoted phrases, function-word filtering (English and Bengali), bounded term and phrase counts
+- Reciprocal Rank Fusion (`app/retrieval/fusion.py`): deterministic, rank-based, configurable `k` and weights
+- `POST /api/v1/search/hybrid`: owner-scoped, rate limited, 128 KiB body cap, per-result dense and lexical ranks, diagnostics, and graceful degradation when one retriever is unavailable
+- Dense search split into candidate generation and hydration (ownership and `ready` re-checked); `POST /api/v1/search/semantic` is unchanged
+- `HYBRID_*` and `SPARSE_*` settings in `.env.example` and Compose
+- Evaluation: dense, sparse and hybrid ablation (`python -m evaluation.hybrid_eval`) over a lexical companion dataset (identifiers, phrases, names, inflection, paraphrase, unanswerable) and the Phase 6 dataset; hybrid latency benchmark through the real schema (`python -m benchmarks.hybrid_search_baseline`)
+
 ### Added - Phase 6: Embeddings & Semantic Search
 
 - Embedding provider interface (`app/embeddings/`) with a local sentence-transformers provider: pinned revision required, safetensors only, no remote code, CPU or GPU, validated vectors; providers register through a registry
@@ -259,7 +269,7 @@ This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH 
 | 0.4.0 | Phase 4 Complete | Document processing working |
 | 0.5.0 | Phase 5 Complete | Document chunking working (vector search follows) |
 | 0.6.0 | Phase 6 Complete | Embeddings and semantic search working (hybrid search follows) |
-| 0.7.0 | Phase 7 Complete | Reranking working |
+| 0.7.0 | Phase 7 Complete | Hybrid retrieval working (reranking follows) |
 | 0.8.0 | Phase 8 Complete | RAG working |
 | 0.9.0 | Phase 9 Complete | Conversations working |
 | 0.10.0 | Phase 10 Complete | Versioning & access control working |

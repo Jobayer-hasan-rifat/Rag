@@ -64,7 +64,7 @@ def test_upgrade_head_enables_pgvector(alembic_config: Config, fresh_database_ur
 
     assert _has_vector(fresh_database_url)
     version = asyncio.run(_scalar(fresh_database_url, "SELECT version_num FROM alembic_version"))
-    assert version == "0006"
+    assert version == "0007"
 
 
 def test_downgrade_to_base_removes_pgvector(
@@ -108,4 +108,70 @@ def test_migration_history_has_a_single_head(alembic_config: Config) -> None:
 
     heads = ScriptDirectory.from_config(alembic_config).get_heads()
 
-    assert heads == ["0006"]
+    assert heads == ["0007"]
+
+
+async def _seed_legacy_chunk(url: str) -> None:
+    """One chunk written before 0007 existed (no owner column, no trigger)."""
+    engine = create_async_engine(url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("SET LOCAL session_replication_role = replica"))
+            await connection.execute(
+                text(
+                    "INSERT INTO users (id, email, display_name, password_hash, role_id) VALUES "
+                    "('00000000-0000-0000-0000-0000000000a1', 'a@example.com', 'A', 'x', 1)"
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO documents (id, user_id, filename, storage_key, file_type, "
+                    "content_type, file_size, checksum_sha256, status) VALUES "
+                    "('00000000-0000-0000-0000-0000000000d1', "
+                    "'00000000-0000-0000-0000-0000000000a1', 'a.txt', 'k', 'txt', 'text/plain', "
+                    "5, repeat('0', 64), 'ready')"
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO document_chunks (document_id, section_id, chunking_version, "
+                    "chunk_index, text, char_count, text_sha256, start_char, end_char) VALUES "
+                    "('00000000-0000-0000-0000-0000000000d1', "
+                    "'00000000-0000-0000-0000-0000000000e1', 'v1', 0, 'hello', 5, "
+                    "repeat('0', 64), 0, 5)"
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+def test_upgrade_backfills_existing_chunks_and_downgrade_restores_the_old_shape(
+    alembic_config: Config, fresh_database_url: str
+) -> None:
+    command.upgrade(alembic_config, "0006")
+    asyncio.run(_seed_legacy_chunk(fresh_database_url))
+
+    command.upgrade(alembic_config, "0007")
+
+    owner = asyncio.run(_scalar(fresh_database_url, "SELECT user_id::text FROM document_chunks"))
+    assert owner == "00000000-0000-0000-0000-0000000000a1"
+    matched = asyncio.run(
+        _scalar(
+            fresh_database_url,
+            "SELECT count(*) FROM document_chunks "
+            "WHERE search_vector @@ plainto_tsquery('simple', 'hello')",
+        )
+    )
+    assert matched == 1
+
+    command.downgrade(alembic_config, "0006")
+
+    columns = asyncio.run(
+        _scalar(
+            fresh_database_url,
+            "SELECT count(*) FROM information_schema.columns WHERE table_name = 'document_chunks' "
+            "AND column_name IN ('user_id', 'search_vector')",
+        )
+    )
+    assert columns == 0
+    command.upgrade(alembic_config, "head")  # and it comes back cleanly

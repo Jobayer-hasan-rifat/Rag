@@ -12,6 +12,7 @@ from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
 from app.db.repositories.document_repository import DocumentRepository
 from app.db.repositories.embedding_repository import EmbeddingRepository
+from app.db.repositories.lexical_repository import LexicalRepository
 from app.db.repositories.refresh_token_repository import RefreshTokenRepository
 from app.db.repositories.user_repository import RoleRepository, UserRepository
 from app.db.session import session_scope
@@ -27,6 +28,7 @@ from app.services.auth_service import AuthContext, AuthService
 from app.services.collection_service import CollectionService
 from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
+from app.services.hybrid_search_service import HybridSearchService
 from app.services.processing_queue import ProcessingQueue
 from app.services.search_service import SearchService
 from app.storage.base import StorageProvider
@@ -214,7 +216,25 @@ def get_search_service(
     )
 
 
+def get_hybrid_search_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    gate: Annotated[asyncio.Semaphore, Depends(get_search_gate)],
+    settings: SettingsDep,
+) -> HybridSearchService:
+    return HybridSearchService(
+        session=session,
+        documents=DocumentRepository(session),
+        collections=CollectionRepository(session),
+        embeddings=EmbeddingRepository(session),
+        lexical=LexicalRepository(session),
+        provider=get_provider(settings),
+        gate=gate,
+        settings=settings,
+    )
+
+
 CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
+HybridSearchServiceDep = Annotated[HybridSearchService, Depends(get_hybrid_search_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
 DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
 

@@ -1,0 +1,314 @@
+{
+ "dataset": "rag-retrieval-lexical-synthetic",
+ "version": 1,
+ "notes": "Same relevance model as ../retrieval/queries.json.",
+ "queries": [
+  {
+   "id": "id-01",
+   "category": "identifier",
+   "query": "ERR-4721",
+   "relevant": [
+    "lx1-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-02",
+   "category": "identifier",
+   "query": "what does error ERR-4712 mean",
+   "relevant": [
+    "lx1-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-03",
+   "category": "identifier",
+   "query": "ERR-5033 certificate",
+   "relevant": [
+    "lx1-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-04",
+   "category": "identifier",
+   "query": "ERR-4271",
+   "relevant": [
+    "lx1-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-05",
+   "category": "identifier",
+   "query": "KX-909",
+   "relevant": [
+    "lx2-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-06",
+   "category": "identifier",
+   "query": "KX-900",
+   "relevant": [
+    "lx2-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-07",
+   "category": "identifier",
+   "query": "ZQ-17",
+   "relevant": [
+    "lx2-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-08",
+   "category": "identifier",
+   "query": "PAY-3318",
+   "relevant": [
+    "lx5-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-09",
+   "category": "identifier",
+   "query": "PAY-3381 priority",
+   "relevant": [
+    "lx5-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-10",
+   "category": "identifier",
+   "query": "release 2.14",
+   "relevant": [
+    "lx5-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "id-11",
+   "category": "identifier",
+   "query": "disk space error ERR-4712",
+   "relevant": [
+    "lx1-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "ph-01",
+   "category": "phrase",
+   "query": "\"lost its queue connection\"",
+   "relevant": [
+    "lx1-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "ph-02",
+   "category": "phrase",
+   "query": "\"two calls in a row\"",
+   "relevant": [
+    "lx3-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "ph-03",
+   "category": "phrase",
+   "query": "\"first Thursday\"",
+   "relevant": [
+    "lx3-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "ph-04",
+   "category": "phrase",
+   "query": "\"original bag\"",
+   "relevant": [
+    "lx3-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "rt-01",
+   "category": "rare_term",
+   "query": "Chattogram depot batteries",
+   "relevant": [
+    "lx2-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "rt-02",
+   "category": "rare_term",
+   "query": "Redis TTL",
+   "relevant": [
+    "lx5-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "rt-03",
+   "category": "rare_term",
+   "query": "staging migration rollback",
+   "relevant": [
+    "lx5-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "nm-01",
+   "category": "bangla_name",
+   "query": "রাহাত খন্দকার",
+   "relevant": [
+    "lx4-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "nm-02",
+   "category": "bangla_name",
+   "query": "ফারহানা চৌধুরী",
+   "relevant": [
+    "lx4-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "bi-01",
+   "category": "bangla_inflection",
+   "query": "সুনামগঞ্জ",
+   "relevant": [
+    "lx4-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "bi-02",
+   "category": "bangla_inflection",
+   "query": "রংপুর তামাক",
+   "relevant": [
+    "lx4-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "bi-03",
+   "category": "bangla_inflection",
+   "query": "ময়মনসিংহ ধান গবেষণা",
+   "relevant": [
+    "lx4-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-01",
+   "category": "paraphrase",
+   "query": "How do ships avoid rocks at night?",
+   "relevant": [
+    "lx6-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-02",
+   "category": "paraphrase",
+   "query": "Which bird waits patiently to catch fish?",
+   "relevant": [
+    "lx6-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-03",
+   "category": "paraphrase",
+   "query": "How do you make fertiliser from food waste?",
+   "relevant": [
+    "lx6-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-04",
+   "category": "paraphrase",
+   "query": "Why can suspension bridges span big rivers?",
+   "relevant": [
+    "lx6-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-05",
+   "category": "paraphrase",
+   "query": "Can I work from a cafe if my internet is good?",
+   "relevant": [
+    "lx3-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-06",
+   "category": "paraphrase",
+   "query": "What happens if I skip team meetings?",
+   "relevant": [
+    "lx3-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-07",
+   "category": "paraphrase",
+   "query": "When do I get reimbursed?",
+   "relevant": [
+    "lx3-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "pa-08",
+   "category": "paraphrase",
+   "query": "How long can I borrow a laptop?",
+   "relevant": [
+    "lx3-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "lna-01",
+   "category": "no_answer",
+   "query": "ERR-9999",
+   "relevant": [],
+   "neutral": []
+  },
+  {
+   "id": "lna-02",
+   "category": "no_answer",
+   "query": "KX-123",
+   "relevant": [],
+   "neutral": []
+  },
+  {
+   "id": "lna-03",
+   "category": "no_answer",
+   "query": "PAY-0001",
+   "relevant": [],
+   "neutral": []
+  },
+  {
+   "id": "lna-04",
+   "category": "no_answer",
+   "query": "What is the capital of France?",
+   "relevant": [],
+   "neutral": []
+  }
+ ]
+}

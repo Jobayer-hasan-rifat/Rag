@@ -723,3 +723,12 @@ ML runtime packages are pinned in `requirements-ml.txt` (installed by the Docker
 ---
 
 *Every technology choice is intentional and justified. Alternatives are documented for future reference if requirements change.*
+
+## Phase 7 Dependency Choices
+
+No new Python or JavaScript dependency. Lexical search uses PostgreSQL's built-in full-text search with the `simple`
+text search configuration; the only addition is the `btree_gin` extension that ships with PostgreSQL (a trusted
+extension, so the database owner can create it), needed to put the `user_id` column in the same GIN index as the
+`tsvector`. Why not a search engine (Elasticsearch, OpenSearch) or BM25 extension: one more service to run, secure and
+keep consistent with the vectors, for a corpus size that PostgreSQL handles in milliseconds (measured, see the
+benchmarks). Reranking, a lexical analyser for Bengali and approximate vector indexes remain deliberately out of scope.

@@ -82,6 +82,15 @@ class Settings(BaseSettings):
     search_query_timeout_seconds: int = Field(default=20, ge=1, le=300)
     # None: exact search (the default; see docs). Set it only after adding an HNSW index.
     search_hnsw_ef_search: int | None = Field(default=None, ge=1, le=1000)
+    # Hybrid search: candidates per retriever, Reciprocal Rank Fusion constant and weights
+    hybrid_dense_candidates: int = Field(default=50, ge=1, le=200)
+    hybrid_sparse_candidates: int = Field(default=50, ge=1, le=200)
+    hybrid_rrf_k: int = Field(default=60, ge=1, le=1000)
+    hybrid_dense_weight: float = Field(default=1.0, ge=0.0, le=10.0)
+    hybrid_sparse_weight: float = Field(default=1.0, ge=0.0, le=10.0)
+    sparse_max_terms: int = Field(default=12, ge=1, le=40)
+    sparse_remove_stopwords: bool = True
+    sparse_statement_timeout_ms: int = Field(default=2000, ge=100, le=60000)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -177,6 +186,8 @@ class Settings(BaseSettings):
             )
         if self.search_default_top_k > self.search_max_top_k:
             raise ValueError("SEARCH_DEFAULT_TOP_K must not exceed SEARCH_MAX_TOP_K")
+        if self.hybrid_dense_weight == 0 and self.hybrid_sparse_weight == 0:
+            raise ValueError("HYBRID_DENSE_WEIGHT and HYBRID_SPARSE_WEIGHT cannot both be zero")
         return self
 
     @property

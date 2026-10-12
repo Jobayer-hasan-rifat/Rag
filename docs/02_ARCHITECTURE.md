@@ -1046,3 +1046,32 @@ graph TB
 ---
 
 *This architecture is designed for clarity, maintainability, and scalability. It follows the principle of starting simple and extracting services only when genuinely necessary.*
+
+## Hybrid Retrieval (Phase 7)
+
+`POST /api/v1/search/hybrid` runs two independent retrievers against PostgreSQL and fuses their rankings.
+
+```mermaid
+graph LR
+    Q[Query] --> N[Normalise]
+    N --> E[Embed with the model]
+    N --> L[Parse words and quoted phrases]
+    E --> D[Dense: exact pgvector scan]
+    L --> S[Sparse: full-text, IDF-weighted]
+    D --> F[Reciprocal Rank Fusion]
+    S --> F
+    F --> H[Hydrate chunks, re-check owner and ready]
+    H --> R[Response]
+```
+
+- **Dense** is the existing Phase 6 search, split in two so that it first finds candidate ids from the narrow vector
+  table and only then loads chunk text for the survivors.
+- **Sparse** searches a generated `tsvector` column on `document_chunks` (`simple` configuration) through a composite
+  GIN index `(user_id, search_vector)`, so a query touches only the caller's postings. Terms are weighted by inverse
+  document frequency within the caller's own corpus.
+- **Fusion** uses ranks only (Reciprocal Rank Fusion, `k = 60`, equal weights), so the cosine and lexical scales never
+  have to be reconciled. Ties are broken deterministically.
+- **Hydration** loads the chosen chunks with a third query that checks ownership and the `ready` status again.
+- **Degradation**: each retriever can fail independently; the other still answers and the response reports it.
+
+Decisions: DEC-045 to DEC-050.

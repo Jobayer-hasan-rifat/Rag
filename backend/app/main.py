@@ -71,7 +71,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(
         BodySizeLimitMiddleware,
-        rules={("POST", "/api/v1/search/semantic"): SEARCH_BODY_LIMIT_BYTES},
+        rules={
+            ("POST", "/api/v1/search/semantic"): SEARCH_BODY_LIMIT_BYTES,
+            ("POST", "/api/v1/search/hybrid"): SEARCH_BODY_LIMIT_BYTES,
+        },
         error_factory=RequestTooLargeError,
     )
     app.add_middleware(

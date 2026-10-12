@@ -601,3 +601,24 @@ pip-audit -r requirements.txt
 ---
 
 *Security is an ongoing process, not a one-time checklist. This document will be updated as new threats emerge and best practices evolve.*
+
+## Hybrid Search Security (Phase 7)
+
+- **Isolation in depth.** Each retriever filters on the caller's id in its own query (`document_chunks.user_id` for the
+  lexical query, `chunk_embeddings.user_id` for the vector query) and joins to `ready` documents of the same owner; the
+  final chunk load checks ownership and status once more, so a chunk that a candidate query should never have returned
+  still cannot be shown. The `user_id` copy on chunks is enforced by a composite foreign key. Filters naming documents or
+  collections that are not the caller's give the same 404 as missing ones. Administrators search only their own
+  documents.
+- **No cross-user side channel.** Term weights (inverse document frequency) and candidate counts are computed inside the
+  caller's own corpus only, so another user's uploads change neither scores, ranks nor counts; a test uploads documents
+  as a second user and asserts identical responses.
+- **Injection.** The lexical SQL is a fixed template; every user value is a bound parameter, and query words reach
+  PostgreSQL's text search functions (`to_tsvector`, `phraseto_tsquery`), which treat their input as plain text and cannot
+  express operators.
+- **Resource bounds.** Query length, at most 5 phrases of 200 characters, at most `SPARSE_MAX_TERMS` terms, per-retriever
+  candidate caps, `top_k` cap, a 128 KiB body cap, the per-user search rate limit and the query-embedding concurrency gate
+  and timeout.
+- **Logging.** The hybrid log event records counts, timings and the degraded retrievers, never the query or document text;
+  failures log only the exception type.
+- **Errors.** Failures of one retriever never expose database messages; both failing gives the generic 503.

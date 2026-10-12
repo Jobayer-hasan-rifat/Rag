@@ -1,0 +1,218 @@
+{
+ "dataset": "rag-retrieval-lexical-synthetic",
+ "version": 1,
+ "license": "CC0-1.0",
+ "notes": "Original synthetic text written for this project. Companion to ../retrieval: identifiers, rare terms, names, phrases and near-duplicate passages where exact words matter, plus paraphrase queries where meaning matters. One passage per section.",
+ "documents": [
+  {
+   "id": "lx1",
+   "title": "Incident Runbook",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Payments",
+     "passage": {
+      "id": "lx1-1",
+      "text": "Error ERR-4721 means the payment worker lost its queue connection. Restart the worker and check the broker credentials before retrying the charge."
+     }
+    },
+    {
+     "heading": "Exports",
+     "passage": {
+      "id": "lx1-2",
+      "text": "Error ERR-4712 means the report exporter ran out of disk space. Clear the temporary export folder and rerun the export."
+     }
+    },
+    {
+     "heading": "Certificates",
+     "passage": {
+      "id": "lx1-3",
+      "text": "Error ERR-5033 appears when a certificate expires. Renew the certificate and reload the gateway; users see a security warning until then."
+     }
+    },
+    {
+     "heading": "Webhooks",
+     "passage": {
+      "id": "lx1-4",
+      "text": "Error ERR-4271 is raised when a webhook signature does not match. Check the shared secret on both sides and replay the failed deliveries."
+     }
+    }
+   ]
+  },
+  {
+   "id": "lx2",
+   "title": "Hardware Catalogue",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Soil sensor",
+     "passage": {
+      "id": "lx2-1",
+      "text": "The KX-900 sensor measures soil moisture and reports every ten minutes over a low-power radio link."
+     }
+    },
+    {
+     "heading": "Air sensor",
+     "passage": {
+      "id": "lx2-2",
+      "text": "The KX-909 sensor measures air temperature and humidity; it needs a firmware update every year."
+     }
+    },
+    {
+     "heading": "Gateway",
+     "passage": {
+      "id": "lx2-3",
+      "text": "The ZQ-17 gateway collects readings from field sensors and forwards them to the cloud over cellular data."
+     }
+    },
+    {
+     "heading": "Spares",
+     "passage": {
+      "id": "lx2-4",
+      "text": "Spare batteries for field sensors are stored in the Chattogram depot and shipped within two days."
+     }
+    }
+   ]
+  },
+  {
+   "id": "lx3",
+   "title": "Staff Policy Notes",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Home working",
+     "passage": {
+      "id": "lx3-1",
+      "text": "Employees who work from home must keep a quiet room and a stable internet connection, and tell their manager the hours they are available."
+     }
+    },
+    {
+     "heading": "Meetings",
+     "passage": {
+      "id": "lx3-2",
+      "text": "Remote staff are expected to join the weekly planning call; missing two calls in a row needs approval from the team lead."
+     }
+    },
+    {
+     "heading": "Expenses",
+     "passage": {
+      "id": "lx3-3",
+      "text": "Expense claims above five thousand taka need a receipt, and the finance office pays approved claims on the first Thursday of the month."
+     }
+    },
+    {
+     "heading": "Equipment",
+     "passage": {
+      "id": "lx3-4",
+      "text": "Equipment loans last ninety days; laptops must be returned with the charger and the original bag."
+     }
+    }
+   ]
+  },
+  {
+   "id": "lx4",
+   "title": "ব্যক্তি ও স্থান",
+   "language": "bn",
+   "sections": [
+    {
+     "heading": "গবেষণা",
+     "passage": {
+      "id": "lx4-1",
+      "text": "ডক্টর রাহাত খন্দকার ময়মনসিংহে ধানের নতুন জাত নিয়ে গবেষণা করেন এবং প্রতি বছর কৃষকদের প্রশিক্ষণ দেন।"
+     }
+    },
+    {
+     "heading": "প্রতিবেদন",
+     "passage": {
+      "id": "lx4-2",
+      "text": "অধ্যাপক ফারহানা চৌধুরী চট্টগ্রাম বন্দরের পরিবেশ দূষণ নিয়ে একটি প্রতিবেদন লিখেছেন।"
+     }
+    },
+    {
+     "heading": "হাওর",
+     "passage": {
+      "id": "lx4-3",
+      "text": "সুনামগঞ্জের হাওরে বর্ষায় নৌকায় করে স্কুলে যেতে হয়, তাই শিক্ষকরা সকালের ক্লাস দেরিতে শুরু করেন।"
+     }
+    },
+    {
+     "heading": "চাষ",
+     "passage": {
+      "id": "lx4-4",
+      "text": "রংপুরের তামাক চাষ কমিয়ে কৃষকরা এখন আলু ও ভুট্টা লাগাচ্ছেন, কারণ এতে খরচ কম এবং দাম স্থির।"
+     }
+    }
+   ]
+  },
+  {
+   "id": "lx5",
+   "title": "Engineering Notes",
+   "language": "mixed",
+   "sections": [
+    {
+     "heading": "Deploy",
+     "passage": {
+      "id": "lx5-1",
+      "text": "Deploy করার আগে migration-টা staging-এ চালিয়ে দেখতে হবে, নাহলে rollback করা কঠিন হয়ে যায়।"
+     }
+    },
+    {
+     "heading": "Cache",
+     "passage": {
+      "id": "lx5-2",
+      "text": "Redis cache এর TTL কমালে database-এর load বাড়ে, তাই peak hour-এ TTL বাড়িয়ে রাখা ভালো।"
+     }
+    },
+    {
+     "heading": "Refund",
+     "passage": {
+      "id": "lx5-3",
+      "text": "JIRA ticket PAY-3318 এ refund bug-টা ঠিক করা হয়েছে; fix-টা release 2.14 এ যাবে।"
+     }
+    },
+    {
+     "heading": "Invoice",
+     "passage": {
+      "id": "lx5-4",
+      "text": "JIRA ticket PAY-3381 এ invoice PDF-এর font সমস্যা নিয়ে কথা হয়েছে; এটা low priority।"
+     }
+    }
+   ]
+  },
+  {
+   "id": "lx6",
+   "title": "Everyday Science",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Lighthouses",
+     "passage": {
+      "id": "lx6-1",
+      "text": "Lighthouses guide ships away from rocky coasts by flashing a light in a fixed pattern at night."
+     }
+    },
+    {
+     "heading": "Herons",
+     "passage": {
+      "id": "lx6-2",
+      "text": "A heron stands motionless in shallow water and strikes quickly when a fish swims close."
+     }
+    },
+    {
+     "heading": "Compost",
+     "passage": {
+      "id": "lx6-3",
+      "text": "Compost turns kitchen scraps into fertiliser after several weeks of regular turning and moisture."
+     }
+    },
+    {
+     "heading": "Bridges",
+     "passage": {
+      "id": "lx6-4",
+      "text": "Bridges built from steel cables hang their deck from towers, which lets them cross wide rivers with few supports."
+     }
+    }
+   ]
+  }
+ ]
+}

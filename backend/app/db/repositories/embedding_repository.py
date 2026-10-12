@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import and_, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -33,6 +34,31 @@ class VectorRow:
     vector: list[float]
     text_sha256: str
     truncated: bool
+
+
+@dataclass(frozen=True)
+class DenseCandidate:
+    chunk_id: uuid.UUID
+    document_id: uuid.UUID
+    distance: float
+
+
+@dataclass(frozen=True)
+class ChunkRecord:
+    """A chunk with its source location (no score)."""
+
+    chunk_id: uuid.UUID
+    document_id: uuid.UUID
+    document_name: str
+    chunk_index: int
+    section_ordinal: int
+    page_number: int | None
+    heading: str | None
+    heading_level: int | None
+    heading_path: tuple[str, ...]
+    text: str
+    start_char: int
+    end_char: int
 
 
 @dataclass(frozen=True)
@@ -201,29 +227,23 @@ class EmbeddingRepository:
 
     # --- search ------------------------------------------------------------------------
 
-    async def search(
-        self,
+    @staticmethod
+    def _nearest(
         *,
         user_id: uuid.UUID,
         config_id: uuid.UUID,
         vector: list[float],
-        top_k: int,
-        document_ids: Sequence[uuid.UUID] | None = None,
-        collection_id: uuid.UUID | None = None,
-        ef_search: int | None = None,
-    ) -> list[SearchHit]:
-        """The `top_k` nearest chunks among the caller's own, searchable (ready) documents.
+        limit: int,
+        document_ids: Sequence[uuid.UUID] | None,
+        collection_id: uuid.UUID | None,
+    ) -> Any:
+        """The nearest vectors as a subquery over the vector table alone.
 
-        Ownership is enforced twice: the vector rows carry the owner (a database-enforced copy of
-        the document's owner) and the document join is restricted to the same user.
+        Only the caller's own vectors under the active configuration, of documents that are
+        `ready`, are considered. Chunk text and sections are joined afterwards for the `limit`
+        survivors only (joining first made the search 8 times slower, measured).
         """
-        if ef_search is not None:
-            await self._session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
-            await self._session.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
         distance = ChunkEmbedding.embedding.cosine_distance(vector)
-        # Find the nearest vectors first, using only columns of the vector table, then join the
-        # metadata for those `top_k` rows. Joining chunk text and sections before the LIMIT makes
-        # PostgreSQL read them for every vector of the user (measured: 8x slower).
         ready_documents = select(Document.id).where(
             Document.user_id == user_id, Document.status == "ready"
         )
@@ -247,7 +267,117 @@ class EmbeddingRepository:
                     )
                 )
             )
-        nearest = inner.order_by(distance).limit(top_k).subquery("nearest")
+        return inner.order_by(distance).limit(limit).subquery("nearest")
+
+    async def nearest_candidates(
+        self,
+        *,
+        user_id: uuid.UUID,
+        config_id: uuid.UUID,
+        vector: list[float],
+        limit: int,
+        document_ids: Sequence[uuid.UUID] | None = None,
+        collection_id: uuid.UUID | None = None,
+        ef_search: int | None = None,
+    ) -> list[DenseCandidate]:
+        """Dense candidate ids and distances only (no chunk text), best first."""
+        if ef_search is not None:
+            await self._session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
+            await self._session.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+        nearest = self._nearest(
+            user_id=user_id,
+            config_id=config_id,
+            vector=vector,
+            limit=limit,
+            document_ids=document_ids,
+            collection_id=collection_id,
+        )
+        result = await self._session.execute(
+            select(nearest.c.chunk_id, nearest.c.document_id, nearest.c.distance).order_by(
+                nearest.c.distance, nearest.c.chunk_id
+            )
+        )
+        return [DenseCandidate(row[0], row[1], float(row[2])) for row in result.all()]
+
+    async def hydrate(
+        self, *, user_id: uuid.UUID, chunk_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, ChunkRecord]:
+        """Chunk text and source metadata for chosen chunks.
+
+        The ownership and `ready` checks are repeated here, so a chunk that a candidate query
+        should never have returned still cannot be shown.
+        """
+        if not chunk_ids:
+            return {}
+        result = await self._session.execute(
+            select(
+                DocumentChunk.id,
+                DocumentChunk.document_id,
+                Document.filename,
+                DocumentChunk.chunk_index,
+                DocumentSection.ordinal,
+                DocumentChunk.page_number,
+                DocumentChunk.heading,
+                DocumentChunk.heading_level,
+                DocumentChunk.heading_path,
+                DocumentChunk.text,
+                DocumentChunk.start_char,
+                DocumentChunk.end_char,
+            )
+            .join(DocumentSection, DocumentSection.id == DocumentChunk.section_id)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(
+                DocumentChunk.id.in_(list(chunk_ids)),
+                DocumentChunk.user_id == user_id,
+                Document.user_id == user_id,
+                Document.status == "ready",
+            )
+        )
+        return {
+            row[0]: ChunkRecord(
+                chunk_id=row[0],
+                document_id=row[1],
+                document_name=row[2],
+                chunk_index=row[3],
+                section_ordinal=row[4],
+                page_number=row[5],
+                heading=row[6],
+                heading_level=row[7],
+                heading_path=tuple(row[8] or ()),
+                text=row[9],
+                start_char=row[10],
+                end_char=row[11],
+            )
+            for row in result.all()
+        }
+
+    async def search(
+        self,
+        *,
+        user_id: uuid.UUID,
+        config_id: uuid.UUID,
+        vector: list[float],
+        top_k: int,
+        document_ids: Sequence[uuid.UUID] | None = None,
+        collection_id: uuid.UUID | None = None,
+        ef_search: int | None = None,
+    ) -> list[SearchHit]:
+        """The `top_k` nearest chunks among the caller's own, searchable (ready) documents.
+
+        Ownership is enforced twice: the vector rows carry the owner (a database-enforced copy of
+        the document's owner) and the document join is restricted to the same user.
+        """
+        if ef_search is not None:
+            await self._session.execute(text(f"SET LOCAL hnsw.ef_search = {int(ef_search)}"))
+            await self._session.execute(text("SET LOCAL hnsw.iterative_scan = relaxed_order"))
+        nearest = self._nearest(
+            user_id=user_id,
+            config_id=config_id,
+            vector=vector,
+            limit=top_k,
+            document_ids=document_ids,
+            collection_id=collection_id,
+        )
         statement = (
             select(
                 nearest.c.chunk_id,
