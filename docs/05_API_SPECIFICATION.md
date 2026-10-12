@@ -272,9 +272,9 @@ All endpoints require authentication and enforce ownership server-side. Response
 keys, filesystem paths or owner IDs. A document that is missing and one that belongs to someone else both
 return 404 (administrators may access any document by ID, but `GET /documents` only lists the caller's own).
 
-Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "failure_reason", "processing_started_at", "processing_completed_at", "page_count", "character_count", "chunk_count", "chunking_version", "collections": [{"id","name"}], "created_at", "updated_at"}`
+Document: `{"id", "filename", "file_type", "content_type", "file_size", "checksum_sha256", "status", "error_message", "failure_reason", "processing_started_at", "processing_completed_at", "page_count", "character_count", "chunk_count", "chunking_version", "embedded_chunk_count", "embedding_completed_at", "searchable", "collections": [{"id","name"}], "created_at", "updated_at"}`
 
-**Processing state**: uploads start as `pending` and are processed asynchronously. `status` moves `pending -> parsing -> chunking -> chunked` (or `failed`); `chunked` means the text was extracted and split into chunks and the document awaits embedding (`ready` is reserved for searchable documents and is not reached yet). `page_count` is set for PDFs, `character_count` once text is stored, and `chunk_count` and `chunking_version` once chunks are stored (otherwise `null`). For `failed` documents `failure_reason` is a stable code (`corrupt_document`, `encrypted_document`, `empty_document`, `too_many_pages`, `content_too_large`, `too_many_chunks`, `chunking_failed`, `timeout`, `storage_missing`, `storage_unavailable`, `extraction_failed`, `database_error`, `retries_exhausted`) and `error_message` a fixed, safe sentence. Stack traces, paths and exception text are never returned. Poll `GET /documents/{id}` for progress.
+**Processing state**: uploads start as `pending` and are processed asynchronously. `status` moves `pending -> parsing -> chunking -> chunked -> embedding -> ready` (or `failed`); `chunked` means the text was split into chunks and the document awaits embedding, `embedding` means vectors are being generated (`embedded_chunk_count` of `chunk_count` so far), and `ready` means the document is searchable (`searchable` is true exactly then). `page_count` is set for PDFs, `character_count` once text is stored, and `chunk_count` and `chunking_version` once chunks are stored (otherwise `null`). For `failed` documents `failure_reason` is a stable code (`corrupt_document`, `encrypted_document`, `empty_document`, `too_many_pages`, `content_too_large`, `too_many_chunks`, `chunking_failed`, `model_unavailable`, `embedding_failed`, `invalid_embedding`, `timeout`, `storage_missing`, `storage_unavailable`, `extraction_failed`, `database_error`, `retries_exhausted`) and `error_message` a fixed, safe sentence. Stack traces, paths and exception text are never returned. Poll `GET /documents/{id}` for progress.
 
 ### GET /documents
 
@@ -333,9 +333,9 @@ both return 404.
 
 ### POST /documents/{id}/retry
 
-Re-queue a **failed** document for processing with a fresh attempt budget. Rate limited per user (same budget as uploads).
+Re-queue a **failed** document with a fresh attempt budget. If the failure happened after chunking (an embedding failure) the document resumes at `chunked` and only the embedding stage runs again; otherwise it restarts at `pending`. Rate limited per user (same budget as uploads).
 
-**Response** (202): the Document, now `pending` with `failure_reason` and `error_message` cleared.
+**Response** (202): the Document, now `pending` (or `chunked`) with `failure_reason` and `error_message` cleared.
 
 **Errors**: 401; 404 (missing or not yours); 409 `INVALID_STATE_TRANSITION` if the document is not `failed`; 429.
 
@@ -367,23 +367,30 @@ logged at ERROR and does not block deletion; a storage failure returns 503 and k
 
 ### POST /search/semantic
 
-Semantic search using vector similarity.
+Semantic search over **your own searchable (`ready`) documents**. The query is embedded with the same model the
+documents were embedded with and matched by cosine similarity. The query is sent in the body, never in the URL, so
+it does not end up in access logs.
 
-**Authentication**: Required
+**Authentication**: Required. Rate limited per user (`RATE_LIMIT_SEARCH_ATTEMPTS` per window, default 60).
 
-**Request Body**:
+**Request body** (JSON, at most 128 KiB):
 ```json
 {
-  "query": "machine learning algorithms",
+  "query": "ইলিশ ধরা কবে নিষিদ্ধ?",
   "top_k": 10,
-  "min_similarity": 0.7,
-  "filters": {
-    "document_ids": ["uuid1", "uuid2"],
-    "collection_ids": ["uuid3"],
-    "file_types": ["pdf"]
-  }
+  "document_ids": ["uuid1", "uuid2"],
+  "collection_id": "uuid3",
+  "min_score": 0.8
 }
 ```
+
+| Field | Rules |
+|-------|-------|
+| `query` | Required text in any language. Normalised like document text (NFC, whitespace); at most `SEARCH_MAX_QUERY_CHARS` (default 1,000) after normalisation; empty or whitespace-only is rejected. |
+| `top_k` | Optional, 1 to `SEARCH_MAX_TOP_K` (default 50); default `SEARCH_DEFAULT_TOP_K` (10). |
+| `document_ids` | Optional, at most 100. Every id must be one of your documents, otherwise **404** (indistinguishable from a missing document). |
+| `collection_id` | Optional. Must be your collection, otherwise 404. |
+| `min_score` | Optional, -1 to 1. Drops results whose `score` is lower. |
 
 **Response** (200):
 ```json
@@ -391,24 +398,55 @@ Semantic search using vector similarity.
   "data": {
     "results": [
       {
+        "rank": 1,
         "chunk_id": "uuid",
         "document_id": "uuid",
-        "document_name": "research_paper.pdf",
-        "content": "Machine learning algorithms are...",
-        "page_number": 5,
-        "similarity_score": 0.89,
-        "metadata": {}
+        "document_name": "hilsa.pdf",
+        "chunk_index": 3,
+        "section_ordinal": 1,
+        "page_number": 2,
+        "heading": "নিষেধাজ্ঞা",
+        "heading_level": 2,
+        "heading_path": ["ইলিশ মাছ", "নিষেধাজ্ঞা"],
+        "text": "ডিম ছাড়ার মৌসুমে ...",
+        "start_char": 0,
+        "end_char": 118,
+        "score": 0.8412,
+        "distance": 0.1588
       }
     ],
-    "total_results": 10,
-    "query_time_ms": 45
+    "search": {
+      "embedding_model": "intfloat/multilingual-e5-small",
+      "model_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+      "metric": "cosine",
+      "score_type": "cosine_similarity",
+      "top_k": 10,
+      "returned": 1,
+      "searched_documents": "own, ready",
+      "latency_ms": 31
+    }
   },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-13T00:00:00Z"}
 }
 ```
+
+**Score semantics.** `score = 1 - distance`, the cosine similarity between the query vector and the chunk vector,
+in [-1, 1] (`distance` is the cosine distance, 0 to 2). Results are ordered best first. The score is a **ranking
+signal for one query and one model**: it is not a probability, not a percentage of relevance, and not comparable
+across models or languages. Some models compress scores into a narrow band (the default e5 model gives roughly
+0.7-0.9 even for unrelated text), so a fixed `min_score` needs to be calibrated on your own data; the number of
+results is not an indication of relevance. An empty `results` list means nothing is searchable yet or `min_score`
+removed everything.
+
+**Scope.** Only the caller's own documents are searched, administrators included (consistent with `GET /documents`).
+Documents that are not `ready` (still processing, mid-embedding, failed, or embedded under an older model) are not
+searched. `section_ordinal`, `page_number` and `heading_path` locate the chunk in its source; `start_char` and
+`end_char` are offsets into the section text.
+
+**Errors**: 401; 404 (a filtered document or collection is not yours or does not exist); 413 `REQUEST_TOO_LARGE`; 422
+`VALIDATION_ERROR` (invalid or too long query, `top_k` above the limit, malformed filters); 429
+`RATE_LIMIT_EXCEEDED` (`Retry-After` header); 503 `EMBEDDING_UNAVAILABLE` (the model cannot load, timed out, or the
+server is saturated; retry later). Error bodies never contain paths, stack traces or model internals.
 
 ---
 
@@ -869,6 +907,7 @@ Check system health.
 - API endpoints: 100 requests per minute per user
 - Authentication endpoints: 10 requests per minute per IP
 - Upload endpoint: 20 uploads per minute per user
+- Semantic search: 60 searches per minute per user (`RATE_LIMIT_SEARCH_ATTEMPTS`); every search costs a model inference
 
 **Headers**:
 ```
@@ -898,6 +937,8 @@ X-RateLimit-Reset: 1602083200
 |------|-------------|-------------|
 | VALIDATION_ERROR | 422 | Request validation failed |
 | AUTHENTICATION_ERROR | 401 | Invalid or missing token |
+| REQUEST_TOO_LARGE | 413 | Request body over the endpoint's limit (search: 128 KiB) |
+| EMBEDDING_UNAVAILABLE | 503 | Semantic search cannot run right now (model unavailable, timed out or busy) |
 | AUTHORIZATION_ERROR | 403 | Insufficient permissions |
 | NOT_FOUND | 404 | Resource not found |
 | CONFLICT | 409 | Resource conflict |

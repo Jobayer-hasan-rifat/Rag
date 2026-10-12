@@ -441,5 +441,5 @@ def test_negative_counts_are_rejected(database_url: str) -> None:
 
     for column in ("page_count", "character_count", "processing_attempts"):
         with pytest.raises(IntegrityError):
-            statement = f"UPDATE documents SET {column} = -1 WHERE id = :d"  # noqa: S608
+            statement = f"UPDATE documents SET {column} = -1 WHERE id = :d"
             db_execute(database_url, statement, d=doc)

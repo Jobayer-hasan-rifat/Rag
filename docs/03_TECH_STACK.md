@@ -187,6 +187,13 @@ This document details the technology stack for the Intelligent Document Processi
 - Fewer features than dedicated vector databases
 - **Mitigation**: Architecture allows migration to dedicated vector DB if needed
 
+**As implemented (Phase 6)**: cosine distance (`<=>`) on `vector(384)` columns, searched exactly per user through a
+btree index on `(user_id, config_id)`. No ANN index is created by default: measured on synthetic data, the exact
+per-user scan was as fast as HNSW with iterative scanning and had 100% recall, while HNSW lost recall under the
+ownership filter. HNSW becomes worthwhile when a single user has on the order of 100,000 vectors or more (see
+DEC-039 for the numbers and how to enable it). pgvector 0.8.x (the `pgvector/pgvector:pg16` image) supports
+iterative index scans.
+
 **Decision recorded**: [PostgreSQL + pgvector vs Dedicated Vector DB](18_DECISION_LOG.md)
 
 ## Caching & Message Broker
@@ -312,6 +319,17 @@ This document details the technology stack for the Intelligent Document Processi
 - Model quality varies by use case
 - CPU inference can be slow for large batches
 - Need GPU for optimal performance
+
+**Default model (Phase 6)**: `intfloat/multilingual-e5-small` (MIT, 384 dimensions, 118M parameters, 94 documented
+languages including Bengali, about 0.5 GB of weights). It was chosen by measurement on a Bangla/English/mixed
+dataset, not by model card; see DEC-037 for the candidates and the numbers. The original design default,
+`all-MiniLM-L6-v2`, is English-only and unsuitable for Bangla. The model is pinned to a commit hash, loaded from
+safetensors only, never with remote code, and downloaded on first use into a shared volume rather than the image.
+
+**CPU and GPU**: everything runs on CPU: about 15-20 chunks of 1,000 characters per second on a 6-thread desktop CPU
+(English faster than Bangla; see the README), model load in about 5 seconds from the cache and 60 seconds including the
+first download of the ~0.5 GB weights. `EMBEDDING_DEVICE=auto` uses CUDA or Apple MPS when present and falls back to
+CPU. A GPU is optional and was not available for measurement, so GPU throughput is unmeasured.
 
 **Decision recorded**: [Local Embedding Model vs API](18_DECISION_LOG.md)
 
@@ -660,6 +678,17 @@ Content sniffing uses signatures and the standard library (`zipfile`, incrementa
 **Licensing note**: PyMuPDF/MuPDF is licensed AGPL-3.0 (commercial licences are available from Artifex). That suits an open-source
 portfolio project; a closed-source deployment would need a commercial licence or a swap to a permissively licensed
 parser behind the same `DocumentExtractor` interface. OCR is not included.
+
+## Phase 6 Dependency Choices
+
+| Dependency | Why | Alternative not chosen |
+|------------|-----|------------------------|
+| `sentence-transformers` + `torch` (CPU wheel) | Local multilingual embeddings with a stable API; named in the project stack; CPU wheel avoids about 2 GB of CUDA libraries | ONNX Runtime (needs converted models), hosted APIs (cost, privacy, external dependency) |
+| `numpy` | Vector arithmetic and validation; required by pgvector's client | Plain Python lists (slow, no validation helpers) |
+| `pgvector` (Python client) | Vector column type and `cosine_distance` operator for SQLAlchemy; works with asyncpg without extra registration | Raw SQL strings for every vector operation |
+| `multilingual-e5-small` | Documented Bengali coverage, retrieval-trained, small, MIT | See DEC-037: MiniLM-multilingual (no Bengali), e5-base, LaBSE, BGE-M3 and gte-multilingual (excluded by the weight-format and remote-code rules) |
+
+ML runtime packages are pinned in `requirements-ml.txt` (installed by the Dockerfile after `requirements.txt`); torch is installed from the PyTorch CPU index.
 
 ## Technology Summary Table
 

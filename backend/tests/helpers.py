@@ -186,7 +186,12 @@ class RecordingQueue:
 
     def __init__(self) -> None:
         self.enqueued: list[Any] = []
+        self.embedding_enqueued: list[Any] = []
 
     async def enqueue(self, document_id: Any) -> bool:
         self.enqueued.append(document_id)
+        return True
+
+    async def enqueue_embedding(self, document_id: Any) -> bool:
+        self.embedding_enqueued.append(document_id)
         return True

@@ -60,6 +60,18 @@ def redis_url() -> Iterator[str]:
         yield f"redis://{host}:{port}"
 
 
+@pytest.fixture(autouse=True)
+def fake_embedding_provider() -> Iterator[None]:
+    """Register the deterministic provider (and forget loaded providers) for every test."""
+    from app.embeddings.registry import register_provider, reset_provider_cache, unregister_provider
+    from tests.embedding_fakes import HashProvider
+
+    register_provider("test_hash", HashProvider)
+    yield
+    unregister_provider("test_hash")
+    reset_provider_cache()
+
+
 @pytest.fixture
 def make_settings() -> SettingsFactory:
     def factory(**overrides: Any) -> Settings:
@@ -77,6 +89,14 @@ def make_settings() -> SettingsFactory:
             "rate_limit_upload_attempts": 1000,
             "max_upload_bytes": 2 * 1024 * 1024,
             "storage_local_path": os.path.join(tempfile.gettempdir(), "rag-test-unused"),
+            # tests never load a real model: the deterministic provider is registered below
+            "embedding_provider": "test_hash",
+            "embedding_model": "test-hash",
+            "embedding_model_revision": "test-revision-1",
+            "embedding_batch_size": 4,
+            "embedding_retry_backoff_seconds": 0,
+            "embedding_query_prefix": "",
+            "embedding_passage_prefix": "",
         }
         values.update(overrides)
         return Settings(_env_file=None, **values)
@@ -195,6 +215,35 @@ def pipeline_client_factory(auth_client_factory: ClientFactory) -> Iterator[Clie
                 perform_ping_check=False,
                 loglevel="WARNING",
                 queues=["celery", "processing"],
+            )
+        )
+        return client
+
+    yield factory
+    stack.close()
+
+
+@pytest.fixture
+def embedding_pipeline_client_factory(
+    auth_client_factory: ClientFactory,
+) -> Iterator[ClientFactory]:
+    """Like `pipeline_client_factory`, and the worker also consumes the embedding queue."""
+    from celery.contrib.testing.worker import start_worker
+
+    from app.workers.celery_app import create_celery_app
+
+    stack = ExitStack()
+
+    def factory(configure: Callable[[FastAPI], None] | None = None, **overrides: Any) -> TestClient:
+        client = auth_client_factory(configure, **overrides)
+        worker_app = create_celery_app(client.app.state.settings, configure_logs=False)  # type: ignore[attr-defined]
+        stack.enter_context(
+            start_worker(
+                worker_app,
+                pool="solo",
+                perform_ping_check=False,
+                loglevel="WARNING",
+                queues=["celery", "processing", "embedding"],
             )
         )
         return client

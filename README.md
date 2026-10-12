@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 5 complete (Intelligent chunking). Embeddings, search and RAG are not implemented yet.
+> **Status**: 🚧 In Development - Phase 6 complete (Embeddings and semantic search). Hybrid search, reranking and RAG answers are not implemented yet.
 
 ## Overview
 
@@ -20,7 +20,13 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
-Infrastructure, authentication, secure document management, asynchronous text extraction and structure-aware chunking; documents are processed into clean, page-aware text and traceable chunks but not yet embedded, searched or used for answers.
+Infrastructure, authentication, secure document management, asynchronous text extraction, structure-aware chunking, multilingual embeddings and owner-scoped semantic search; documents are processed into traceable chunks and vectors that can be searched in Bangla, English and mixed text, but no answers are generated yet (no hybrid search, reranking or RAG).
+
+- Local multilingual embeddings (`intfloat/multilingual-e5-small`: 384 dimensions, MIT, 94 documented languages including Bengali, CPU-friendly, about 0.5 GB), behind a provider interface; the model revision is pinned, weights load from safetensors only, and nothing is downloaded into the image
+- A versioned vector store in PostgreSQL/pgvector (cosine distance): every vector records the exact model configuration it came from, belongs to a chunk of the same document and to that document's owner (enforced by foreign keys), and a model change requires an explicit re-index instead of silently mixing vectors
+- A dedicated embedding worker with batched, idempotent, time-bounded jobs, crash recovery and retries; `ready` now means *searchable* (every chunk has a vector)
+- `POST /api/v1/search/semantic`: authenticated, rate-limited, owner-scoped search returning chunk text with page, heading, section and score; no user can reach another user's documents
+- A small version-controlled evaluation dataset (Bangla, English, mixed, cross-lingual, confusable and unanswerable queries) with Recall@k, MRR, nDCG@k and latency/throughput measurement
 
 - Deterministic, versioned chunking that never crosses a page or heading boundary: each chunk is an exact slice of its source with page number, heading path and character offsets, bounded in size, with overlap only inside oversized paragraphs
 - Bangla-safe splitting (Bengali danda sentence ends, no cut inside a conjunct or ZWJ/ZWNJ sequence), Markdown tables and code fences kept whole, idempotent re-chunking and a `chunked` status that keeps `ready` reserved for searchable documents
@@ -143,6 +149,18 @@ docker compose ps
 | API docs (Swagger) | http://localhost:8000/docs |
 | Readiness probe | http://localhost:8000/health/ready |
 
+**First start and the embedding model.** The `embedding_worker` service downloads the embedding model (about 0.5 GB of weights, pinned to a commit hash) into the shared `model_cache` volume the first time it starts, which takes about a minute on a normal connection; documents wait in `chunked` until it is ready. Everything runs on the CPU (the Docker image uses the CPU build of PyTorch); a GPU is optional (`EMBEDDING_DEVICE=auto` uses CUDA or Apple MPS when present). The embedding worker uses about 0.9 GB of memory with the default model (limit 3 GB) and the API loads its own copy for query embedding on the first search. To fetch the model ahead of time: `docker compose run --rm embedding_worker python -m app.embeddings.download`. Changing `EMBEDDING_MODEL`, its revision or the prefixes means re-embedding: run `docker compose exec embedding_worker celery -A app.workers.celery_app:celery_app call app.workers.embedding_tasks.reindex_embeddings`. All settings are listed in `.env.example`.
+
+Try a search once a document is `ready` (replace the token):
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/search/semantic \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"query": "ইলিশ ধরা কবে নিষিদ্ধ?", "top_k": 5}'
+```
+
+`score` is the cosine similarity between query and chunk (a ranking signal, not a probability); see the [API specification](docs/05_API_SPECIFICATION.md).
+
 PostgreSQL and Redis are published on `127.0.0.1` only. If a host port is taken (for example Windows reserves 6379 on some machines), change `POSTGRES_HOST_PORT` / `REDIS_HOST_PORT` in `.env`.
 
 ### Development commands
@@ -205,18 +223,21 @@ npm run typecheck && npm run build
 | 2 | Authentication | ✅ Complete |
 | 3 | Document Management | ✅ Complete |
 | 4 | Document Processing | ✅ Complete |
-| 5 | Embeddings & Vector Search | ⏳ Pending |
-| 6 | Hybrid Retrieval | ⏳ Pending |
-| 7 | Reranking | ⏳ Pending |
-| 8 | RAG | ⏳ Pending |
-| 9 | Conversations | ⏳ Pending |
-| 10 | Versioning & Access Control | ⏳ Pending |
-| 11 | Evaluation | ⏳ Pending |
-| 12 | Frontend | ⏳ Pending |
-| 13 | Security Hardening | ⏳ Pending |
-| 14 | Performance & Benchmarking | ⏳ Pending |
-| 15 | CI/CD & Deployment | ⏳ Pending |
-| 16 | Final Audit & Portfolio Prep | ⏳ Pending |
+| 5 | Intelligent Chunking | ✅ Complete |
+| 6 | Embeddings & Semantic Search | ✅ Complete |
+| 7 | Hybrid Retrieval | ⏳ Planned |
+| 8 | Reranking | ⏳ Planned |
+| 9 | RAG | ⏳ Planned |
+| 10 | Conversations | ⏳ Planned |
+| 11 | Versioning & Access Control | ⏳ Planned |
+| 12 | Evaluation | ⏳ Planned |
+| 13 | Frontend | ⏳ Planned |
+| 14 | Security Hardening | ⏳ Planned |
+| 15 | Performance & Benchmarking | ⏳ Planned |
+| 16 | CI/CD & Deployment | ⏳ Planned |
+| 17 | Final Audit & Portfolio Prep | ⏳ Planned |
+
+Numbering follows the order in which phases were executed; planned phases may be reordered.
 
 ## Documentation
 
@@ -243,8 +264,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 3): 726 tests passing and 1 POSIX-only test skipped on Windows (unit, API and infrastructure integration),
-about 99% line coverage of `app/`. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
+Current state (Phase 6): 1112 tests passing and 12 skipped on Windows (11 opt-in tests that load the real embedding model, run with `RAG_REAL_MODEL_TESTS=1`, and 1 POSIX-only test), about 99% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model. See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
 
@@ -259,7 +279,20 @@ This platform includes systematic evaluation of RAG quality:
 ### Citation Metrics
 - Citation precision, recall, correctness
 
-*Evaluation framework will be implemented in Phase 11.*
+*The full RAG evaluation framework (generation and citation metrics) is planned.*
+
+### Retrieval evaluation (implemented in Phase 6)
+
+`backend/evaluation/` holds a small synthetic dataset (48 passages in English, Bangla and mixed documents; 52 queries including cross-lingual, confusable-wording, punctuation/Unicode and unanswerable ones), metric code (Recall@k, MRR, nDCG@k, answerability AUROC) and runners: `python -m evaluation.retrieval_eval --mode database` evaluates the real pipeline end to end; `python -m evaluation.compare_models` compares candidate models. Measured with the default model on CPU:
+
+| Metric | Value |
+|--------|------:|
+| Recall@1 / @3 / @10 | 0.891 / 1.000 / 1.000 |
+| MRR@10 / nDCG@10 | 0.942 / 0.957 |
+| Bangla queries (12) Recall@1 / @3 | 0.917 / 1.000 |
+| Cross-lingual queries (4) Recall@1 | 0.750 |
+
+The same dataset shows why the model was chosen: a multilingual model that does not list Bengali among its languages reached Bangla Recall@1 of 0.42 against 0.92 here (see DEC-037 in the [decision log](docs/18_DECISION_LOG.md)). **Read these numbers carefully:** the dataset is small (one query is about 2 points), synthetic, written by one author, uses short passages, and the model was selected on it, so the results show that the pipeline separates these passages, not that Bangla retrieval is strong in general. A larger evaluation on real documents is planned.
 
 ## Security
 
@@ -299,6 +332,19 @@ Chunking baseline (Phase 5, median of 5 runs, same machine; reproduce with `pyth
 Persisting chunks in batches of 1,000 rows took 74 ms for 1,000 chunks and 676 ms for 10,000, about 9-10x faster than row-by-row inserts (652 ms and 6.7 s). Chunking is a small fraction of end-to-end processing time; extraction dominates.
 
 Chunk quality is measured on a seeded synthetic corpus (`python -m benchmarks.chunking_eval`): on all ten corpus cases every chunk is within the size limit and an exact slice of its source, all non-whitespace text is covered, no chunk starts or ends inside a grapheme cluster, and output is deterministic; prose chunks end on a sentence or paragraph boundary in 100% of cases with a mean size of roughly 65-85% of the limit. This is a structural evaluation of the splitter, not a retrieval-quality measurement; retrieval quality is evaluated in a later phase.
+
+Embedding and search baseline (Phase 6; `python -m benchmarks.embedding_baseline`, same CPU, 6 threads, no GPU, model `multilingual-e5-small`):
+
+| Measure | Result |
+|---------|-------:|
+| Model load, from cache / first download | 4.6 s / 60.8 s |
+| Embedding throughput, 1,000-character chunks, batch 8 (English / Bangla / mixed) | 20.9 / 14.7 / 17.8 chunks/s |
+| Query embedding latency (p50 / p95) | 14 / 15 ms |
+| Vector search through the real schema, 2,500 of 50,000 vectors (p50) | 6.6 ms |
+| Vector search, one user owning 50,000 vectors (p50) | 23.7 ms |
+| Search over HTTP in the Docker stack (4 documents, p50 / p95) | 26 / 29 ms |
+
+On CPU, small batches were fastest (batch 4-8; throughput falls as the batch grows), so the default batch size is 8. **GPU throughput was not measured: no GPU was available.** Search is exact by default (no ANN index): per-user exact scans matched an HNSW index on speed with perfect recall in the multi-user case (details and thresholds in DEC-039). Numbers come from one desktop machine and synthetic vectors.
 
 These exclude storage reads, database writes (except the chunk insert figures above) and queueing. Remaining benchmarks are planned for Phase 14:
 

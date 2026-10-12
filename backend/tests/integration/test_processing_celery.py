@@ -108,8 +108,12 @@ def test_manual_retry_goes_through_the_queue_again(
     db_execute(
         migrated_database_url,
         "UPDATE documents SET status='failed', failure_reason='extraction_failed', "
-        "error_message='x', processing_attempts=3 WHERE id = :d",
+        "error_message='x', processing_attempts=3, chunk_count=NULL, chunking_version=NULL "
+        "WHERE id = :d",  # what a real failure during processing leaves behind
         d=doc_id,
+    )
+    db_execute(
+        migrated_database_url, "DELETE FROM document_chunks WHERE document_id = :d", d=doc_id
     )
 
     response = client.post(f"{DOCS}/{doc_id}/retry", headers=alice)

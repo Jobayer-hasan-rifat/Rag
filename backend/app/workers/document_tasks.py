@@ -18,9 +18,24 @@ from app.observability.context import request_id_var
 from app.observability.logging import get_logger
 from app.services.processing_service import ProcessingOutcome, ProcessingService
 from app.storage.factory import create_storage
-from app.workers.dispatch import PROCESS_DOCUMENT_TASK
+from app.workers.dispatch import EMBED_DOCUMENT_TASK, PROCESS_DOCUMENT_TASK
 
 logger = get_logger("app.workers.documents")
+
+
+def _queue_embedding(app: Any, document_id: uuid.UUID) -> None:
+    """Hand a freshly chunked document to the embedding queue.
+
+    Never fatal: if the broker is unreachable the document stays `chunked` and the recovery
+    sweep queues it later.
+    """
+    try:
+        app.send_task(EMBED_DOCUMENT_TASK, args=[str(document_id)], ignore_result=True)
+    except Exception:
+        logger.warning(
+            "could not queue embedding; the recovery sweep will retry",
+            extra={"document_id": str(document_id)},
+        )
 
 
 def chunking_config(settings: Settings) -> ChunkingConfig:
@@ -93,6 +108,8 @@ def process_document(self: Task, document_id: str) -> dict[str, str | None]:
             return {"status": "failed", "reason": "timeout"}
         if outcome.status == "retry" and outcome.retry_in is not None:
             raise self.retry(countdown=outcome.retry_in)
+        if outcome.status == "chunked":
+            _queue_embedding(self.app, parsed)
         return {"status": outcome.status, "reason": outcome.reason}
     finally:
         request_id_var.reset(token)
@@ -121,7 +138,9 @@ def recover_stalled_documents(self: Task) -> dict[str, int]:
 
 @shared_task(bind=True, name="app.workers.document_tasks.rechunk_document")  # type: ignore[untyped-decorator]
 def rechunk_document(self: Task, document_id: str) -> dict[str, str | None]:
-    """Regenerate a `chunked` document's chunks from its stored sections.
+    """Regenerate a `chunked` (or `ready`) document's chunks from its stored sections.
+
+    The old vectors go with the old chunks; the document is queued for embedding again.
 
     Operator/maintenance task (for example after a chunking-version or configuration change):
     Run: celery -A app.workers.celery_app:celery_app call
@@ -140,6 +159,8 @@ def rechunk_document(self: Task, document_id: str) -> dict[str, str | None]:
         except SoftTimeLimitExceeded:
             asyncio.run(_fail_timed_out(settings, parsed, task_id))
             return {"status": "failed", "reason": "timeout"}
+        if outcome.status == "chunked":
+            _queue_embedding(self.app, parsed)
         return {"status": outcome.status, "reason": outcome.reason}
     finally:
         request_id_var.reset(token)

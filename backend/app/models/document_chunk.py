@@ -45,6 +45,8 @@ class DocumentChunk(Base):
             name="fk_document_chunks_document_id_documents",
             ondelete="CASCADE",
         ),
+        # target of the composite foreign key from chunk_embeddings (a vector's chunk and document)
+        UniqueConstraint("id", "document_id", name="uq_document_chunks_id_document"),
         CheckConstraint("chunk_index >= 0", name="index_non_negative"),
         CheckConstraint("char_count = char_length(text)", name="char_count_matches"),
         CheckConstraint("char_count > 0", name="not_empty"),

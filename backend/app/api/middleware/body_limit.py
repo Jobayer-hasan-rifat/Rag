@@ -1,8 +1,10 @@
+from collections.abc import Callable
+
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.responses import error_response
-from app.exceptions import FileTooLargeError
+from app.exceptions import AppError, FileTooLargeError
 
 
 class BodySizeLimitMiddleware:
@@ -14,11 +16,17 @@ class BodySizeLimitMiddleware:
     """
 
     def __init__(
-        self, app: ASGIApp, *, rules: dict[tuple[str, str], int], overhead_bytes: int = 0
+        self,
+        app: ASGIApp,
+        *,
+        rules: dict[tuple[str, str], int],
+        overhead_bytes: int = 0,
+        error_factory: Callable[[int], AppError] = FileTooLargeError,
     ) -> None:
         self.app = app
         self._rules = rules
         self._overhead = overhead_bytes
+        self._error_factory = error_factory
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         limit = (
@@ -30,7 +38,7 @@ class BodySizeLimitMiddleware:
 
         declared = dict(scope["headers"]).get(b"content-length")
         if declared is not None and declared.isdigit() and int(declared) > limit:
-            error = FileTooLargeError(limit - self._overhead)
+            error = self._error_factory(limit - self._overhead)
             response = error_response(
                 Request(scope),
                 status_code=error.status_code,
@@ -49,7 +57,7 @@ class BodySizeLimitMiddleware:
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
                 if received > limit:
-                    raise FileTooLargeError(limit - self._overhead)
+                    raise self._error_factory(limit - self._overhead)
             return message
 
         await self.app(scope, counting_receive, send)

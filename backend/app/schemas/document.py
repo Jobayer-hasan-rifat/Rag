@@ -29,6 +29,9 @@ class DocumentResponse(BaseModel):
     character_count: int | None
     chunk_count: int | None
     chunking_version: str | None
+    embedded_chunk_count: int | None
+    embedding_completed_at: datetime | None
+    searchable: bool
     collections: list[CollectionSummary]
     created_at: datetime
     updated_at: datetime

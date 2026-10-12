@@ -262,12 +262,19 @@ Metadata for an uploaded file. The file itself lives in object storage, never in
 | processing_attempts | INTEGER | NOT NULL, DEFAULT 0, CHECK (>= 0) | Attempts in the current retry budget |
 | chunk_count | INTEGER | NULLABLE, CHECK (NULL or >= 0) | Chunks of the current run; NULL until chunked and again after a failure |
 | chunking_version | VARCHAR(20) | NULLABLE | Chunking algorithm version that produced the chunks |
+| embedding_attempts | INTEGER | NOT NULL, DEFAULT 0, CHECK (>= 0) | Consecutive embedding claims that made no progress (progress resets it to 1) |
+| embedding_started_at | TIMESTAMPTZ | NULLABLE | Start of the latest embedding claim |
+| embedding_updated_at | TIMESTAMPTZ | NULLABLE | Heartbeat: last progress, release or failure of the embedding stage |
+| embedding_completed_at | TIMESTAMPTZ | NULLABLE | When the document became `ready` (or the stage failed) |
+| embedded_chunk_count | INTEGER | NULLABLE, CHECK (NULL or >= 0) | Chunks with a vector so far (progress); equals `chunk_count` when ready |
+| embedding_config_id | UUID | FOREIGN KEY embedding_configs(id) ON DELETE SET NULL | Configuration of the vectors a `ready` document is searchable under |
 | processing_metadata | JSONB | NOT NULL, DEFAULT '{}' | Extractor, processing version, duration, script profile, sanitised file properties |
 | created_at / updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Timestamps |
 
 **Status values** (see the lifecycle in the architecture document): `pending`, `parsing`, `chunking`,
 `chunked`, `embedding`, `indexing`, `ready`, `failed`. `chunked` means chunks are stored and the document awaits
-embedding; `ready` is reserved for embedded, indexed (searchable) documents.
+embedding; `embedding` means vectors are being stored; `ready` means every chunk has a vector under the active
+configuration (searchable); `indexing` is reserved and unused.
 
 **Indexes / constraints**: `ix_documents_user_created` on `(user_id, created_at DESC, id DESC)` (the
 listing query); `ix_documents_status`; `uq_documents_storage_key`;
@@ -320,6 +327,54 @@ Retrievable passages. Each chunk is an exact slice of one section and belongs to
 (idempotency and ordering), `ix_document_chunks_section_id`, `ix_document_chunks_document_page` on `(document_id, page_number)`.
 Chunk text duplicates section text (plus overlap) by design: chunks are what retrieval reads, and the exact-slice
 rule keeps the two verifiable. A later phase adds the embedding column here.
+
+#### embedding_configs
+
+One row per embedding configuration ever used. A configuration is the complete recipe for a vector, so two
+vectors are comparable only if they share one.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| fingerprint | VARCHAR(64) | UNIQUE, NOT NULL | SHA-256 over the fields below (not over runtime settings) |
+| provider / model / revision | VARCHAR | NOT NULL | Provider name, model identifier and the pinned revision (commit hash) |
+| dimension | INTEGER | NOT NULL, CHECK (> 0) | Vector width |
+| metric | VARCHAR(20) | NOT NULL, CHECK IN ('cosine') | Distance metric the vectors are meant for |
+| normalized | BOOLEAN | NOT NULL | Whether the model returns unit-length vectors |
+| query_prefix / passage_prefix | TEXT | NOT NULL, DEFAULT '' | Text added before queries and chunks (for example `query: `) |
+| max_seq_length | INTEGER | NOT NULL, CHECK (> 0) | Token limit applied to inputs |
+| include_heading | BOOLEAN | NOT NULL | Whether the heading path is prepended to each chunk before embedding |
+| preprocessing_version | VARCHAR(20) | NOT NULL | Version of the code that turns a chunk into model input |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | First use |
+
+#### chunk_embeddings
+
+The vector of one chunk under one configuration. `vector(384)` is fixed by the schema (the default model's
+width); using a model with another dimension requires a migration, which makes that switch explicit.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Identifier |
+| chunk_id | UUID | NOT NULL | The embedded chunk; `(chunk_id, document_id)` is a composite foreign key to `document_chunks(id, document_id)` ON DELETE CASCADE |
+| document_id | UUID | NOT NULL | Owning document (same value as the chunk's) |
+| user_id | UUID | NOT NULL | Owner of the document; `(document_id, user_id)` is a composite foreign key to `documents(id, user_id)` ON DELETE CASCADE |
+| config_id | UUID | FOREIGN KEY embedding_configs(id) ON DELETE RESTRICT, NOT NULL | Configuration the vector belongs to |
+| embedding | vector(384) | NOT NULL | The vector; a value of the wrong width is rejected by the database |
+| text_sha256 | VARCHAR(64) | NOT NULL, CHECK (length = 64) | Hash of the chunk text that was embedded; a mismatch with the chunk marks the vector stale |
+| truncated | BOOLEAN | NOT NULL, DEFAULT false | The input exceeded the model's sequence limit |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Creation timestamp |
+
+**Constraints and indexes**: `uq_chunk_embeddings_chunk_config` unique on `(chunk_id, config_id)` (no duplicate active
+vectors; inserts use `ON CONFLICT DO NOTHING`), `ix_chunk_embeddings_user_config` on `(user_id, config_id)` (the
+search filter), `ix_chunk_embeddings_document_id`, `ix_chunk_embeddings_config_id`. `document_chunks` gains
+`uq_document_chunks_id_document` on `(id, document_id)` as the target of the chunk foreign key.
+
+**Isolation by construction.** The two composite foreign keys mean a vector can only point at a chunk of its own
+document and can only carry that document's owner. Search filters on `user_id` directly on the vector table and
+joins the document on the same owner.
+
+**Distance and scores.** The metric is cosine distance (`<=>`, range 0 to 2); `score = 1 - distance` is a cosine
+similarity in [-1, 1]. Vectors are unit length, so cosine and inner product rank identically.
 
 #### document_collections
 
@@ -532,6 +587,24 @@ CREATE TRIGGER update_conversation_on_message AFTER INSERT ON messages
 ```
 
 ## Vector Index Configuration
+
+**Implemented (Phase 6)**: no ANN index. Search filters by `(user_id, config_id)` with a btree index and sorts the
+distances of that user's rows, which is exact (recall 1.0). Measured on synthetic 384-dimensional vectors
+(`benchmarks/vector_search_baseline.py`, one desktop machine): 3.8 ms median for a user holding 5,000 of 100,000
+vectors, 30 ms for one user holding all 100,000. Through the real schema and repository (joins and ownership
+checks included) the median is 2.7 ms for 500 vectors, 6.6 ms for 2,500, 7.7 ms for 10,000 and 23.7 ms for 50,000
+when one user owns them all. HNSW with iterative scans gave 2-3 ms but recall of 0.69-0.91 on the same data, and no
+speed-up for the multi-user case, so it is not created by default. To add it when one user's vectors
+reach the hundreds of thousands:
+
+```sql
+CREATE INDEX CONCURRENTLY ix_chunk_embeddings_hnsw
+    ON chunk_embeddings USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+```
+
+then set `SEARCH_HNSW_EF_SEARCH` (the search then sets `hnsw.ef_search` and `hnsw.iterative_scan = relaxed_order`
+per query) and re-measure recall on your own data: an ANN index with an ownership filter can return fewer or
+different results than the exact search. The design notes below are the original plan and are kept for reference.
 
 ### IVFFlat Index for Vector Search
 

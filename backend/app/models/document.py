@@ -41,6 +41,11 @@ class Document(TimestampMixin, Base):
             "status = 'failed' OR failure_reason IS NULL", name="failure_only_when_failed"
         ),
         CheckConstraint("processing_attempts >= 0", name="attempts_non_negative"),
+        CheckConstraint("embedding_attempts >= 0", name="embedding_attempts_non_negative"),
+        CheckConstraint(
+            "embedded_chunk_count IS NULL OR embedded_chunk_count >= 0",
+            name="embedded_chunk_count_non_negative",
+        ),
         CheckConstraint("chunk_count IS NULL OR chunk_count >= 0", name="chunk_count_non_negative"),
         CheckConstraint("page_count IS NULL OR page_count >= 0", name="page_count_non_negative"),
         CheckConstraint(
@@ -80,6 +85,16 @@ class Document(TimestampMixin, Base):
     processing_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     processing_attempts: Mapped[int] = mapped_column(
         Integer, server_default=text("0"), default=0, nullable=False
+    )
+    embedding_attempts: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), default=0, nullable=False
+    )
+    embedding_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    embedding_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    embedding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    embedded_chunk_count: Mapped[int | None] = mapped_column(Integer)
+    embedding_config_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("embedding_configs.id", ondelete="SET NULL", name="fk_documents_embedding_cfg")
     )
     processing_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB, server_default=text("'{}'::jsonb"), default=dict, nullable=False

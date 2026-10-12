@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -11,6 +12,7 @@ from app.api.middleware.request_context import RequestContextMiddleware
 from app.api.router import api_v1_router, root_health_router
 from app.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
+from app.exceptions import RequestTooLargeError
 from app.observability.logging import configure_logging, get_logger
 from app.redis import create_redis_client
 from app.security.jwt import JWTService
@@ -22,6 +24,7 @@ from app.workers.dispatch import CeleryProcessingQueue
 logger = get_logger("app.main")
 
 MULTIPART_OVERHEAD_BYTES = 1024 * 1024
+SEARCH_BODY_LIMIT_BYTES = 128 * 1024  # a 10,000-character query is at most ~40 KB of UTF-8
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -39,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.processing_queue = CeleryProcessingQueue(
             create_celery_app(settings, configure_logs=False)
         )
+        app.state.search_gate = asyncio.Semaphore(settings.search_max_concurrent_queries)
         app.state.password_hasher = PasswordHasher(settings.bcrypt_cost_factor)
         app.state.jwt_service = JWTService(settings)
         logger.info("application started", extra={"version": __version__})
@@ -64,6 +68,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         BodySizeLimitMiddleware,
         rules={("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES},
         overhead_bytes=MULTIPART_OVERHEAD_BYTES,
+    )
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        rules={("POST", "/api/v1/search/semantic"): SEARCH_BODY_LIMIT_BYTES},
+        error_factory=RequestTooLargeError,
     )
     app.add_middleware(
         CORSMiddleware,

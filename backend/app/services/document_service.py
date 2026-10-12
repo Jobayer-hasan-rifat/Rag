@@ -240,12 +240,20 @@ class DocumentService:
         document = await self._accessible(actor, document_id)
         if document.status != DocumentStatus.FAILED:
             raise InvalidStatusTransitionError("Only failed documents can be retried")
-        if not await self._documents.reset_for_manual_retry(document.id):
+        resumed_at = await self._documents.reset_for_manual_retry(document.id)
+        if resumed_at is None:
             raise InvalidStatusTransitionError("Only failed documents can be retried")
         await self._session.commit()
         await self._session.refresh(document)
-        logger.info("processing retry requested", extra={"document_id": str(document.id)})
-        await self._processing_queue.enqueue(document.id)
+        logger.info(
+            "processing retry requested",
+            extra={"document_id": str(document.id), "resumed_at": resumed_at},
+        )
+        if resumed_at == DocumentStatus.CHUNKED:
+            # the failure came after chunking: only the embedding stage has to run again
+            await self._processing_queue.enqueue_embedding(document.id)
+        else:
+            await self._processing_queue.enqueue(document.id)
         return await self._view(document)
 
     async def change_status(

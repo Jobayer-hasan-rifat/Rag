@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 6: Embeddings & Semantic Search
+
+- Embedding provider interface (`app/embeddings/`) with a local sentence-transformers provider: pinned revision required, safetensors only, no remote code, CPU or GPU, validated vectors; providers register through a registry
+- Default model `intfloat/multilingual-e5-small` (384 dimensions), chosen by measuring four candidates on a Bangla/English/mixed dataset (DEC-037); `python -m app.embeddings.download` fetches it
+- `embedding_configs` and `chunk_embeddings` tables (migration `0006`): pgvector cosine vectors tied to a chunk of the same document and to its owner by composite foreign keys, one vector per chunk and configuration, with embedding progress columns on documents
+- Embedding stage: dedicated `embedding` queue and `embedding_worker` service, batched idempotent time-bounded tasks, retries, heartbeat-based crash recovery, `reindex_embeddings` maintenance task, new failure reasons `model_unavailable`, `embedding_failed`, `invalid_embedding`
+- `POST /api/v1/search/semantic`: authenticated, per-user rate limited, owner-scoped, bounded `top_k` and query length, document/collection filters, 128 KiB body cap, scores as cosine similarity
+- Document responses gain `embedded_chunk_count`, `embedding_completed_at` and `searchable`
+- Retrieval evaluation framework (`backend/evaluation/`: dataset, Recall@k/MRR/nDCG@k/AUROC, model comparison and end-to-end runners) and benchmarks for embedding throughput and vector search
+- `EMBEDDING_*` and `SEARCH_*` settings in `.env.example` and Compose; CPU-only PyTorch in the image, models in a shared `model_cache` volume
+
+### Changed
+
+- `ready` now means every chunk has a vector (searchable); documents leave `chunked` through `embedding`. Phase 5 documents left in `chunked` are embedded automatically
+- An embedding failure keeps the document's chunks, and a manual retry resumes at `chunked`
+- Re-chunking a searchable document drops its vectors and queues it for embedding again
+- The default embedding model changed from the English-only `all-MiniLM-L6-v2` in the original design to a multilingual one
+
 ### Added - Phase 5: Intelligent Chunking
 
 - Structure-aware, deterministic chunker (`app/core/chunking/`): chunks never cross a page or heading boundary, are exact slices of their section, keep page number, heading and heading path, and respect a configurable size limit; linear-time on adversarial input
@@ -240,7 +258,7 @@ This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH 
 | 0.3.0 | Phase 3 Complete | Document management working |
 | 0.4.0 | Phase 4 Complete | Document processing working |
 | 0.5.0 | Phase 5 Complete | Document chunking working (vector search follows) |
-| 0.6.0 | Phase 6 Complete | Hybrid search working |
+| 0.6.0 | Phase 6 Complete | Embeddings and semantic search working (hybrid search follows) |
 | 0.7.0 | Phase 7 Complete | Reranking working |
 | 0.8.0 | Phase 8 Complete | RAG working |
 | 0.9.0 | Phase 9 Complete | Conversations working |

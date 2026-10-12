@@ -1,0 +1,131 @@
+{
+  "mode": "memory",
+  "model": "intfloat/multilingual-e5-small",
+  "revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "dimension": 384,
+  "device": "cpu",
+  "passages": 48,
+  "queries": 52,
+  "unanswerable": 6,
+  "embed_seconds": 0.36,
+  "passages_per_second": 132.0,
+  "embedding_failures": 0,
+  "truncated_passages": 0,
+  "query_ms_median": 15.0,
+  "query_ms_p95": 18.4,
+  "overall": {
+    "queries": 46,
+    "recall_at_1": 0.8913043478260869,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0,
+    "mrr_at_10": 0.9420289855072465,
+    "ndcg_at_10": 0.9570373698757789
+  },
+  "answerability_auroc": 0.9818840579710145,
+  "top_score_answerable": 0.8617299043613932,
+  "top_score_unanswerable": 0.772420714298884,
+  "by_category": {
+    "bangla": {
+      "queries": 12,
+      "recall_at_1": 0.9166666666666666,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 0.9583333333333334,
+      "ndcg_at_10": 0.9692441461309548
+    },
+    "confusable": {
+      "queries": 4,
+      "recall_at_1": 0.75,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 0.875,
+      "ndcg_at_10": 0.9077324383928644
+    },
+    "cross_lingual": {
+      "queries": 4,
+      "recall_at_1": 0.75,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 0.8333333333333334,
+      "ndcg_at_10": 0.875
+    },
+    "english": {
+      "queries": 10,
+      "recall_at_1": 0.9,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 0.95,
+      "ndcg_at_10": 0.9630929753571458
+    },
+    "mixed": {
+      "queries": 10,
+      "recall_at_1": 0.9,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 0.95,
+      "ndcg_at_10": 0.9630929753571458
+    },
+    "punctuation_unicode": {
+      "queries": 6,
+      "recall_at_1": 1.0,
+      "recall_at_3": 1.0,
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "mrr_at_10": 1.0,
+      "ndcg_at_10": 1.0
+    }
+  },
+  "failures": [
+    {
+      "query": "en-06",
+      "category": "english",
+      "relevant": [
+        "en3-4"
+      ],
+      "top1": "en3-2",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "bn-01",
+      "category": "bangla",
+      "relevant": [
+        "bn1-2"
+      ],
+      "top1": "bn1-1",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "mx-01",
+      "category": "mixed",
+      "relevant": [
+        "mx1-2"
+      ],
+      "top1": "en2-2",
+      "rank_of_relevant": 2
+    },
+    {
+      "query": "xl-03",
+      "category": "cross_lingual",
+      "relevant": [
+        "en3-3"
+      ],
+      "top1": "en3-1",
+      "rank_of_relevant": 3
+    },
+    {
+      "query": "cf-04",
+      "category": "confusable",
+      "relevant": [
+        "en4-2"
+      ],
+      "top1": "bn4-1",
+      "rank_of_relevant": 2
+    }
+  ]
+}

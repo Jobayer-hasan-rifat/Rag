@@ -12,3 +12,7 @@ class ProcessingQueue(Protocol):
         recovery sweep re-queues it.
         """
         ...
+
+    async def enqueue_embedding(self, document_id: uuid.UUID) -> bool:
+        """Queue the embedding stage for a chunked document (same failure semantics)."""
+        ...

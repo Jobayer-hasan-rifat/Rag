@@ -78,6 +78,14 @@ class FileTooLargeError(AppError):
         super().__init__("File exceeds the maximum allowed size", details={"max_bytes": max_bytes})
 
 
+class RequestTooLargeError(AppError):
+    status_code = 413
+    code = "REQUEST_TOO_LARGE"
+
+    def __init__(self, max_bytes: int) -> None:
+        super().__init__("The request body is too large", details={"max_bytes": max_bytes})
+
+
 class UnsupportedFileTypeError(AppError):
     status_code = 415
     code = "UNSUPPORTED_FILE_TYPE"
@@ -137,3 +145,13 @@ class QuotaExceededError(AppError):
             "Your storage quota would be exceeded; delete documents to free space",
             details={"quota_bytes": quota_bytes},
         )
+
+
+class EmbeddingUnavailableError(AppError):
+    """Semantic search cannot run right now (model not loaded, or too busy). Retry later."""
+
+    status_code = 503
+    code = "EMBEDDING_UNAVAILABLE"
+
+    def __init__(self, message: str = "Semantic search is temporarily unavailable") -> None:
+        super().__init__(message)

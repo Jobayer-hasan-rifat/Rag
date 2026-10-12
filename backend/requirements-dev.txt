@@ -94,6 +94,8 @@ mypy-extensions==1.1.0
     # via
     #   black
     #   mypy
+numpy==2.5.4
+    # via rag-backend (pyproject.toml)
 opentelemetry-api==1.45.1
     # via fastapi
 packaging==26.3
@@ -105,6 +107,8 @@ pathspec==1.1.1
     # via
     #   black
     #   mypy
+pgvector==0.5.1
+    # via rag-backend (pyproject.toml)
 platformdirs==4.12.3
     # via black
 pluggy==1.6.0

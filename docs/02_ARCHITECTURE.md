@@ -455,11 +455,15 @@ stateDiagram-v2
     pending --> failed
     chunked --> chunking: re-chunk (maintenance task)
     chunked --> pending: re-process
-    chunked --> embedding: embeddings (later phase)
-    embedding --> indexing
-    indexing --> ready: searchable (later phase)
+    chunked --> embedding: embedding worker claims it
+    embedding --> ready: every chunk has a vector
+    embedding --> chunked: out of time budget, transient failure or crash (progress kept)
+    embedding --> failed: permanent failure or retries exhausted (chunks kept)
+    ready --> embedding: re-embed under a new model (explicit reindex)
+    ready --> chunking: re-chunk (vectors are dropped)
     ready --> pending: re-process
-    failed --> pending: manual retry
+    failed --> pending: manual retry (failure came before chunking)
+    failed --> chunked: manual retry (failure came after chunking)
     pending --> [*]: delete
     parsing --> [*]: delete
     chunking --> [*]: delete
@@ -470,8 +474,11 @@ stateDiagram-v2
 
 In the current pipeline `pending` means *uploaded and queued*, `parsing` means *extracting and normalising text*,
 `chunking` means *text is stored and chunks are being generated*, and `chunked` means *chunks are stored and the
-document is ready for embedding*. `ready` is reserved for documents that are embedded and indexed, that is,
-searchable; no document reaches it until the embedding and indexing stages exist, so `ready` is never ambiguous.
+document is waiting for embedding*, `embedding` means *vectors are being generated and stored*, and `ready` means
+*every chunk has a vector under the active embedding configuration, so the document is searchable*. The `indexing`
+state is reserved (the vector index is maintained by PostgreSQL, so `embedding -> ready` is the normal path). Search
+only ever considers `ready` documents, so a document that is mid-way through embedding, or whose vectors belong to
+an older model, is never partially searchable.
 Transitions are enforced by `ensure_transition` (`app/core/documents/lifecycle.py`) and, for the worker,
 by guarded `UPDATE ... WHERE status = ...` statements. `error_message` and `failure_reason` are only allowed
 while `failed` (database CHECK). Deletion is a hard delete, so there is no `deleted` status.
@@ -524,6 +531,8 @@ sequenceDiagram
         W->>DB: replace sections, set counts and metadata, status=chunking (committed)
         W->>W: chunk sections (structure-aware, deterministic)
         W->>DB: replace chunks in one transaction, status=chunked
+        W->>Q: enqueue embed_document(id) on the embedding queue
+        Note over W,Q: if the broker is down the document stays chunked; the embedding sweep queues it
         alt transient failure and attempts remain
             W->>DB: status=pending, retry after backoff
         else permanent failure
@@ -593,12 +602,64 @@ chunking configuration, so it is tested without a database or a queue. Propertie
 - **Bounded**: a document that would produce more than `CHUNKING_MAX_CHUNKS` fails with `too_many_chunks`; the
   chunker checks the processing deadline and runs in linear time on pathological text (long runs of punctuation,
   combining marks or no whitespace).
-- **Consistent**: a document has chunks only while it is `chunked` or beyond; a failed or re-queued document loses
-  them in the same transaction as the status change.
+- **Consistent**: a document has chunks only while it is `chunked` or beyond, or has failed *after* chunking (an
+  embedding failure keeps its chunks so a retry only repeats embedding). A document that fails or is re-queued
+  during processing loses them in the same transaction as the status change.
 
-Size is measured in characters through a `SizeMeasure` abstraction, so a token-aware measure can replace it when
-embeddings arrive. A document is re-chunked from its stored sections (no re-extraction) by the
+Size is measured in characters through a `SizeMeasure` abstraction (a token-aware measure can replace it). With the
+default model a 1,000-character chunk is about 310 tokens for Bangla, 245 for English and 275 for mixed text, well
+inside the 512-token limit, and any chunk that does get truncated is flagged on its vector. A document is re-chunked from its stored sections (no re-extraction) by the
 `rechunk_document` maintenance task.
+
+### Embeddings and Vector Search
+
+**Embedding providers** (`app/embeddings/`). `EmbeddingProvider` is a small synchronous interface
+(`warmup`, `embed_documents`, `embed_query`); the pipeline never imports a concrete model. The default
+`SentenceTransformerProvider` runs a local model on CPU or GPU. Another provider (a hosted API, a different
+library) registers itself in `app/embeddings/registry.py` and is selected by `EMBEDDING_PROVIDER`; nothing in the
+ingestion pipeline changes. Safety rules are enforced in the provider and are not configurable: the model
+revision must be a pinned commit hash, only safetensors weights are loaded (no pickle), remote code is never
+executed, and a model that cannot load fails clearly instead of returning placeholder vectors. Every vector is
+validated before it is stored: right shape and dimension, finite values, non-zero, unit length when the model is
+normalised.
+
+**Configuration identity.** Everything that changes the vectors a model produces (provider, model, revision,
+dimension, normalisation, query and passage prefixes, sequence limit, heading context, preprocessing version) is
+folded into an `EmbeddingConfig` and a SHA-256 *fingerprint*. Speed-only settings (batch size, device, threads)
+are runtime settings and are not part of it. Each configuration used is stored once in `embedding_configs`; a
+vector references its configuration, so vectors from two models can never be compared by accident.
+
+**Storage.** `chunk_embeddings` holds one pgvector row per chunk and configuration (cosine distance, 384
+dimensions for the default model). A composite foreign key ties each vector to a chunk *of the same document*, and
+a second one ties it to that document's *owner*, so the database itself prevents a vector from carrying the
+wrong document or user. Vectors are deleted with their chunk, document or user.
+
+**Pipeline.** After chunking, the worker queues `embed_document` on a dedicated `embedding` queue consumed by an
+embedding worker (the model needs more memory than the document worker and the worker never parses uploads). The
+task claims the document with a guarded `UPDATE` (`chunked -> embedding`), then loops: take the next batch of
+chunks that have no vector under the active configuration, embed them in a worker thread, insert with
+`ON CONFLICT DO NOTHING`, update progress, commit. Because each batch commits, an interrupted job resumes where it
+stopped and a re-run only does what is left. A task works for at most `EMBEDDING_TASK_BUDGET_SECONDS`; if chunks
+remain, the document returns to `chunked` and a new task continues. The attempt counter counts consecutive
+claims that made no progress, so a large document processed over many tasks never exhausts its budget while a
+crash loop does. When no chunks are left, `UPDATE ... WHERE chunk_count = (vectors stored)` moves the document to
+`ready` in one statement, and vectors from earlier configurations are dropped in the same transaction.
+
+**Recovery.** A Celery beat sweep releases `embedding` documents whose heartbeat is older than
+`EMBEDDING_STALE_AFTER_SECONDS` (or fails them when attempts are used up) and queues `chunked` documents that nobody
+claimed (a lost message). Re-chunking a document drops its vectors with its chunks and queues it again.
+
+**Changing the model.** Switching `EMBEDDING_MODEL`, its revision, the prefixes or the heading setting creates a new
+configuration. Nothing happens automatically: until a document is re-embedded it has no vectors under the new
+configuration, so search does not return it. The `reindex_embeddings` maintenance task queues the affected
+documents; each one is re-embedded and its old vectors are removed when the new set is complete. A different
+vector *dimension* additionally needs a migration, because the column width is part of the schema.
+
+**Search** (`POST /api/v1/search/semantic`). The query is normalised like document text, embedded in a worker thread
+with bounded concurrency and a timeout, and matched with `ORDER BY embedding <=> query LIMIT k` over the caller's
+own `ready` documents (the vector rows carry the owner, and the document join repeats the check). `score` is
+`1 - cosine distance`. The default is exact search: with the `(user_id, config_id)` index the scan is limited to
+one user's vectors, and in measurements it was as fast as an HNSW index with perfect recall (see DEC-039).
 
 ### Failure Handling and Recovery
 

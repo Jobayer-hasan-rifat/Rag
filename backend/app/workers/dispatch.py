@@ -8,6 +8,7 @@ from app.observability.logging import get_logger
 logger = get_logger("app.workers.dispatch")
 
 PROCESS_DOCUMENT_TASK = "app.workers.document_tasks.process_document"
+EMBED_DOCUMENT_TASK = "app.workers.embedding_tasks.embed_document"
 
 
 class CeleryProcessingQueue:
@@ -19,6 +20,21 @@ class CeleryProcessingQueue:
     def enqueue_sync(self, document_id: uuid.UUID) -> None:
         # Results are never read, so do not subscribe this process to a result channel.
         self._celery.send_task(PROCESS_DOCUMENT_TASK, args=[str(document_id)], ignore_result=True)
+
+    def enqueue_embedding_sync(self, document_id: uuid.UUID) -> None:
+        self._celery.send_task(EMBED_DOCUMENT_TASK, args=[str(document_id)], ignore_result=True)
+
+    async def enqueue_embedding(self, document_id: uuid.UUID) -> bool:
+        try:
+            await asyncio.to_thread(self.enqueue_embedding_sync, document_id)
+        except Exception:
+            logger.warning(
+                "could not queue document embedding; the recovery sweep will retry",
+                extra={"document_id": str(document_id)},
+                exc_info=True,
+            )
+            return False
+        return True
 
     async def enqueue(self, document_id: uuid.UUID) -> bool:
         try:

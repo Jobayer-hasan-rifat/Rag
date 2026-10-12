@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Annotated, Literal
@@ -5,6 +6,9 @@ from typing import Annotated, Literal
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.embeddings.constants import VECTOR_DIMENSION
+
+_COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
 _PLACEHOLDER_MARKERS = ("change_this", "changeme", "your-secret")
 
 
@@ -51,6 +55,33 @@ class Settings(BaseSettings):
     chunking_overlap_chars: int = Field(default=150, ge=0)
     chunking_min_chars: int = Field(default=20, ge=1)
     chunking_max_chunks: int = Field(default=50_000, ge=1)
+    embedding_provider: str = "sentence_transformers"
+    embedding_model: str = "intfloat/multilingual-e5-small"
+    embedding_model_revision: str = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
+    embedding_dimension: int = Field(default=VECTOR_DIMENSION, ge=1, le=2000)
+    embedding_normalize: bool = True
+    embedding_query_prefix: str = "query: "
+    embedding_passage_prefix: str = "passage: "
+    embedding_max_seq_length: int = Field(default=512, ge=16, le=8192)
+    embedding_include_heading: bool = False
+    embedding_batch_size: int = Field(default=8, ge=1, le=256)
+    embedding_device: Literal["auto", "cpu", "cuda", "mps"] = "auto"
+    embedding_cache_dir: str | None = None
+    embedding_allow_download: bool = True
+    embedding_torch_threads: int | None = Field(default=None, ge=1, le=256)
+    embedding_max_attempts: int = Field(default=3, ge=1, le=10)
+    embedding_retry_backoff_seconds: int = Field(default=30, ge=0, le=3600)
+    embedding_task_budget_seconds: int = Field(default=180, ge=5, le=3600)
+    embedding_model_load_allowance_seconds: int = Field(default=120, ge=10, le=3600)
+    embedding_stale_after_seconds: int = Field(default=600, ge=10)
+    embedding_requeue_after_seconds: int = Field(default=120, ge=10)
+    search_default_top_k: int = Field(default=10, ge=1, le=100)
+    search_max_top_k: int = Field(default=50, ge=1, le=200)
+    search_max_query_chars: int = Field(default=1000, ge=10, le=10_000)
+    search_max_concurrent_queries: int = Field(default=4, ge=1, le=64)
+    search_query_timeout_seconds: int = Field(default=20, ge=1, le=300)
+    # None: exact search (the default; see docs). Set it only after adding an HNSW index.
+    search_hnsw_ef_search: int | None = Field(default=None, ge=1, le=1000)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -58,10 +89,19 @@ class Settings(BaseSettings):
     rate_limit_auth_attempts: int = Field(default=10, ge=1)
     rate_limit_window_seconds: int = Field(default=60, ge=1)
     rate_limit_upload_attempts: int = Field(default=20, ge=1)
+    rate_limit_search_attempts: int = Field(default=60, ge=1)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+
+    @field_validator(
+        "embedding_cache_dir", "embedding_torch_threads", "search_hnsw_ef_search", mode="before"
+    )
+    @classmethod
+    def _empty_means_unset(cls, value: object) -> object:
+        """`FOO=` in an env file means "not set" for these optional settings."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -114,6 +154,38 @@ class Settings(BaseSettings):
         if self.chunking_min_chars >= self.chunking_max_chars:
             raise ValueError("CHUNKING_MIN_CHARS must be smaller than CHUNKING_MAX_CHARS")
         return self
+
+    @model_validator(mode="after")
+    def _check_embedding_settings(self) -> "Settings":
+        if self.embedding_dimension != VECTOR_DIMENSION:
+            raise ValueError(
+                f"EMBEDDING_DIMENSION must equal the database vector width ({VECTOR_DIMENSION}); "
+                "a model with another dimension needs a migration first"
+            )
+        if self.embedding_provider == "sentence_transformers" and not (
+            _COMMIT_SHA.fullmatch(self.embedding_model_revision)
+            or PurePosixPath(self.embedding_model).is_absolute()
+            or PureWindowsPath(self.embedding_model).is_absolute()
+        ):
+            raise ValueError(
+                "EMBEDDING_MODEL_REVISION must be a full 40-character commit hash so the exact "
+                "model files are reproducible"
+            )
+        if self.embedding_stale_after_seconds <= self.embedding_hard_time_limit_seconds:
+            raise ValueError(
+                "EMBEDDING_STALE_AFTER_SECONDS must exceed the embedding task hard time limit"
+            )
+        if self.search_default_top_k > self.search_max_top_k:
+            raise ValueError("SEARCH_DEFAULT_TOP_K must not exceed SEARCH_MAX_TOP_K")
+        return self
+
+    @property
+    def embedding_soft_time_limit_seconds(self) -> int:
+        return self.embedding_task_budget_seconds + self.embedding_model_load_allowance_seconds + 30
+
+    @property
+    def embedding_hard_time_limit_seconds(self) -> int:
+        return self.embedding_soft_time_limit_seconds + 30
 
     @property
     def processing_soft_time_limit_seconds(self) -> int:

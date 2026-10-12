@@ -57,10 +57,14 @@ mako==1.4.3
     # via alembic
 markupsafe==3.0.4
     # via mako
+numpy==2.5.4
+    # via rag-backend (pyproject.toml)
 opentelemetry-api==1.45.1
     # via fastapi
 packaging==26.3
     # via kombu
+pgvector==0.5.1
+    # via rag-backend (pyproject.toml)
 prompt-toolkit==3.0.53
     # via click-repl
 pydantic==2.13.5

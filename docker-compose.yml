@@ -33,6 +33,31 @@ x-backend-environment: &backend-environment
   CHUNKING_OVERLAP_CHARS: ${CHUNKING_OVERLAP_CHARS:-150}
   CHUNKING_MIN_CHARS: ${CHUNKING_MIN_CHARS:-20}
   CHUNKING_MAX_CHUNKS: ${CHUNKING_MAX_CHUNKS:-50000}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-sentence_transformers}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+  EMBEDDING_MODEL_REVISION: ${EMBEDDING_MODEL_REVISION:-614241f622f53c4eeff9890bdc4f31cfecc418b3}
+  EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
+  EMBEDDING_QUERY_PREFIX: "${EMBEDDING_QUERY_PREFIX-query: }"
+  EMBEDDING_PASSAGE_PREFIX: "${EMBEDDING_PASSAGE_PREFIX-passage: }"
+  EMBEDDING_MAX_SEQ_LENGTH: ${EMBEDDING_MAX_SEQ_LENGTH:-512}
+  EMBEDDING_INCLUDE_HEADING: ${EMBEDDING_INCLUDE_HEADING:-false}
+  EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-8}
+  EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-auto}
+  EMBEDDING_MAX_ATTEMPTS: ${EMBEDDING_MAX_ATTEMPTS:-3}
+  EMBEDDING_TASK_BUDGET_SECONDS: ${EMBEDDING_TASK_BUDGET_SECONDS:-180}
+  EMBEDDING_MODEL_LOAD_ALLOWANCE_SECONDS: ${EMBEDDING_MODEL_LOAD_ALLOWANCE_SECONDS:-120}
+  EMBEDDING_STALE_AFTER_SECONDS: ${EMBEDDING_STALE_AFTER_SECONDS:-600}
+  EMBEDDING_REQUEUE_AFTER_SECONDS: ${EMBEDDING_REQUEUE_AFTER_SECONDS:-120}
+  EMBEDDING_RETRY_BACKOFF_SECONDS: ${EMBEDDING_RETRY_BACKOFF_SECONDS:-30}
+  SEARCH_QUERY_TIMEOUT_SECONDS: ${SEARCH_QUERY_TIMEOUT_SECONDS:-20}
+  RATE_LIMIT_SEARCH_ATTEMPTS: ${RATE_LIMIT_SEARCH_ATTEMPTS:-60}
+  SEARCH_DEFAULT_TOP_K: ${SEARCH_DEFAULT_TOP_K:-10}
+  SEARCH_MAX_TOP_K: ${SEARCH_MAX_TOP_K:-50}
+  SEARCH_MAX_QUERY_CHARS: ${SEARCH_MAX_QUERY_CHARS:-1000}
+  SEARCH_MAX_CONCURRENT_QUERIES: ${SEARCH_MAX_CONCURRENT_QUERIES:-4}
+  # The models live in a shared volume, never in the image. Only the embedding worker downloads.
+  HF_HOME: /data/models
+  EMBEDDING_ALLOW_DOWNLOAD: "false"
   WORKER_MAX_TASKS_PER_CHILD: ${WORKER_MAX_TASKS_PER_CHILD:-50}
   WORKER_MAX_MEMORY_PER_CHILD_KB: ${WORKER_MAX_MEMORY_PER_CHILD_KB:-1000000}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
@@ -101,6 +126,7 @@ services:
     volumes:
       - ./backend:/app
       - uploads_data:/data/uploads
+      - model_cache:/data/models
     ports:
       - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
     depends_on:
@@ -162,6 +188,54 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # Embeddings run in their own worker: it loads the model (about 0.5 GB for the default), needs
+  # more memory than the document worker and never parses uploaded files. It is also the only
+  # service allowed to download the model; start-up fetches it into the shared model cache.
+  embedding_worker:
+    build: *backend-build
+    command:
+      - sh
+      - -c
+      - >-
+        python -m app.embeddings.download ||
+        echo "model download failed; the first embedding task will retry it";
+        exec celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
+        -Q embedding --concurrency=${EMBEDDING_WORKER_CONCURRENCY:-1}
+    environment:
+      <<: *backend-environment
+      EMBEDDING_ALLOW_DOWNLOAD: "true"
+      WORKER_MAX_TASKS_PER_CHILD: ${EMBEDDING_WORKER_MAX_TASKS_PER_CHILD:-1000}
+      WORKER_MAX_MEMORY_PER_CHILD_KB: ${EMBEDDING_WORKER_MAX_MEMORY_PER_CHILD_KB:-2500000}
+      XDG_CACHE_HOME: /tmp/.cache
+    mem_limit: ${EMBEDDING_WORKER_MEMORY_LIMIT:-3g}
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./backend:/app
+      - model_cache:/data/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - celery -A app.workers.celery_app:celery_app inspect ping -d celery@$$HOSTNAME --timeout 5
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    restart: unless-stopped
+
   celery_beat:
     build: *backend-build
     command:
@@ -209,4 +283,5 @@ volumes:
   postgres_data:
   uploads_data:
   redis_data:
+  model_cache:
   frontend_node_modules:

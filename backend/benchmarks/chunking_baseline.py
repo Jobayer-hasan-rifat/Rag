@@ -186,7 +186,7 @@ def _database_url() -> tuple[str, Callable[[], None]]:
         base = external
     else:
         container = PostgresContainer(
-            POSTGRES_IMAGE, username="bench", password="bench", dbname="bench"  # noqa: S106
+            POSTGRES_IMAGE, username="bench", password="bench", dbname="bench"
         )
         container.start()
         base = (

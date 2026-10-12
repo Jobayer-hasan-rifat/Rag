@@ -22,6 +22,9 @@ class FailureReason(StrEnum):
     DATABASE_ERROR = "database_error"
     TOO_MANY_CHUNKS = "too_many_chunks"
     CHUNKING_FAILED = "chunking_failed"
+    MODEL_UNAVAILABLE = "model_unavailable"
+    EMBEDDING_FAILED = "embedding_failed"
+    INVALID_EMBEDDING = "invalid_embedding"
     RETRIES_EXHAUSTED = "retries_exhausted"
 
 
@@ -44,6 +47,9 @@ SAFE_MESSAGES: dict[FailureReason, str] = {
         "The document would produce more chunks than the processing limit."
     ),
     FailureReason.CHUNKING_FAILED: "The extracted text could not be split into chunks.",
+    FailureReason.MODEL_UNAVAILABLE: "The embedding model is not available. Try again later.",
+    FailureReason.EMBEDDING_FAILED: "Search vectors could not be generated for this document.",
+    FailureReason.INVALID_EMBEDDING: "The embedding model returned unusable vectors.",
     FailureReason.RETRIES_EXHAUSTED: "Processing was interrupted repeatedly and was abandoned.",
 }
 

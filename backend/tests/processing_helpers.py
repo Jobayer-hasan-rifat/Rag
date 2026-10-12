@@ -100,3 +100,45 @@ def rechunk_now(
 
 
 __all__ = ["bearer"]
+
+
+def embed_now(
+    client: TestClient, document_id: str, task_id: str = "test-embed", **overrides: Any
+) -> Any:
+    """Run the embedding stage for one document in this process (no broker involved)."""
+    from app.workers.embedding_tasks import _embed
+
+    settings = client.app.state.settings  # type: ignore[attr-defined]
+    if overrides:
+        settings = settings.model_copy(update=overrides)
+    return asyncio.run(_embed(settings, uuid.UUID(document_id), task_id))
+
+
+def vectors_of(db_url: str, document_id: str) -> list[dict[str, Any]]:
+    rows = db_rows(
+        db_url,
+        "SELECT e.chunk_id::text, e.config_id::text, e.text_sha256, e.truncated, c.chunk_index, "
+        "c.text_sha256, vector_dims(e.embedding) "
+        "FROM chunk_embeddings e JOIN document_chunks c ON c.id = e.chunk_id "
+        "WHERE e.document_id = :d ORDER BY c.chunk_index",
+        d=document_id,
+    )
+    names = (
+        "chunk_id", "config_id", "text_sha256", "truncated", "chunk_index", "chunk_sha256", "dims",
+    )  # fmt: skip
+    return [dict(zip(names, row, strict=True)) for row in rows]
+
+
+def embedding_row_of(db_url: str, document_id: str) -> dict[str, Any]:
+    rows = db_rows(
+        db_url,
+        "SELECT status, failure_reason, error_message, chunk_count, embedded_chunk_count, "
+        "embedding_attempts, embedding_started_at, embedding_updated_at, embedding_completed_at, "
+        "embedding_config_id::text FROM documents WHERE id = :d",
+        d=document_id,
+    )
+    names = (
+        "status", "failure_reason", "error_message", "chunk_count", "embedded_chunk_count",
+        "embedding_attempts", "started_at", "updated_at", "completed_at", "config_id",
+    )  # fmt: skip
+    return dict(zip(names, rows[0], strict=True))

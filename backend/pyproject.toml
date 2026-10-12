@@ -20,9 +20,16 @@ dependencies = [
     "aiofiles>=24.1,<26",
     "pymupdf>=1.24,<2",
     "python-docx>=1.1,<2",
+    "numpy>=2.0,<3",
+    "pgvector>=0.4,<1",
 ]
 
 [project.optional-dependencies]
+# Local embedding model runtime. torch is installed from the CPU wheel index (see Dockerfile).
+ml = [
+    "torch>=2.5,<3",
+    "sentence-transformers>=5.0,<7",
+]
 dev = [
     "pytest>=9.0.3,<10",
     "pytest-asyncio>=0.24,<2",
@@ -50,6 +57,7 @@ asyncio_default_fixture_loop_scope = "function"
 addopts = "-ra --strict-markers"
 markers = [
     "integration: needs real PostgreSQL/Redis (Testcontainers or TEST_* env vars)",
+    "real_model: loads the real embedding model (set RAG_REAL_MODEL_TESTS=1; downloads on first use)",
 ]
 filterwarnings = ["error::DeprecationWarning:app.*"]
 
@@ -67,8 +75,9 @@ known-first-party = ["app", "tests"]
 known-third-party = ["alembic"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "RUF001", "RUF002", "RUF003"]  # tests use deliberate Unicode
-"benchmarks/**" = ["S311", "RUF001", "RUF002", "RUF003"]  # seeded corpus, deliberate Unicode
+"tests/**" = ["S101", "S105", "S106", "S608", "RUF001", "RUF002", "RUF003"]  # tests use deliberate Unicode
+"benchmarks/**" = ["S311", "S106", "RUF001", "RUF002", "RUF003"]  # seeded data, throwaway DB
+"evaluation/**" = ["S101", "S106", "RUF001", "RUF002", "RUF003"]  # tooling, deliberate Unicode
 
 [tool.black]
 line-length = 100

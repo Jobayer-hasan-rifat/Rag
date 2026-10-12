@@ -112,8 +112,25 @@ def test_chunked_documents_can_be_rechunked_in_place_or_fully_reprocessed() -> N
     ensure_transition(S.CHUNKED, S.PENDING)
 
 
-def test_only_the_embedding_stage_follows_chunked_and_ready_is_last() -> None:
+def test_only_the_embedding_stage_follows_chunked_and_ready_needs_embedding() -> None:
     assert ALLOWED_TRANSITIONS[S.CHUNKED] == {S.EMBEDDING, S.CHUNKING, S.PENDING}
-    assert S.READY not in {
-        t for s, targets in ALLOWED_TRANSITIONS.items() if s is not S.INDEXING for t in targets
-    }
+    # a document can only become searchable by finishing the embedding (or indexing) stage
+    reaching_ready = {s for s, targets in ALLOWED_TRANSITIONS.items() if S.READY in targets}
+    assert reaching_ready == {S.EMBEDDING, S.INDEXING}
+
+
+def test_embedding_work_can_be_released_retried_and_redone() -> None:
+    ensure_transition(S.EMBEDDING, S.CHUNKED)  # transient failure or crash: chunks are kept
+    ensure_transition(S.EMBEDDING, S.FAILED)
+    ensure_transition(S.READY, S.EMBEDDING)  # re-embedding under a new model
+    ensure_transition(S.READY, S.CHUNKING)  # re-chunking drops the vectors
+    ensure_transition(S.FAILED, S.CHUNKED)  # manual retry after an embedding failure
+
+
+@pytest.mark.parametrize(
+    ("current", "target"),
+    [(S.CHUNKED, S.READY), (S.CHUNKED, S.FAILED), (S.PARSING, S.EMBEDDING), (S.READY, S.FAILED)],
+)
+def test_embedding_stage_cannot_be_skipped_or_faked(current: S, target: S) -> None:
+    with pytest.raises(InvalidStatusTransitionError):
+        ensure_transition(current, target)

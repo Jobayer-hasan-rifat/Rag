@@ -72,7 +72,8 @@ def test_response_exposes_no_storage_details(auth_client: TestClient) -> None:
         "id", "filename", "file_type", "content_type", "file_size", "checksum_sha256",
         "status", "error_message", "failure_reason", "processing_started_at",
         "processing_completed_at", "page_count", "character_count",
-        "chunk_count", "chunking_version",
+        "chunk_count", "chunking_version", "embedded_chunk_count", "embedding_completed_at",
+        "searchable",
         "collections", "created_at", "updated_at",
     }  # fmt: skip
 

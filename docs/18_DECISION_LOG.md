@@ -736,6 +736,131 @@ Replace-all is idempotent and cannot leave a mixture of two runs; batching was a
 
 **Consequence**: re-chunking regenerates chunk IDs, so any later artefact keyed on chunk ID (embeddings) must be rebuilt after re-chunking.
 
+### DEC-037: Default Embedding Model: multilingual-e5-small
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+`intfloat/multilingual-e5-small` (MIT, 384 dimensions, 118M parameters, 94 documented languages including Bengali, about 0.5 GB), pinned to commit `614241f622f53c4eeff9890bdc4f31cfecc418b3`, with the `query: ` / `passage: ` prefixes the model requires.
+
+**Alternatives measured** (46 answerable queries, 48 passages, CPU; `python -m evaluation.compare_models`):
+
+| Model | Dim | Recall@1 | Recall@3 | MRR@10 | Bangla Recall@1 | Passages/s | Query ms |
+|-------|----:|---------:|---------:|-------:|----------------:|-----------:|---------:|
+| paraphrase-multilingual-MiniLM-L12-v2 | 384 | 0.652 | 0.717 | 0.696 | 0.42 | 147 | 13 |
+| **multilingual-e5-small** | 384 | 0.891 | 1.000 | 0.942 | 0.92 | 139 | 14 |
+| multilingual-e5-base | 768 | 0.935 | 1.000 | 0.967 | 0.92 | 39 | 38 |
+| LaBSE | 768 | 0.957 | 0.957 | 0.957 | 1.00 | 43 | 39 |
+
+Not measured because they are excluded by policy: `BAAI/bge-m3` (the main revision ships only a pickle `pytorch_model.bin`, 2.3 GB) and `Alibaba-NLP/gte-multilingual-base` (needs `trust_remote_code`). The original design default `all-MiniLM-L6-v2` is English-only.
+
+**Reason**:
+MiniLM-multilingual does not list Bengali among its languages and measured accordingly (Bangla Recall@1 0.42 against 0.92). e5-small is as fast as it, retrieval-trained, and within noise of the larger models: e5-base's 4-point Recall@1 advantage is two queries out of 46, for 3.5 times the latency and twice the vector storage; LaBSE is trained for translation pairs rather than retrieval, was best on same-language Bangla/English queries but missed a query entirely (Recall@5 0.957) and separates unanswerable queries worst (AUROC 0.920 against 0.982). 384 dimensions also keeps storage small and matches the project's original sizing.
+
+**Consequence / limits**: the dataset is small, synthetic and written by one author; one query is about two percentage points, so differences between e5-small, e5-base and LaBSE are not statistically meaningful, and absolute numbers must not be read as general Bangla retrieval quality. Only the MiniLM result (a large, explained gap) is a clear finding. Re-run the comparison, and ideally a larger real-document evaluation, before relying on the model in production; the provider interface makes a change a configuration edit plus a reindex.
+
+### DEC-038: Separate `chunk_embeddings` and `embedding_configs` Tables
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+Vectors live in their own table, keyed by `(chunk_id, config_id)`, each referencing a stored embedding configuration, with composite foreign keys that tie the vector to its chunk's document and to the document's owner.
+
+**Alternatives**: an `embedding` column on `document_chunks` (the original design and the Phase 5 plan); one table per model.
+
+**Reason**:
+A column cannot hold two models' vectors, so a model upgrade would have to overwrite in place and mix incompatible vectors during the transition. A separate table makes re-embedding explicit, lets old vectors stay until the new set is complete, records exactly which model produced each vector, and keeps the large vector data out of the chunk table that is read for inspection. The owner foreign key lets search filter on the vector table directly while the database guarantees the owner is correct.
+
+**Consequence**: one join per search to reach chunk text; the vector width is fixed by the schema (a different dimension needs a migration).
+
+### DEC-039: Exact Search by Default; HNSW Is Opt-In
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+No ANN index. Search filters on `(user_id, config_id)` (btree) and sorts exact cosine distances.
+
+**Evidence** (`benchmarks/vector_search_baseline.py`; synthetic clustered 384-d vectors, 100 queries, desktop CPU, pgvector 0.8.7):
+
+| Vectors | Scope | Method | p50 ms | Recall@10 |
+|--------:|-------|--------|-------:|----------:|
+| 100,000 | one of 20 users (5,000 vectors) | exact | 3.8 | 1.000 |
+| 100,000 | one of 20 users | HNSW ef=40 / 100 / 200 | 3.2 / 3.1 / 3.1 | 0.694 / 0.751 / 0.831 |
+| 100,000 | one user (all 100,000) | exact | 30.4 | 1.000 |
+| 100,000 | one user | HNSW ef=40 / 100 / 200 | 3.3 / 2.1 / 2.4 | 0.615 / 0.799 / 0.909 |
+| 10,000 | one user | exact / HNSW ef=200 | 3.8 / 1.1 | 1.000 / 1.000 |
+
+**Reason**: every query is scoped to one user, so the exact scan touches only that user's vectors, is as fast as the ANN index in the multi-user case and always correct. An ANN index with an ownership filter loses recall. The project guidance to index vector columns is met by documenting the threshold and the exact statement (see the schema document) instead of paying the recall and complexity cost early.
+
+Through the real schema (`benchmarks/embedding_baseline.py`, exact search): 2.7 ms for 500 vectors, 6.6 ms for 2,500, 7.7 ms for 10,000 and 23.7 ms for 50,000 owned by one user. An earlier version of the query that joined chunk text and sections before applying the `LIMIT` took 31.9 ms at 10,000 and 76.3 ms at 50,000; the nearest vectors are now found first and the metadata joined only for those rows.
+
+**Consequence**: a single user with several hundred thousand vectors will want HNSW (`SEARCH_HNSW_EF_SEARCH` switches the search to use it); latency is linear in a user's vector count until then. Revisit with measurements on real data.
+
+### DEC-040: Embedding Stage Lifecycle: `embedding -> ready`, Failures Keep Chunks
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+`chunked -> embedding -> ready`, where `ready` means every chunk has a vector under the active configuration and is the only status search reads. `indexing` stays defined but unused. A failure after chunking keeps the chunks (`failed` with `chunk_count` set), and a manual retry resumes at `chunked`. Re-chunking a `ready` document returns it through `chunking` and drops its vectors with its chunks.
+
+**Alternatives**: keep `embedding -> indexing -> ready`; delete chunks on any failure (the Phase 5 rule); let search read documents that are partly embedded.
+
+**Reason**: the vector index is maintained by PostgreSQL, so an `indexing` step would be empty; keeping chunks after an embedding failure avoids repeating extraction and chunking for a failure that has nothing to do with them; reading only `ready` documents means a document is never half-searchable. The attempt counter counts claims without progress, so large documents embedded over several tasks are not penalised and crash loops still stop.
+
+**Consequence**: the Phase 5 invariant becomes "chunks exist while a document is chunked or beyond, or failed after chunking".
+
+### DEC-041: Dedicated Embedding Worker and Bounded Tasks
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+A separate `embedding` queue and worker service (concurrency 1, higher memory limit, long-lived processes) with tasks bounded by a time budget that continue themselves. Models are cached in a shared volume; only the embedding worker downloads. The API also loads the model (for query embedding) from the cache, offline, with bounded concurrency.
+
+**Alternatives**: embed in the processing worker (memory, recycling after 50 tasks reloads the model, parses untrusted files next to a loaded model); embed queries by calling the worker (extra latency and moving parts).
+
+**Reason**: isolation and scaling of the memory-heavy component, no model reloads, and a hard bound on any single task keeps Celery time limits and redelivery safe. The API needs the model anyway for queries; a single code path is simpler than a query RPC.
+
+**Consequence**: the API image carries the ML runtime and each API process holds the model in memory (about 0.5 GB for the default); a very small deployment can run one API worker. The first search after a fresh deployment returns 503 until the embedding worker has downloaded the model.
+
+### DEC-042: Search API Shape
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+`POST /api/v1/search/semantic` with a JSON body; only the caller's own `ready` documents (administrators too); `score` is cosine similarity with `distance` also returned; the query is normalised like document text; per-user rate limit; 128 KiB body cap; `top_k` and query length bounded by configuration.
+
+**Reason**: a POST keeps queries (which may be sensitive) out of URLs and logs; normalising queries with the document normaliser makes composed and decomposed Unicode match; exposing the metric rather than a "relevance percentage" avoids implying a calibration the model does not have.
+
+**Consequence**: administrators cannot search other users' documents through this endpoint (a deliberate choice that differs from by-id access); the 404-for-unowned-filter rule is the same as for documents.
+
+### DEC-043: Re-embedding Is Explicit
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+A changed embedding configuration never triggers re-embedding by itself. The operator runs the `reindex_embeddings` task; each document is re-embedded under the new configuration and its old vectors are deleted when the new set is complete. Documents without vectors under the active configuration are not returned by search.
+
+**Reason**: automatic mass re-embedding after a settings typo would burn hours of compute and silently change results; mixing vectors of two models would corrupt rankings. An explicit step with a visible reduced-results window is safer.
+
+**Consequence**: documents are unsearchable between a model change and their re-embedding; run the task right after the change. Vectors of the old configuration are not kept for rollback (re-run the task with the old settings to roll back).
+
+### DEC-044: Model Supply-Chain Rules and Heading Context
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**:
+The model revision must be a full commit hash (settings validation refuses a branch name); weights load from safetensors only; remote code is never trusted; downloads happen only in the embedding worker or the explicit `python -m app.embeddings.download` command. Heading context (prepending the heading path to each chunk before embedding) is available (`EMBEDDING_INCLUDE_HEADING`) but off by default because it gave no consistent gain in measurement (Recall@1 0.891 to 0.913 for e5-small, 0.935 to 0.913 for e5-base); it is part of the configuration fingerprint, so changing it is a reindex.
+
+**Reason**: an unpinned or pickle-based model is code execution on the worker; the measured effect of heading context was within noise and would have added input length and a reindex for no demonstrated benefit.
+
 ---
 
 ## Future Decisions to Make

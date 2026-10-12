@@ -1,0 +1,116 @@
+{
+  "dataset": "rag-retrieval-synthetic",
+  "version": 1,
+  "license": "CC0-1.0",
+  "notes": "Original synthetic text written for this project. One passage per section, so a passage is exactly one chunk after processing. No real documents or personal data.",
+  "documents": [
+    {
+      "id": "en1", "title": "Monsoon Rice Farming", "language": "en",
+      "sections": [
+        {"heading": "Planting", "passage": {"id": "en1-1", "text": "Farmers transplant Aman rice seedlings in July, when monsoon rain has filled the fields. Seedlings are spaced about twenty centimetres apart so each plant has room to grow."}},
+        {"heading": "Flooding", "passage": {"id": "en1-2", "text": "During heavy floods, standing water can submerge young rice plants for more than ten days, and submergence-tolerant varieties survive where traditional ones die."}},
+        {"heading": "Harvest", "passage": {"id": "en1-3", "text": "Aman rice is harvested in November and December. Workers cut the stalks by hand, bundle them, and thresh the grain on a cleared patch of earth."}},
+        {"heading": "Storage", "passage": {"id": "en1-4", "text": "Dried grain is stored in sealed clay or metal bins to keep out moisture and rodents. Properly dried rice can be kept for more than a year."}}
+      ]
+    },
+    {
+      "id": "en2", "title": "Database Indexing", "language": "en",
+      "sections": [
+        {"heading": "B-tree indexes", "passage": {"id": "en2-1", "text": "A B-tree index keeps keys in sorted order, so equality and range queries can find rows without scanning the whole table."}},
+        {"heading": "Cost of indexes", "passage": {"id": "en2-2", "text": "Every index speeds up reads but slows down writes, because each insert or update must also change the index, and indexes use extra disk space."}},
+        {"heading": "Composite indexes", "passage": {"id": "en2-3", "text": "A composite index on two columns helps queries that filter on the first column or on both columns, but usually not on the second column alone."}},
+        {"heading": "Maintenance", "passage": {"id": "en2-4", "text": "Over time, heavy deletes leave indexes bloated with dead entries; rebuilding or vacuuming reclaims the space and restores lookup speed."}}
+      ]
+    },
+    {
+      "id": "en3", "title": "Dengue Prevention", "language": "en",
+      "sections": [
+        {"heading": "The mosquito", "passage": {"id": "en3-1", "text": "The Aedes mosquito that spreads dengue breeds in clean standing water, such as flower pots, discarded tyres and water storage buckets."}},
+        {"heading": "Symptoms", "passage": {"id": "en3-2", "text": "Dengue usually begins with sudden high fever, severe headache, pain behind the eyes and aching joints, followed by a skin rash after a few days."}},
+        {"heading": "Prevention", "passage": {"id": "en3-3", "text": "Emptying containers of standing water every week removes mosquito breeding sites and is the most effective household measure."}},
+        {"heading": "Warning signs", "passage": {"id": "en3-4", "text": "Persistent vomiting, bleeding gums or severe stomach pain are warning signs that require immediate hospital care."}}
+      ]
+    },
+    {
+      "id": "en4", "title": "River Banks and Banking", "language": "en",
+      "sections": [
+        {"heading": "Erosion", "passage": {"id": "en4-1", "text": "Erosion along the river bank forces families to move their homes inland every few years as the current cuts away the soil."}},
+        {"heading": "Savings", "passage": {"id": "en4-2", "text": "A savings bank pays interest on deposits and lends the pooled money to businesses and households."}},
+        {"heading": "Mobile banking", "passage": {"id": "en4-3", "text": "Mobile banking lets customers send money, pay bills and cash out at agent shops using only a basic phone and a registered number."}},
+        {"heading": "Embankments", "passage": {"id": "en4-4", "text": "Engineers build embankments of compacted earth and concrete blocks to hold back floodwater and protect farmland near the river."}}
+      ]
+    },
+    {
+      "id": "bn1", "title": "ইলিশ মাছ", "language": "bn",
+      "sections": [
+        {"heading": "পরিচিতি", "passage": {"id": "bn1-1", "text": "ইলিশ বাংলাদেশের জাতীয় মাছ। এটি সাগর থেকে মিঠাপানির নদীতে ডিম ছাড়তে আসে এবং এর স্বাদের জন্য বিশ্বজুড়ে পরিচিত।"}},
+        {"heading": "নিষেধাজ্ঞা", "passage": {"id": "bn1-2", "text": "ডিম ছাড়ার মৌসুমে অক্টোবর মাসে প্রায় বাইশ দিন ইলিশ ধরা নিষিদ্ধ থাকে, যাতে মাছের বংশবৃদ্ধি অব্যাহত থাকে।"}},
+        {"heading": "রান্না", "passage": {"id": "bn1-3", "text": "সর্ষে ইলিশ একটি জনপ্রিয় পদ, যাতে ইলিশ মাছ বাটা সর্ষে, কাঁচা মরিচ ও সর্ষের তেলে রান্না করা হয়।"}},
+        {"heading": "জেলেদের জীবন", "passage": {"id": "bn1-4", "text": "উপকূলের জেলেরা ভোরে নৌকা নিয়ে সাগরে যান এবং জাল ফেলে মাছ ধরেন; ঝড়ের সংকেত থাকলে তাঁরা নদীতে ফিরে আসেন।"}}
+      ]
+    },
+    {
+      "id": "bn2", "title": "সুন্দরবন", "language": "bn",
+      "sections": [
+        {"heading": "বন ও বাঘ", "passage": {"id": "bn2-1", "text": "সুন্দরবন বিশ্বের বৃহত্তম ম্যানগ্রোভ বন এবং এখানে রয়েল বেঙ্গল টাইগারের আবাস রয়েছে।"}},
+        {"heading": "গাছপালা", "passage": {"id": "bn2-2", "text": "সুন্দরী গাছ থেকে বনের নাম এসেছে। জোয়ার-ভাটার নোনা পানিতে টিকে থাকার জন্য এই গাছের শ্বাসমূল মাটির ওপর উঠে থাকে।"}},
+        {"heading": "মধু সংগ্রহ", "passage": {"id": "bn2-3", "text": "মৌয়ালরা বসন্তকালে বনের ভেতর থেকে মধু সংগ্রহ করেন, এবং এই কাজ করতে গিয়ে তাঁদের প্রায়ই বন্যপ্রাণীর ঝুঁকি নিতে হয়।"}},
+        {"heading": "প্রাকৃতিক সুরক্ষা", "passage": {"id": "bn2-4", "text": "ঘূর্ণিঝড় ও জলোচ্ছ্বাসের সময় সুন্দরবন প্রাকৃতিক ঢালের মতো কাজ করে এবং উপকূলের গ্রামগুলোকে ক্ষতির হাত থেকে রক্ষা করে।"}}
+      ]
+    },
+    {
+      "id": "bn3", "title": "ভাষা আন্দোলন", "language": "bn",
+      "sections": [
+        {"heading": "একুশে ফেব্রুয়ারি", "passage": {"id": "bn3-1", "text": "১৯৫২ সালের একুশে ফেব্রুয়ারি ঢাকায় বাংলা ভাষার দাবিতে মিছিলে পুলিশ গুলি চালালে কয়েকজন ছাত্র শহীদ হন।"}},
+        {"heading": "আন্তর্জাতিক স্বীকৃতি", "passage": {"id": "bn3-2", "text": "ইউনেসকো ১৯৯৯ সালে একুশে ফেব্রুয়ারিকে আন্তর্জাতিক মাতৃভাষা দিবস হিসেবে ঘোষণা করে।"}},
+        {"heading": "শহীদ মিনার", "passage": {"id": "bn3-3", "text": "প্রতি বছর ভোরে মানুষ খালি পায়ে শহীদ মিনারে গিয়ে ফুল দিয়ে ভাষা শহীদদের স্মরণ করেন।"}},
+        {"heading": "বইমেলা", "passage": {"id": "bn3-4", "text": "ফেব্রুয়ারি মাসজুড়ে ঢাকায় অমর একুশে বইমেলা চলে, যেখানে নতুন বই প্রকাশিত হয় এবং হাজার হাজার পাঠক ভিড় করেন।"}}
+      ]
+    },
+    {
+      "id": "bn4", "title": "মোবাইল ব্যাংকিং ও প্রযুক্তি", "language": "bn",
+      "sections": [
+        {"heading": "মোবাইল ব্যাংকিং", "passage": {"id": "bn4-1", "text": "মোবাইল ব্যাংকিং ব্যবহার করে গ্রামের মানুষ ব্যাংকে না গিয়েই টাকা পাঠাতে ও বিল পরিশোধ করতে পারেন।"}},
+        {"heading": "নিরাপত্তা", "passage": {"id": "bn4-2", "text": "পিন নম্বর কারও সঙ্গে ভাগ করা উচিত নয়, কারণ প্রতারকেরা ফোন করে পিন জেনে নিয়ে অ্যাকাউন্ট থেকে টাকা সরিয়ে ফেলে।"}},
+        {"heading": "ইন্টারনেট", "passage": {"id": "bn4-3", "text": "গ্রামীণ এলাকায় ইন্টারনেটের গতি কম হওয়ায় অনলাইন ক্লাসে অংশ নিতে শিক্ষার্থীদের অসুবিধা হয়।"}},
+        {"heading": "কৃষি অ্যাপ", "passage": {"id": "bn4-4", "text": "কৃষকেরা মোবাইল অ্যাপের মাধ্যমে আবহাওয়ার পূর্বাভাস ও ফসলের বাজারদর জানতে পারেন।"}}
+      ]
+    },
+    {
+      "id": "mx1", "title": "ডাটাবেজ ও সার্ভার", "language": "mixed",
+      "sections": [
+        {"heading": "Database পছন্দ", "passage": {"id": "mx1-1", "text": "আমাদের অ্যাপ্লিকেশনে PostgreSQL ডাটাবেজ ব্যবহার করা হয়, কারণ এটি reliable এবং বড় আকারের ডেটা সামলাতে পারে।"}},
+        {"heading": "Slow query", "passage": {"id": "mx1-2", "text": "Query ধীর হলে প্রথমে EXPLAIN চালিয়ে দেখুন কোন অংশে সময় বেশি লাগছে, তারপর প্রয়োজন হলে index যোগ করুন।"}},
+        {"heading": "Backup", "passage": {"id": "mx1-3", "text": "প্রতিদিন রাতে automatic backup নেওয়া হয় এবং backup ফাইলগুলো আলাদা সার্ভারে সংরক্ষণ করা হয়, যাতে disk নষ্ট হলেও ডেটা হারিয়ে না যায়।"}},
+        {"heading": "Caching", "passage": {"id": "mx1-4", "text": "Server-এর load বেড়ে গেলে cache ব্যবহার করে বারবার একই query চালানো এড়ানো যায়, ফলে response time কমে।"}}
+      ]
+    },
+    {
+      "id": "mx2", "title": "মেশিন লার্নিং ক্লাস", "language": "mixed",
+      "sections": [
+        {"heading": "Training data", "passage": {"id": "mx2-1", "text": "Machine learning-এ training data যত ভালো হয়, model-এর ফলাফলও তত নির্ভরযোগ্য হয়; তাই data cleaning-এর ওপর বিশেষ জোর দেওয়া হয়।"}},
+        {"heading": "Overfitting", "passage": {"id": "mx2-2", "text": "Overfitting হলে model training data মুখস্থ করে ফেলে এবং নতুন data-তে খারাপ করে; validation set দিয়ে এটা ধরা যায়।"}},
+        {"heading": "Embedding", "passage": {"id": "mx2-3", "text": "Embedding হলো টেক্সটকে সংখ্যার vector-এ রূপান্তর করা, যাতে কাছাকাছি অর্থের লেখা vector space-এ কাছাকাছি থাকে।"}},
+        {"heading": "Hardware", "passage": {"id": "mx2-4", "text": "GPU না থাকলেও ছোট model CPU-তে চালানো যায়, তবে batch size ছোট রাখতে হয় এবং সময় বেশি লাগে।"}}
+      ]
+    },
+    {
+      "id": "mx3", "title": "ঢাকা ভ্রমণ গাইড", "language": "mixed",
+      "sections": [
+        {"heading": "পুরান ঢাকা", "passage": {"id": "mx3-1", "text": "Dhaka-র পুরান ঢাকায় গিয়ে আহসান মঞ্জিল দেখতে ভুলবেন না; এটি ঢাকার নবাবদের একসময়ের প্রাসাদ ছিল এবং এখন museum।"}},
+        {"heading": "Traffic", "passage": {"id": "mx3-2", "text": "Traffic এড়াতে সকাল সাতটার আগে বের হওয়া ভালো, কারণ দুপুরে প্রধান রাস্তাগুলোতে দীর্ঘ জ্যাম থাকে।"}},
+        {"heading": "Launch ভ্রমণ", "passage": {"id": "mx3-3", "text": "Sadarghat launch terminal থেকে প্রতিদিন রাতে দক্ষিণাঞ্চলের জেলাগুলোর উদ্দেশে বড় লঞ্চ ছাড়ে, তাই আগে থেকে ticket কেটে রাখা ভালো।"}},
+        {"heading": "পিঠা উৎসব", "passage": {"id": "mx3-4", "text": "শীতকালে Dhaka-য় পিঠা উৎসব হয়, যেখানে ভাপা পিঠা, পাটিসাপটা আর নকশি পিঠা পাওয়া যায়।"}}
+      ]
+    },
+    {
+      "id": "mx4", "title": "অফিস নীতিমালা", "language": "mixed",
+      "sections": [
+        {"heading": "Leave", "passage": {"id": "mx4-1", "text": "প্রতি বছর কর্মীরা বিশ দিনের paid leave পান, এবং ছুটির আবেদন অন্তত তিন দিন আগে manager-কে জানাতে হয়।"}},
+        {"heading": "Remote work", "passage": {"id": "mx4-2", "text": "Work from home করতে চাইলে সপ্তাহের শুরুতে team lead-এর অনুমতি নিতে হবে এবং ভিডিও meeting-এ যোগ দেওয়া বাধ্যতামূলক।"}},
+        {"heading": "Salary", "passage": {"id": "mx4-3", "text": "Salary প্রতি মাসের শেষ কর্মদিবসে bank account-এ জমা হয়; কোনো ভুল থাকলে HR বিভাগে email করুন।"}},
+        {"heading": "Orientation", "passage": {"id": "mx4-4", "text": "নতুন কর্মীদের প্রথম সপ্তাহে orientation দেওয়া হয়, যেখানে company-র নিয়মকানুন ও security policy বোঝানো হয়।"}}
+      ]
+    }
+  ]
+}
