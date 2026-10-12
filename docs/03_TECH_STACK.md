@@ -732,3 +732,18 @@ extension, so the database owner can create it), needed to put the `user_id` col
 `tsvector`. Why not a search engine (Elasticsearch, OpenSearch) or BM25 extension: one more service to run, secure and
 keep consistent with the vectors, for a corpus size that PostgreSQL handles in milliseconds (measured, see the
 benchmarks). Reranking, a lexical analyser for Bengali and approximate vector indexes remain deliberately out of scope.
+
+## Phase 8 Reranker Model
+
+Candidates that pass the supply-chain rules (Apache-2.0, `model.safetensors`, a standard architecture implemented in
+`transformers`, no custom code): `BAAI/bge-reranker-v2-m3` (XLM-RoBERTa, 568M parameters, 2.3 GB, 100+ languages
+including Bengali in its base model's training) and `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` (118M parameters,
+0.47 GB, trained on machine-translated MS MARCO in 13 languages, Bengali not among them). Rejected:
+`jinaai/jina-reranker-v2-base-multilingual` (custom code, CC-BY-NC), `Alibaba-NLP/gte-multilingual-reranker-base` (custom
+code), `amberoad/bert-multilingual-passage-reranking-msmarco` (pickle weights only).
+
+Default when reranking is enabled: `BAAI/bge-reranker-v2-m3` at revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`
+(DEC-052). Resources on a 6-thread desktop CPU: about 2.3 GB resident for the model (the API process measured 2.5 GB
+with the embedding model also loaded), 4 s to load from a warm file cache (about 33 s from the Docker volume), 1.0-1.2 s
+to score 10 candidates and 2.2-3.2 s for 30; GPU is supported (`RERANK_DEVICE=auto|cuda|mps`) but was not measured.
+No new dependency: it uses `transformers` and `torch`, already installed for embeddings.

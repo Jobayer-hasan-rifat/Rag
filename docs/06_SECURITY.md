@@ -622,3 +622,22 @@ pip-audit -r requirements.txt
 - **Logging.** The hybrid log event records counts, timings and the degraded retrievers, never the query or document text;
   failures log only the exception type.
 - **Errors.** Failures of one retriever never expose database messages; both failing gives the generic 503.
+
+## Reranking Security (Phase 8)
+
+- **Authorization is unchanged and comes first.** Only candidates that the owner-scoped, `ready`-only retrieval already
+  returned for the requesting user are offered to the model; a request cannot name chunk ids, and filters naming other
+  users' documents are the same 404 as before. Tests assert that no other user's text ever reaches the reranker.
+- **Model supply chain.** The revision must be a full commit hash when reranking is enabled, only safetensors weights
+  are loaded, `trust_remote_code` is always false, models whose configuration declares custom code or a non-standard
+  architecture or more than one output are refused, and downloads happen only in the embedding worker or the explicit
+  `python -m app.reranking.download` command (the API container runs offline). The model is loaded once per process.
+- **Resource bounds.** Candidate count (default 10, hard cap 100), 512-token input limit, batch size, a concurrency
+  gate whose slot is held until the thread really ends, a scoring deadline checked between batches, a request timeout,
+  and the existing per-user search rate limit and body cap. An abandoned request cannot pile up model work.
+- **Failure and honesty.** Missing model, overload, timeout, inference errors and malformed output (wrong count, NaN or
+  infinite) become an explicit fallback to the hybrid order with `rerank.applied: false`; no score is ever invented.
+- **Logging.** Only counts and timings are logged (`reranked`, with `candidates`, `truncated`, `latency_ms`,
+  `load_ms`); never the query, passages or library error messages.
+- **Residual.** Reranking is CPU-heavy; a user can spend the shared search budget faster. The deployment can turn it
+  off, cap candidates or lower the timeout.

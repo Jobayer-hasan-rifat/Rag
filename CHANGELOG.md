@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 8: Optional Reranking
+
+- Cross-encoder reranking layer (`app/reranking/`): a `Reranker` interface independent of the embedding provider, a transformers-based multilingual cross-encoder (pinned revision, safetensors only, no remote code, architecture and single-output validation), pure ordering logic with deterministic ties, a registry that loads one model per process lazily, and `python -m app.reranking.download`
+- `rerank` and `rerank_candidates` options on `POST /api/v1/search/hybrid`: opt-in, candidates only from owner-scoped hybrid retrieval, bounded candidate count and `top_k`, reranked position, raw score, original retrieval rank and truncation flag per result, and an explicit fallback (`rerank.applied: false`, `degraded: ["rerank"]`) when reranking cannot run
+- Inference in a worker thread behind a concurrency gate and deadline, after releasing the database connection; optional background preload at start-up
+- `RERANK_*` settings in `.env.example` and Compose; the embedding worker fetches the model when `RERANK_ENABLED=true`
+- Reranking ablation (`python -m evaluation.rerank_eval`) with a separate held-out dataset; evaluation ids are now deterministic so results are reproducible
+
+### Changed
+
+- Default behaviour of `/search/hybrid` and `/search/semantic` is unchanged; reranking is disabled by default
+- Phase 7 evaluation figures were re-run with fixed chunk ids (ties in fusion were broken by random ids before); hybrid MRR@10 is 0.931 rather than 0.919
+
 ### Added - Phase 7: Hybrid Retrieval
 
 - Lexical (full-text) retrieval over `document_chunks`: a generated `tsvector` (`simple` configuration, no stemming, safe for Bengali) and a composite GIN index `(user_id, search_vector)` with a trigger-filled, foreign-key-protected owner column (migration `0007`, needs the `btree_gin` extension)
@@ -270,7 +283,7 @@ This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH 
 | 0.5.0 | Phase 5 Complete | Document chunking working (vector search follows) |
 | 0.6.0 | Phase 6 Complete | Embeddings and semantic search working (hybrid search follows) |
 | 0.7.0 | Phase 7 Complete | Hybrid retrieval working (reranking follows) |
-| 0.8.0 | Phase 8 Complete | RAG working |
+| 0.8.0 | Phase 8 Complete | Optional reranking working (RAG follows) |
 | 0.9.0 | Phase 9 Complete | Conversations working |
 | 0.10.0 | Phase 10 Complete | Versioning & access control working |
 | 0.11.0 | Phase 11 Complete | Evaluation framework working |

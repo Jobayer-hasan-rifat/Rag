@@ -1,0 +1,298 @@
+{
+ "dataset": "rag-retrieval-heldout-synthetic",
+ "version": 1,
+ "notes": "Same relevance model as ../retrieval/queries.json.",
+ "queries": [
+  {
+   "id": "he-01",
+   "category": "english",
+   "query": "How many books can a member borrow?",
+   "relevant": [
+    "h1-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-02",
+   "category": "english",
+   "query": "What is the fine for returning a book late?",
+   "relevant": [
+    "h1-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-03",
+   "category": "english",
+   "query": "Where can I study late before exams?",
+   "relevant": [
+    "h1-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-04",
+   "category": "english",
+   "query": "How do I look at old handwritten documents?",
+   "relevant": [
+    "h1-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-05",
+   "category": "english",
+   "query": "What should I do when replication is delayed?",
+   "relevant": [
+    "h2-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-06",
+   "category": "english",
+   "query": "When are database backups made and how long are they kept?",
+   "relevant": [
+    "h2-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-07",
+   "category": "english",
+   "query": "What is the safe order for changing the signing key?",
+   "relevant": [
+    "h2-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-08",
+   "category": "english",
+   "query": "How do I get to the island from Teknaf?",
+   "relevant": [
+    "h6-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "he-09",
+   "category": "english",
+   "query": "Do I need permission to visit the mangrove forest?",
+   "relevant": [
+    "h6-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-01",
+   "category": "bangla",
+   "query": "বর্ষায় ছোট নৌকা কখন তীরে ফেরে?",
+   "relevant": [
+    "h3-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-02",
+   "category": "bangla",
+   "query": "উল্টো বাতাসে মাঝিরা কী ব্যবহার করেন?",
+   "relevant": [
+    "h3-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-03",
+   "category": "bangla",
+   "query": "বরিশালের লঞ্চ কখন পৌঁছায়?",
+   "relevant": [
+    "h3-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-04",
+   "category": "bangla",
+   "query": "নদী ভাঙলে পরিবারগুলো কী করে?",
+   "relevant": [
+    "h3-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-05",
+   "category": "bangla",
+   "query": "ছোট বাচ্চাদের হাড় শক্ত করতে কী খাওয়ানো উচিত?",
+   "relevant": [
+    "h4-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-06",
+   "category": "bangla",
+   "query": "পেট খারাপ হলে কোন পানীয় বারবার খাওয়াতে হয়?",
+   "relevant": [
+    "h4-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hb-07",
+   "category": "bangla",
+   "query": "টিকার পর জ্বর এলে কী করব?",
+   "relevant": [
+    "h4-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hm-01",
+   "category": "mixed",
+   "query": "deadline পেছাতে কার approval লাগে?",
+   "relevant": [
+    "h5-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hm-02",
+   "category": "mixed",
+   "query": "recording কতদিন থাকে?",
+   "relevant": [
+    "h5-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hm-03",
+   "category": "mixed",
+   "query": "VPN কাজ না করলে কী করব?",
+   "relevant": [
+    "h5-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hi-01",
+   "category": "identifier",
+   "query": "SRV-5102",
+   "relevant": [
+    "h2-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hi-02",
+   "category": "identifier",
+   "query": "SRV-5120",
+   "relevant": [
+    "h2-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hi-03",
+   "category": "identifier",
+   "query": "IT-4410",
+   "relevant": [
+    "h5-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hp-01",
+   "category": "phrase",
+   "query": "\"cold storage bucket\"",
+   "relevant": [
+    "h2-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hp-02",
+   "category": "phrase",
+   "query": "\"cotton gloves\"",
+   "relevant": [
+    "h1-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hp-03",
+   "category": "phrase",
+   "query": "\"final week of examinations\"",
+   "relevant": [
+    "h1-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hx-01",
+   "category": "cross_lingual",
+   "query": "What causes people to lose land along rivers?",
+   "relevant": [
+    "h3-4"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hx-02",
+   "category": "cross_lingual",
+   "query": "How often should pregnant women take iron tablets?",
+   "relevant": [
+    "h4-3"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hx-03",
+   "category": "cross_lingual",
+   "query": "ঢাকার লাইব্রেরি থেকে কয়টি বই ধার নেওয়া যায়?",
+   "relevant": [
+    "h1-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hc-01",
+   "category": "confusable",
+   "query": "Which alert is about network delay between replicas?",
+   "relevant": [
+    "h2-2"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hc-02",
+   "category": "confusable",
+   "query": "Which alert is about running out of disk space?",
+   "relevant": [
+    "h2-1"
+   ],
+   "neutral": []
+  },
+  {
+   "id": "hn-01",
+   "category": "no_answer",
+   "query": "What is the university tuition fee?",
+   "relevant": [],
+   "neutral": []
+  },
+  {
+   "id": "hn-02",
+   "category": "no_answer",
+   "query": "SRV-9999",
+   "relevant": [],
+   "neutral": []
+  },
+  {
+   "id": "hn-03",
+   "category": "no_answer",
+   "query": "চাঁদে মানুষ কবে গিয়েছিল?",
+   "relevant": [],
+   "neutral": []
+  }
+ ]
+}

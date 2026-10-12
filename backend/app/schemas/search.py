@@ -86,6 +86,18 @@ class HybridSearchRequest(BaseModel):
     collection_id: uuid.UUID | None = Field(
         default=None, description="Restrict to the documents of one of your collections"
     )
+    rerank: bool = Field(
+        default=False,
+        description="Re-score the best candidates with a cross-encoder. Off by default; the "
+        "response then has the same shape and order as before.",
+    )
+    rerank_candidates: int | None = Field(
+        default=None,
+        ge=1,
+        le=200,
+        description="How many hybrid candidates to rerank (server limit applies; `top_k` must "
+        "not exceed it). Only used with `rerank`.",
+    )
 
 
 class HybridHitResponse(BaseModel):
@@ -140,3 +152,44 @@ class HybridSearchInfo(BaseModel):
 class HybridSearchResponse(BaseModel):
     results: list[HybridHitResponse]
     search: HybridSearchInfo
+
+
+class RerankedHitResponse(HybridHitResponse):
+    """A hybrid result after reranking. `rank` is the final position; `score`, `dense_rank`,
+    `sparse_rank` and `dense_score` are unchanged from retrieval."""
+
+    retrieval_rank: int = Field(description="Position in the hybrid ranking before reranking")
+    rerank_score: float | None = Field(
+        description="The cross-encoder's raw output (a logit): higher is more relevant to this "
+        "query. Not a probability, not comparable across queries or models, never stored. "
+        "Null when reranking did not happen."
+    )
+    rerank_truncated: bool | None = Field(
+        description="True if the passage was longer than the model's input limit and its end "
+        "was not scored; null when reranking did not happen"
+    )
+
+
+class RerankInfo(BaseModel):
+    requested: Literal[True] = True
+    applied: bool = Field(
+        description="False if reranking failed and the hybrid order was kept (see "
+        "`fallback_reason`); `degraded` then contains `rerank`"
+    )
+    fallback_reason: Literal["unavailable", "busy", "timeout", "failed", "invalid"] | None
+    score_type: Literal["raw_logit"] = "raw_logit"
+    model: str
+    model_revision: str
+    device: str
+    candidates: int = Field(description="Candidates offered to the reranker")
+    truncated_candidates: int = Field(description="Candidates longer than the model input limit")
+    latency_ms: int = Field(description="Time spent reranking, including a model load if needed")
+
+
+class RerankedSearchInfo(HybridSearchInfo):
+    rerank: RerankInfo
+
+
+class RerankedSearchResponse(BaseModel):
+    results: list[RerankedHitResponse]
+    search: RerankedSearchInfo

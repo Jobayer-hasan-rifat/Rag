@@ -91,6 +91,22 @@ class Settings(BaseSettings):
     sparse_max_terms: int = Field(default=12, ge=1, le=40)
     sparse_remove_stopwords: bool = True
     sparse_statement_timeout_ms: int = Field(default=2000, ge=100, le=60000)
+    rerank_enabled: bool = False
+    rerank_provider: str = "cross_encoder"
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rerank_model_revision: str = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+    rerank_device: Literal["auto", "cpu", "cuda", "mps"] = "auto"
+    rerank_batch_size: int = Field(default=8, ge=1, le=64)
+    rerank_candidates: int = Field(default=10, ge=1, le=200)
+    rerank_max_candidates: int = Field(default=100, ge=1, le=200)
+    rerank_max_length: int = Field(default=512, ge=16, le=8192)
+    rerank_timeout_seconds: int = Field(default=20, ge=1, le=300)
+    rerank_load_timeout_seconds: int = Field(default=120, ge=5, le=1800)
+    rerank_max_concurrent: int = Field(default=1, ge=1, le=16)
+    rerank_preload: bool = True
+    rerank_cache_dir: str | None = None
+    rerank_allow_download: bool = True
+    rerank_torch_threads: int | None = Field(default=None, ge=1, le=256)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -105,7 +121,12 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     @field_validator(
-        "embedding_cache_dir", "embedding_torch_threads", "search_hnsw_ef_search", mode="before"
+        "embedding_cache_dir",
+        "embedding_torch_threads",
+        "search_hnsw_ef_search",
+        "rerank_cache_dir",
+        "rerank_torch_threads",
+        mode="before",
     )
     @classmethod
     def _empty_means_unset(cls, value: object) -> object:
@@ -186,6 +207,21 @@ class Settings(BaseSettings):
             )
         if self.search_default_top_k > self.search_max_top_k:
             raise ValueError("SEARCH_DEFAULT_TOP_K must not exceed SEARCH_MAX_TOP_K")
+        if self.rerank_candidates > self.rerank_max_candidates:
+            raise ValueError("RERANK_CANDIDATES must not exceed RERANK_MAX_CANDIDATES")
+        if (
+            self.rerank_enabled
+            and self.rerank_provider == "cross_encoder"
+            and not (
+                _COMMIT_SHA.fullmatch(self.rerank_model_revision)
+                or PurePosixPath(self.rerank_model).is_absolute()
+                or PureWindowsPath(self.rerank_model).is_absolute()
+            )
+        ):
+            raise ValueError(
+                "RERANK_MODEL_REVISION must be a full 40-character commit hash so the exact "
+                "model files are reproducible"
+            )
         if self.hybrid_dense_weight == 0 and self.hybrid_sparse_weight == 0:
             raise ValueError("HYBRID_DENSE_WEIGHT and HYBRID_SPARSE_WEIGHT cannot both be zero")
         return self

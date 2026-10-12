@@ -63,6 +63,19 @@ x-backend-environment: &backend-environment
   SPARSE_MAX_TERMS: ${SPARSE_MAX_TERMS:-12}
   SPARSE_STATEMENT_TIMEOUT_MS: ${SPARSE_STATEMENT_TIMEOUT_MS:-2000}
   SPARSE_REMOVE_STOPWORDS: ${SPARSE_REMOVE_STOPWORDS:-true}
+  RERANK_ENABLED: ${RERANK_ENABLED:-false}
+  RERANK_MODEL: ${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+  RERANK_MODEL_REVISION: ${RERANK_MODEL_REVISION:-953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e}
+  RERANK_DEVICE: ${RERANK_DEVICE:-auto}
+  RERANK_BATCH_SIZE: ${RERANK_BATCH_SIZE:-8}
+  RERANK_CANDIDATES: ${RERANK_CANDIDATES:-10}
+  RERANK_MAX_CANDIDATES: ${RERANK_MAX_CANDIDATES:-100}
+  RERANK_MAX_LENGTH: ${RERANK_MAX_LENGTH:-512}
+  RERANK_TIMEOUT_SECONDS: ${RERANK_TIMEOUT_SECONDS:-20}
+  RERANK_LOAD_TIMEOUT_SECONDS: ${RERANK_LOAD_TIMEOUT_SECONDS:-120}
+  RERANK_MAX_CONCURRENT: ${RERANK_MAX_CONCURRENT:-1}
+  RERANK_PRELOAD: ${RERANK_PRELOAD:-true}
+  RERANK_ALLOW_DOWNLOAD: "false"
   # The models live in a shared volume, never in the image. Only the embedding worker downloads.
   HF_HOME: /data/models
   EMBEDDING_ALLOW_DOWNLOAD: "false"
@@ -207,11 +220,16 @@ services:
       - >-
         python -m app.embeddings.download ||
         echo "model download failed; the first embedding task will retry it";
+        if [ "$${RERANK_ENABLED}" = "true" ]; then
+        python -m app.reranking.download ||
+        echo "reranker download failed; reranked searches will fall back until it is fetched";
+        fi;
         exec celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
         -Q embedding --concurrency=${EMBEDDING_WORKER_CONCURRENCY:-1}
     environment:
       <<: *backend-environment
       EMBEDDING_ALLOW_DOWNLOAD: "true"
+      RERANK_ALLOW_DOWNLOAD: "true"
       WORKER_MAX_TASKS_PER_CHILD: ${EMBEDDING_WORKER_MAX_TASKS_PER_CHILD:-1000}
       WORKER_MAX_MEMORY_PER_CHILD_KB: ${EMBEDDING_WORKER_MAX_MEMORY_PER_CHILD_KB:-2500000}
       XDG_CACHE_HOME: /tmp/.cache

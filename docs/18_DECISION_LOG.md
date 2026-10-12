@@ -917,7 +917,7 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 **Reason**: rank-based fusion needs no calibration. The defaults are the published ones. A sweep over `k` and weights on the evaluation set (reported in the benchmarks) showed that a dense-heavy weighting looked slightly better, but the sweep ran on the same 77 answerable queries it would be tuned on, so the neutral defaults were kept; the sweep is evidence for a future larger evaluation, not a basis for a change today.
 
-**Consequences**: on the evaluation set hybrid retrieval did **not** beat dense retrieval overall (MRR 0.919 against 0.940); it was better on queries that need exact words or phrases and worse on some paraphrase and cross-language queries. The numbers and their limits are recorded with the benchmarks.
+**Consequences**: on the evaluation set hybrid retrieval did **not** beat dense retrieval overall (MRR 0.931 against 0.940); it was better on queries that need exact words or phrases and worse on some paraphrase and cross-language queries. The numbers and their limits are recorded with the benchmarks.
 
 ---
 
@@ -928,7 +928,7 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 **Chosen Option**: English and Bengali function words (`the`, `is`, `কী`, `কেন`, ...) are removed from the free words of the lexical query (not from quoted phrases, and never from the index); `SPARSE_REMOVE_STOPWORDS=false` restores plain matching.
 
-**Reason**: the first evaluation run showed the lexical retriever matching questions on `what`, `is`, `the` and similar words, filling its candidate list with noise that Reciprocal Rank Fusion then placed above correct dense results (cross-language queries fell from 0.71 to 0.03 MRR). Removing function words recovered most of the loss (hybrid MRR 0.874 to 0.919). The lists are short, conventional lists, not derived from the evaluation queries, but the change was motivated by looking at the evaluation, so the post-change numbers are slightly optimistic; both runs are kept.
+**Reason**: the first evaluation run showed the lexical retriever matching questions on `what`, `is`, `the` and similar words, filling its candidate list with noise that Reciprocal Rank Fusion then placed above correct dense results (cross-language queries fell from 0.71 to 0.03 MRR). Removing function words recovered most of the loss (hybrid MRR 0.874 to about 0.92-0.93; runs differed by about 0.01 because ties were broken by random chunk ids, which the evaluation now fixes). The lists are short, conventional lists, not derived from the evaluation queries, but the change was motivated by looking at the evaluation, so the post-change numbers are slightly optimistic; both runs are kept.
 
 **Consequences**: a query made only of function words has no lexical candidates (quote it to force a phrase match).
 
@@ -944,6 +944,71 @@ The model revision must be a full commit hash (settings validation refuses a bra
 **Alternatives**: a `mode` parameter on the semantic endpoint (changes its contract and score meaning), failing the request when either retriever fails (less available).
 
 **Reason**: clients of `/search/semantic` keep a stable contract and score meaning; retrieval stays useful when the model is unavailable.
+
+---
+
+### DEC-051: Reranking Is a Separate, Optional, Per-Request Layer
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: `app/reranking/` (types, ordering, cross-encoder, registry) independent of the embedding provider, switched on by `RERANK_ENABLED` (default off) and requested per call with `rerank: true` on `POST /api/v1/search/hybrid`.
+
+**Alternatives**: a `Reranker` as another embedding provider (a cross-encoder scores pairs and produces no vector); a new endpoint; always-on reranking.
+
+**Reason**: the semantic endpoint and default hybrid behaviour must stay byte-for-byte as they were so the baseline remains comparable; a request-level flag lets a client A/B the two on the same data.
+
+---
+
+### DEC-052: Default Reranker `BAAI/bge-reranker-v2-m3`
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: bge-reranker-v2-m3 (Apache-2.0, XLM-RoBERTa, safetensors, standard architecture, pinned revision `953dc6f6...`).
+
+**Alternatives**: `mmarco-mMiniLMv2-L12-H384-v1` (5x smaller and 10x faster, but trained on 13 languages without Bengali); three models refused for custom code, a non-commercial licence or pickle-only weights.
+
+**Reason**: measured on the Phase 7 dataset (selection happened on this set, so it is not a blind result): bge raised hybrid MRR@10 from 0.931 to 0.981 with 10 candidates and improved cross-language, confusable and mixed-script queries, while the small model improved the base set but made the lexical set and paraphrase queries worse (MRR 0.74 for paraphrase) and was worse than no reranking with 30 candidates. A separate, smaller held-out set (24 passages, 30 answerable queries) was used once afterwards; there the baselines were already near the ceiling (dense MRR 1.000) so it confirms "no harm" for bge and does not demonstrate improvement.
+
+**Consequences**: about 2.3 GB of weights and resident memory and about 1 s of CPU time for 10 candidates. Reranking is therefore off by default and the small model remains configurable. No claim of general Bangla quality is made.
+
+---
+
+### DEC-053: Inference in the API Process, Not a Queue
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: score in a worker thread of the API process, behind a concurrency gate (`RERANK_MAX_CONCURRENT`, default 1), a deadline checked between batches and a request timeout; the database connection is released first.
+
+**Alternatives**: a Celery reranking worker.
+
+**Reason**: reranking is interactive (about 1 s), and a queue adds a broker round trip, a result wait and a second resident copy of a 2.3 GB model without removing the CPU cost. If measurements later show contention with search, a dedicated service is the next step.
+
+---
+
+### DEC-054: Raw Scores, Bounded Candidates, Documented Truncation
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: the reranker's raw output (logit) is returned as `rerank_score` with no softmax or normalisation; default 10 candidates (cap 100); query and passage share a 512-token budget and the end of a longer passage is dropped and flagged per result (`rerank_truncated`).
+
+**Reason**: a sigmoid would suggest a probability the model does not guarantee; scores are query-dependent and never stored. Ten candidates were as good as thirty on the evaluation set (MRR 0.981 against 0.976) at a third of the cost. Chunks are at most about 1,000 characters, so truncation was not observed in the evaluation (0 pairs) but can occur for dense scripts.
+
+---
+
+### DEC-055: Reranking Failure Falls Back Visibly
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: if the model is missing, busy, slow, failing or returns unusable output, the response is 200 with the hybrid order, `rerank.applied: false`, a reason and `degraded: ["rerank"]`; asking for reranking on a server where it is disabled is a 422.
+
+**Alternatives**: failing the request (less available); silently returning the hybrid order (misleading).
+
+**Reason**: reranking is an enhancement of a working retrieval, but the caller must be able to tell what it received.
 
 ---
 

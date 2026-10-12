@@ -1075,3 +1075,27 @@ graph LR
 - **Degradation**: each retriever can fail independently; the other still answers and the response reports it.
 
 Decisions: DEC-045 to DEC-050.
+
+## Optional Reranking (Phase 8)
+
+```mermaid
+graph LR
+    H[Hybrid candidates: owner-scoped, ready only] --> R[Release DB connection]
+    R --> G[Concurrency gate + deadline]
+    G --> T[Worker thread: cross-encoder scores the pairs]
+    T --> O[Order by raw score, keep top_k]
+    T -. failure or timeout .-> F[Keep hybrid order, report fallback]
+```
+
+- A cross-encoder reads the query and one passage together and outputs a relevance score, which is more precise than
+  comparing separately computed vectors but costs one model pass per candidate, so only a small bounded candidate set
+  (default 10) is re-scored.
+- The reranker (`app/reranking/`) is independent of the embedding provider: loading, scoring and ordering are separate
+  modules; one model per API process, loaded lazily (or in the background at start-up when enabled); nothing is
+  imported or downloaded when reranking is off.
+- Inference runs in a worker thread, behind a concurrency gate and a deadline checked between batches, after the
+  database connection has been released. It runs in the API process, not in Celery: the request is interactive, and a
+  queue would add a round trip and a second copy of the model for no measured gain (DEC-053).
+- Candidates are exactly what retrieval returned for the requesting user; ownership and `ready` were enforced before.
+
+Decisions: DEC-051 to DEC-055.

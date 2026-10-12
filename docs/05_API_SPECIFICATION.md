@@ -584,6 +584,30 @@ administrators included.
 **Errors**: 401, 404 (foreign or missing filter), 413 (body over 128 KiB), 422 (invalid query, `top_k` or filters), 429
 (rate limit), 503 (no retriever available).
 
+#### Optional reranking (Phase 8)
+
+Add `"rerank": true` (and optionally `"rerank_candidates": 10`) to re-score the best hybrid candidates with a
+cross-encoder. Off by default: without the flag the request, response and order are exactly as above, and
+`POST /search/semantic` never reranks. The server must have `RERANK_ENABLED=true`, otherwise a request with
+`rerank: true` is a `422 RERANKING_DISABLED`.
+
+- **Candidates.** The first `rerank_candidates` results of the (owner-scoped, `ready`-only) hybrid ranking, at most
+  `RERANK_MAX_CANDIDATES`, default `RERANK_CANDIDATES` (10). Callers cannot name chunks. `top_k` must not exceed the
+  candidate count (422); when omitted it is `min(SEARCH_DEFAULT_TOP_K, candidates)`.
+- **Response.** The shape above plus, per result, `retrieval_rank` (position in the hybrid ranking), `rerank_score`
+  and `rerank_truncated`, and `search.rerank` (`applied`, `fallback_reason`, `score_type: "raw_logit"`, `model`,
+  `model_revision`, `device`, `candidates`, `truncated_candidates`, `latency_ms`). `rank` is the final position;
+  `score`, `dense_rank`, `sparse_rank` and `dense_score` keep their retrieval values.
+- **Score semantics.** `rerank_score` is the model's raw output (a logit): higher means more relevant to this query.
+  It is not a probability, is not normalised, is not comparable between queries or models, and is never stored.
+  Results are ordered by it; ties fall back to the retrieval rank.
+- **Long passages.** A query and passage are scored together up to `RERANK_MAX_LENGTH` tokens (512); a longer passage
+  loses its end, and `rerank_truncated` is true for it.
+- **Failure.** If the model is unavailable, busy, too slow, fails or returns unusable scores, the response is still
+  200 with the hybrid order, `rerank.applied: false`, a `fallback_reason` (`unavailable`, `busy`, `timeout`, `failed`,
+  `invalid`), `rerank_score: null`, and `rerank` added to `degraded`. A reranked-looking list is never returned
+  without reranking having happened.
+
 ---
 
 ## RAG Endpoints

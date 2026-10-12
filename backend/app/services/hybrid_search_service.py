@@ -101,6 +101,10 @@ class HybridSearchService:
         self._embedder = QueryEmbedder(provider, gate, settings)
         self._settings = settings
 
+    async def release_connection(self) -> None:
+        """End the read transaction, so a slow step that follows does not hold a connection."""
+        await self._session.rollback()
+
     async def search(
         self,
         actor: User,
@@ -110,12 +114,14 @@ class HybridSearchService:
         document_ids: list[uuid.UUID] | None,
         collection_id: uuid.UUID | None,
         retrievers: frozenset[Retriever] = frozenset({DENSE, SPARSE}),
+        candidate_limit: int | None = None,
     ) -> HybridOutcome:
         started = time.monotonic()
         settings = self._settings
         actor_id = actor.id
         text = prepare_query(query, settings)
-        limit = resolve_top_k(top_k, settings)
+        # `candidate_limit` is set only by the server (reranking needs more than `top_k`)
+        limit = candidate_limit if candidate_limit is not None else resolve_top_k(top_k, settings)
         wanted = await validate_scope(
             self._documents, self._collections, actor_id, document_ids, collection_id
         )

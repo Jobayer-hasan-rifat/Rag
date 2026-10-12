@@ -136,6 +136,16 @@ class RequestValidationFailedError(AppError):
     code = "VALIDATION_ERROR"
 
 
+class RerankingDisabledError(AppError):
+    """Reranking was requested but this deployment has it switched off."""
+
+    status_code = 422
+    code = "RERANKING_DISABLED"
+
+    def __init__(self) -> None:
+        super().__init__("Reranking is not enabled on this server")
+
+
 class QuotaExceededError(AppError):
     status_code = 403
     code = "QUOTA_EXCEEDED"

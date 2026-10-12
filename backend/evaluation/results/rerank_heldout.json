@@ -1,0 +1,1316 @@
+{
+  "dataset": "heldout",
+  "passages": 24,
+  "queries": 33,
+  "answerable": 30,
+  "candidates": [
+    10,
+    30
+  ],
+  "retrieval": {
+    "embed_seconds": 0.67,
+    "embedding_failures": 0
+  },
+  "baseline": {
+    "dense": {
+      "overall": {
+        "queries": 30,
+        "recall_at_1": 1.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "base_set": {
+        "queries": 30,
+        "recall_at_1": 1.0,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "lexical_set": {},
+      "by_language": {
+        "bn": {
+          "queries": 9,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "en": {
+          "queries": 17,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 4,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "by_category": {
+        "bangla": {
+          "queries": 7,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "confusable": {
+          "queries": 2,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "cross_lingual": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "english": {
+          "queries": 9,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "identifier": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "phrase": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "retrieval_ms": {
+        "p50": 26.1,
+        "p95": 28.5
+      },
+      "candidate_recall": {
+        "10": 1.0,
+        "30": 1.0
+      }
+    },
+    "hybrid": {
+      "overall": {
+        "queries": 30,
+        "recall_at_1": 0.9333333333333333,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.961111111111111,
+        "ndcg_at_10": 0.9710309917857153
+      },
+      "base_set": {
+        "queries": 30,
+        "recall_at_1": 0.9333333333333333,
+        "recall_at_3": 1.0,
+        "recall_at_5": 1.0,
+        "recall_at_10": 1.0,
+        "mrr_at_10": 0.961111111111111,
+        "ndcg_at_10": 0.9710309917857153
+      },
+      "lexical_set": {},
+      "by_language": {
+        "bn": {
+          "queries": 9,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "en": {
+          "queries": 17,
+          "recall_at_1": 0.8823529411764706,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.9313725490196079,
+          "ndcg_at_10": 0.9488782207983211
+        },
+        "mixed": {
+          "queries": 4,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "by_category": {
+        "bangla": {
+          "queries": 7,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "confusable": {
+          "queries": 2,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "cross_lingual": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "english": {
+          "queries": 9,
+          "recall_at_1": 0.7777777777777778,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 0.8703703703703703,
+          "ndcg_at_10": 0.9034366392857175
+        },
+        "identifier": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "mixed": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        "phrase": {
+          "queries": 3,
+          "recall_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "recall_at_10": 1.0,
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      },
+      "retrieval_ms": {
+        "p50": 27.9,
+        "p95": 31.8
+      },
+      "candidate_recall": {
+        "10": 1.0,
+        "30": 1.0
+      }
+    }
+  },
+  "models": {
+    "mmarco": {
+      "model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+      "revision": "1427fd652930e4ba29e8149678df786c240d8825",
+      "device": "cpu",
+      "load_seconds_from_disk_cache": 2.5,
+      "first_call_ms": 13.4,
+      "rss_mb_before_after_load": [
+        1252.6,
+        2027.1
+      ],
+      "truncated_pairs": 0,
+      "by_candidates": {
+        "10": {
+          "dense+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 0.8888888888888888,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9444444444444444,
+                "ndcg_at_10": 0.9589921948412731
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 0.8571428571428571,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9285714285714286,
+                "ndcg_at_10": 0.9472756790816368
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 89.0,
+              "p95": 97.1
+            },
+            "retrieval_ms": {
+              "p50": 26.4,
+              "p95": 28.5
+            },
+            "total_ms": {
+              "p50": 114.1,
+              "p95": 125.0
+            }
+          },
+          "hybrid+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 0.8888888888888888,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9444444444444444,
+                "ndcg_at_10": 0.9589921948412731
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 0.8571428571428571,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9285714285714286,
+                "ndcg_at_10": 0.9472756790816368
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 88.9,
+              "p95": 94.3
+            },
+            "retrieval_ms": {
+              "p50": 28.3,
+              "p95": 40.2
+            },
+            "total_ms": {
+              "p50": 116.9,
+              "p95": 129.9
+            }
+          }
+        },
+        "30": {
+          "dense+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 0.8888888888888888,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9444444444444444,
+                "ndcg_at_10": 0.9589921948412731
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 0.8571428571428571,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9285714285714286,
+                "ndcg_at_10": 0.9472756790816368
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 206.8,
+              "p95": 285.8
+            },
+            "retrieval_ms": {
+              "p50": 26.4,
+              "p95": 28.5
+            },
+            "total_ms": {
+              "p50": 232.8,
+              "p95": 312.5
+            }
+          },
+          "hybrid+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 0.9666666666666667,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 0.9833333333333333,
+              "ndcg_at_10": 0.9876976584523819
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 0.8888888888888888,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9444444444444444,
+                "ndcg_at_10": 0.9589921948412731
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 0.8571428571428571,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 0.9285714285714286,
+                "ndcg_at_10": 0.9472756790816368
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 197.8,
+              "p95": 213.9
+            },
+            "retrieval_ms": {
+              "p50": 28.3,
+              "p95": 40.2
+            },
+            "total_ms": {
+              "p50": 225.9,
+              "p95": 244.0
+            }
+          }
+        }
+      }
+    },
+    "bge": {
+      "model": "BAAI/bge-reranker-v2-m3",
+      "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+      "device": "cpu",
+      "load_seconds_from_disk_cache": 4.3,
+      "first_call_ms": 131.7,
+      "rss_mb_before_after_load": [
+        1418.9,
+        3756.8
+      ],
+      "truncated_pairs": 0,
+      "by_candidates": {
+        "10": {
+          "dense+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 1000.1,
+              "p95": 1087.3
+            },
+            "retrieval_ms": {
+              "p50": 26.4,
+              "p95": 28.5
+            },
+            "total_ms": {
+              "p50": 1023.5,
+              "p95": 1113.2
+            }
+          },
+          "hybrid+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 1002.6,
+              "p95": 1139.5
+            },
+            "retrieval_ms": {
+              "p50": 28.3,
+              "p95": 40.2
+            },
+            "total_ms": {
+              "p50": 1031.5,
+              "p95": 1169.2
+            }
+          }
+        },
+        "30": {
+          "dense+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 2232.5,
+              "p95": 2518.2
+            },
+            "retrieval_ms": {
+              "p50": 26.4,
+              "p95": 28.5
+            },
+            "total_ms": {
+              "p50": 2257.8,
+              "p95": 2544.9
+            }
+          },
+          "hybrid+rerank": {
+            "overall": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "base_set": {
+              "queries": 30,
+              "recall_at_1": 1.0,
+              "recall_at_3": 1.0,
+              "recall_at_5": 1.0,
+              "recall_at_10": 1.0,
+              "mrr_at_10": 1.0,
+              "ndcg_at_10": 1.0
+            },
+            "lexical_set": {},
+            "by_language": {
+              "bn": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "en": {
+                "queries": 17,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 4,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "by_category": {
+              "bangla": {
+                "queries": 7,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "confusable": {
+                "queries": 2,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "cross_lingual": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "english": {
+                "queries": 9,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "identifier": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "mixed": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              },
+              "phrase": {
+                "queries": 3,
+                "recall_at_1": 1.0,
+                "recall_at_3": 1.0,
+                "recall_at_5": 1.0,
+                "recall_at_10": 1.0,
+                "mrr_at_10": 1.0,
+                "ndcg_at_10": 1.0
+              }
+            },
+            "rerank_ms": {
+              "p50": 2252.3,
+              "p95": 2520.3
+            },
+            "retrieval_ms": {
+              "p50": 28.3,
+              "p95": 40.2
+            },
+            "total_ms": {
+              "p50": 2279.9,
+              "p95": 2552.1
+            }
+          }
+        }
+      }
+    }
+  }
+}

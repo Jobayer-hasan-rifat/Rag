@@ -72,6 +72,34 @@ def fake_embedding_provider() -> Iterator[None]:
     reset_provider_cache()
 
 
+@pytest.fixture(autouse=True)
+def fake_rerankers() -> Iterator[None]:
+    """Register deterministic rerankers (and forget loaded ones) for every test."""
+    from app.reranking.registry import (
+        register_reranker,
+        reset_reranker_cache,
+        unregister_reranker,
+    )
+    from tests import rerank_fakes
+
+    fakes = {
+        "test_fake": rerank_fakes.FakeReranker,
+        "test_unavailable": rerank_fakes.UnavailableReranker,
+        "test_failing": rerank_fakes.FailingReranker,
+        "test_crash": rerank_fakes.CrashingReranker,
+        "test_deadline": rerank_fakes.DeadlineReranker,
+        "test_nan": rerank_fakes.NaNReranker,
+        "test_short": rerank_fakes.ShortReranker,
+        "test_slow": rerank_fakes.SlowReranker,
+    }
+    for name, factory in fakes.items():
+        register_reranker(name, factory)
+    yield
+    for name in fakes:
+        unregister_reranker(name)
+    reset_reranker_cache()
+
+
 @pytest.fixture
 def make_settings() -> SettingsFactory:
     def factory(**overrides: Any) -> Settings:
@@ -97,6 +125,11 @@ def make_settings() -> SettingsFactory:
             "embedding_retry_backoff_seconds": 0,
             "embedding_query_prefix": "",
             "embedding_passage_prefix": "",
+            # reranking is off unless a test turns it on, and only ever with a fake
+            "rerank_provider": "test_fake",
+            "rerank_model": "test-fake",
+            "rerank_model_revision": "test-revision-1",
+            "rerank_preload": False,
         }
         values.update(overrides)
         return Settings(_env_file=None, **values)

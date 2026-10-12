@@ -663,3 +663,14 @@ degraded modes for each retriever and both, status changes and a mid-request sta
 log hygiene, and that the semantic endpoint did not change).
 
 **Phase 7 results (2026-10-13)**: 1270 tests (1258 pass; 11 opt-in real-model tests and 1 POSIX-permissions test are skipped by default), about 98% line coverage; ruff, black and mypy clean; pip-audit reports no known vulnerabilities.
+
+**Phase 8 additions (2026-10-13)**: unit tests for the ordering logic (raw-score order, ties, determinism, duplicates,
+non-finite scores, top_k), model rules (architecture and custom-code refusal, a missing model with downloads disabled,
+pinned-revision validation, one instance per process, no load on creation), and the rerank service (success, fallback
+reasons, deadline, blocked model, busy gate, slot release); API tests with deterministic fake rerankers (default
+behaviour unchanged, 422 when disabled, ordering and field semantics, candidate and `top_k` validation, truncation
+flags, cross-user isolation with the text that reached the model recorded, not-ready and deleted documents, shared rate
+limit, every fallback reason, degraded retriever plus reranking, log hygiene, preload only when enabled); and opt-in
+real-model tests (`RAG_REAL_MODEL_TESTS=1`) for the pinned cross-encoder.
+
+**Phase 8 results (2026-10-13)**: 1351 tests; 1350 pass with RAG_REAL_MODEL_TESTS=1 (19 real-model tests for the embedding model and the reranker are skipped in an ordinary run, and 1 POSIX-permissions test is skipped on Windows); about 98% line coverage; ruff, black and mypy clean; pip-audit reports no known vulnerabilities.

@@ -6,6 +6,7 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent / "retrieval"
 LEXICAL_DIR = Path(__file__).resolve().parent / "retrieval_lexical"
+HELDOUT_DIR = Path(__file__).resolve().parent / "retrieval_heldout"
 
 
 @dataclass(frozen=True)

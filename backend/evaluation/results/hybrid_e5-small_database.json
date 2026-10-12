@@ -7,7 +7,7 @@
   "queries": 87,
   "lexical_queries": 35,
   "unanswerable": 10,
-  "embed_seconds": 2.03,
+  "embed_seconds": 2.0,
   "embedding_failures": 0,
   "sparse_remove_stopwords": true,
   "fusion": {
@@ -191,28 +191,28 @@
         }
       },
       "latency_ms": {
-        "median": 23.7,
-        "p95": 29.3
+        "median": 24.6,
+        "p95": 31.1
       }
     },
     "sparse": {
       "overall": {
         "queries": 77,
-        "recall_at_1": 0.7662337662337663,
+        "recall_at_1": 0.8051948051948052,
         "recall_at_3": 0.8571428571428571,
         "recall_at_5": 0.8571428571428571,
         "recall_at_10": 0.8571428571428571,
-        "mrr_at_10": 0.8095238095238095,
-        "ndcg_at_10": 0.8218906301484252
+        "mrr_at_10": 0.8311688311688312,
+        "ndcg_at_10": 0.8379703768089068
       },
       "base_set": {
         "queries": 46,
-        "recall_at_1": 0.6956521739130435,
+        "recall_at_1": 0.7608695652173914,
         "recall_at_3": 0.8260869565217391,
         "recall_at_5": 0.8260869565217391,
         "recall_at_10": 0.8260869565217391,
-        "mrr_at_10": 0.7572463768115942,
-        "ndcg_at_10": 0.7751010601708106
+        "mrr_at_10": 0.7934782608695652,
+        "ndcg_at_10": 0.8020171578416168
       },
       "lexical_set": {
         "queries": 31,
@@ -226,21 +226,21 @@
       "by_language": {
         "bn": {
           "queries": 24,
-          "recall_at_1": 0.7083333333333334,
+          "recall_at_1": 0.75,
           "recall_at_3": 0.7916666666666666,
           "recall_at_5": 0.7916666666666666,
           "recall_at_10": 0.7916666666666666,
-          "mrr_at_10": 0.75,
-          "ndcg_at_10": 0.7609108127976215
+          "mrr_at_10": 0.7708333333333334,
+          "ndcg_at_10": 0.7762887397321441
         },
         "en": {
           "queries": 38,
-          "recall_at_1": 0.7894736842105263,
+          "recall_at_1": 0.8421052631578947,
           "recall_at_3": 0.868421052631579,
           "recall_at_5": 0.868421052631579,
           "recall_at_10": 0.868421052631579,
-          "mrr_at_10": 0.8289473684210527,
-          "ndcg_at_10": 0.8392839279135361
+          "mrr_at_10": 0.8552631578947368,
+          "ndcg_at_10": 0.8587086777255647
         },
         "mixed": {
           "queries": 15,
@@ -248,19 +248,19 @@
           "recall_at_3": 0.9333333333333333,
           "recall_at_5": 0.9333333333333333,
           "recall_at_10": 0.9333333333333333,
-          "mrr_at_10": 0.8555555555555556,
-          "ndcg_at_10": 0.8753953169047638
+          "mrr_at_10": 0.8666666666666667,
+          "ndcg_at_10": 0.884123967142861
         }
       },
       "by_category": {
         "bangla": {
           "queries": 12,
-          "recall_at_1": 0.8333333333333334,
+          "recall_at_1": 0.9166666666666666,
           "recall_at_3": 1.0,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.9166666666666666,
-          "ndcg_at_10": 0.9384882922619097
+          "mrr_at_10": 0.9583333333333334,
+          "ndcg_at_10": 0.9692441461309548
         },
         "bangla_inflection": {
           "queries": 3,
@@ -300,12 +300,12 @@
         },
         "english": {
           "queries": 10,
-          "recall_at_1": 0.9,
+          "recall_at_1": 1.0,
           "recall_at_3": 1.0,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.95,
-          "ndcg_at_10": 0.9630929753571458
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
         },
         "identifier": {
           "queries": 11,
@@ -322,8 +322,8 @@
           "recall_at_3": 0.9,
           "recall_at_5": 0.9,
           "recall_at_10": 0.9,
-          "mrr_at_10": 0.7833333333333333,
-          "ndcg_at_10": 0.8130929753571458
+          "mrr_at_10": 0.8,
+          "ndcg_at_10": 0.8261859507142916
         },
         "paraphrase": {
           "queries": 8,
@@ -345,12 +345,12 @@
         },
         "punctuation_unicode": {
           "queries": 6,
-          "recall_at_1": 0.6666666666666666,
+          "recall_at_1": 0.8333333333333334,
           "recall_at_3": 0.8333333333333334,
           "recall_at_5": 0.8333333333333334,
           "recall_at_10": 0.8333333333333334,
-          "mrr_at_10": 0.75,
-          "ndcg_at_10": 0.7718216255952429
+          "mrr_at_10": 0.8333333333333334,
+          "ndcg_at_10": 0.8333333333333334
         },
         "rare_term": {
           "queries": 3,
@@ -363,28 +363,28 @@
         }
       },
       "latency_ms": {
-        "median": 6.1,
-        "p95": 8.2
+        "median": 6.3,
+        "p95": 9.0
       }
     },
     "hybrid": {
       "overall": {
         "queries": 77,
-        "recall_at_1": 0.8701298701298701,
-        "recall_at_3": 0.948051948051948,
+        "recall_at_1": 0.8961038961038961,
+        "recall_at_3": 0.935064935064935,
         "recall_at_5": 1.0,
         "recall_at_10": 1.0,
-        "mrr_at_10": 0.9192640692640692,
-        "ndcg_at_10": 0.9393965097313247
+        "mrr_at_10": 0.9311688311688312,
+        "ndcg_at_10": 0.9480824454576946
       },
       "base_set": {
         "queries": 46,
-        "recall_at_1": 0.8043478260869565,
-        "recall_at_3": 0.9130434782608695,
+        "recall_at_1": 0.8478260869565217,
+        "recall_at_3": 0.8913043478260869,
         "recall_at_5": 1.0,
         "recall_at_10": 1.0,
-        "mrr_at_10": 0.8757246376811594,
-        "ndcg_at_10": 0.9065782933856642
+        "mrr_at_10": 0.8956521739130435,
+        "ndcg_at_10": 0.9211177944928485
       },
       "lexical_set": {
         "queries": 31,
@@ -399,20 +399,20 @@
         "bn": {
           "queries": 24,
           "recall_at_1": 0.875,
-          "recall_at_3": 0.9583333333333334,
+          "recall_at_3": 0.9166666666666666,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.9201388888888888,
-          "ndcg_at_10": 0.9400669296518688
+          "mrr_at_10": 0.9166666666666666,
+          "ndcg_at_10": 0.9371784529049269
         },
         "en": {
           "queries": 38,
-          "recall_at_1": 0.8421052631578947,
+          "recall_at_1": 0.8947368421052632,
           "recall_at_3": 0.9210526315789473,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.9,
-          "ndcg_at_10": 0.9247630311604131
+          "mrr_at_10": 0.9263157894736843,
+          "ndcg_at_10": 0.9441877809724417
         },
         "mixed": {
           "queries": 15,
@@ -464,20 +464,20 @@
         "cross_lingual": {
           "queries": 4,
           "recall_at_1": 0.25,
-          "recall_at_3": 0.75,
+          "recall_at_3": 0.5,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.5208333333333334,
-          "ndcg_at_10": 0.6404015779112127
+          "mrr_at_10": 0.5,
+          "ndcg_at_10": 0.6230707174295609
         },
         "english": {
           "queries": 10,
-          "recall_at_1": 0.9,
+          "recall_at_1": 1.0,
           "recall_at_3": 1.0,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.95,
-          "ndcg_at_10": 0.9630929753571458
+          "mrr_at_10": 1.0,
+          "ndcg_at_10": 1.0
         },
         "identifier": {
           "queries": 11,
@@ -517,12 +517,12 @@
         },
         "punctuation_unicode": {
           "queries": 6,
-          "recall_at_1": 0.6666666666666666,
+          "recall_at_1": 0.8333333333333334,
           "recall_at_3": 0.8333333333333334,
           "recall_at_5": 1.0,
           "recall_at_10": 1.0,
-          "mrr_at_10": 0.7916666666666666,
-          "ndcg_at_10": 0.8436010519408085
+          "mrr_at_10": 0.875,
+          "ndcg_at_10": 0.9051127596788988
         },
         "rare_term": {
           "queries": 3,
@@ -535,8 +535,8 @@
         }
       },
       "latency_ms": {
-        "median": 26.8,
-        "p95": 31.3
+        "median": 27.2,
+        "p95": 33.2
       }
     }
   },
@@ -551,10 +551,11 @@
   "comparison": {
     "top1_hits": {
       "dense": 69,
-      "sparse": 59,
-      "hybrid": 67
+      "sparse": 62,
+      "hybrid": 69
     },
     "hybrid_top1_but_dense_not": [
+      "en-06",
       "bn-01",
       "mx-01",
       "ph-03",
@@ -562,15 +563,12 @@
     ],
     "dense_top1_but_hybrid_not": [
       "mx-08",
-      "pu-02",
       "pu-04",
       "xl-01",
       "cf-03",
       "pa-06"
     ],
     "hybrid_top1_but_sparse_not": [
-      "en-07",
-      "bn-08",
       "bn-10",
       "mx-01",
       "mx-05",
@@ -579,9 +577,7 @@
       "pa-07",
       "pa-08"
     ],
-    "sparse_top1_but_hybrid_not": [
-      "en-06"
-    ],
+    "sparse_top1_but_hybrid_not": [],
     "dense_candidate_overlap_with_sparse_top10": 1.92
   },
   "sweep": [
@@ -589,223 +585,209 @@
       "k": 10,
       "dense_weight": 1.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.883,
-      "mrr_at_10": 0.926,
-      "ndcg_at_10": 0.944,
-      "base_mrr": 0.876,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.932,
+      "ndcg_at_10": 0.949,
+      "base_mrr": 0.887,
       "lexical_mrr": 1.0
     },
     {
       "k": 10,
       "dense_weight": 1.0,
       "sparse_weight": 0.5,
-      "recall_at_1": 0.935,
-      "mrr_at_10": 0.962,
-      "ndcg_at_10": 0.972,
-      "base_mrr": 0.937,
+      "recall_at_1": 0.922,
+      "mrr_at_10": 0.956,
+      "ndcg_at_10": 0.967,
+      "base_mrr": 0.926,
       "lexical_mrr": 1.0
     },
     {
       "k": 10,
       "dense_weight": 0.5,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 10,
       "dense_weight": 1.0,
       "sparse_weight": 2.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 10,
       "dense_weight": 2.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.935,
-      "mrr_at_10": 0.962,
-      "ndcg_at_10": 0.972,
-      "base_mrr": 0.937,
+      "recall_at_1": 0.922,
+      "mrr_at_10": 0.956,
+      "ndcg_at_10": 0.967,
+      "base_mrr": 0.926,
       "lexical_mrr": 1.0
     },
     {
       "k": 30,
       "dense_weight": 1.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.883,
-      "mrr_at_10": 0.926,
-      "ndcg_at_10": 0.944,
-      "base_mrr": 0.876,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.932,
+      "ndcg_at_10": 0.949,
+      "base_mrr": 0.887,
       "lexical_mrr": 1.0
     },
     {
       "k": 30,
       "dense_weight": 1.0,
       "sparse_weight": 0.5,
-      "recall_at_1": 0.909,
-      "mrr_at_10": 0.943,
-      "ndcg_at_10": 0.957,
-      "base_mrr": 0.904,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.936,
+      "ndcg_at_10": 0.952,
+      "base_mrr": 0.893,
       "lexical_mrr": 1.0
     },
     {
       "k": 30,
       "dense_weight": 0.5,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 30,
       "dense_weight": 1.0,
       "sparse_weight": 2.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 30,
       "dense_weight": 2.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.909,
-      "mrr_at_10": 0.943,
-      "ndcg_at_10": 0.957,
-      "base_mrr": 0.904,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.936,
+      "ndcg_at_10": 0.952,
+      "base_mrr": 0.893,
       "lexical_mrr": 1.0
     },
     {
       "k": 60,
       "dense_weight": 1.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.883,
-      "mrr_at_10": 0.926,
-      "ndcg_at_10": 0.944,
-      "base_mrr": 0.876,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.932,
+      "ndcg_at_10": 0.949,
+      "base_mrr": 0.887,
       "lexical_mrr": 1.0
     },
     {
       "k": 60,
       "dense_weight": 1.0,
       "sparse_weight": 0.5,
-      "recall_at_1": 0.896,
-      "mrr_at_10": 0.934,
-      "ndcg_at_10": 0.951,
-      "base_mrr": 0.89,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.928,
+      "ndcg_at_10": 0.946,
+      "base_mrr": 0.879,
       "lexical_mrr": 1.0
     },
     {
       "k": 60,
       "dense_weight": 0.5,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 60,
       "dense_weight": 1.0,
       "sparse_weight": 2.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 60,
       "dense_weight": 2.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.896,
-      "mrr_at_10": 0.934,
-      "ndcg_at_10": 0.951,
-      "base_mrr": 0.89,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.928,
+      "ndcg_at_10": 0.946,
+      "base_mrr": 0.879,
       "lexical_mrr": 1.0
     },
     {
       "k": 100,
       "dense_weight": 1.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.883,
-      "mrr_at_10": 0.926,
-      "ndcg_at_10": 0.944,
-      "base_mrr": 0.876,
+      "recall_at_1": 0.896,
+      "mrr_at_10": 0.932,
+      "ndcg_at_10": 0.949,
+      "base_mrr": 0.887,
       "lexical_mrr": 1.0
     },
     {
       "k": 100,
       "dense_weight": 1.0,
       "sparse_weight": 0.5,
-      "recall_at_1": 0.896,
-      "mrr_at_10": 0.934,
-      "ndcg_at_10": 0.951,
-      "base_mrr": 0.89,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.928,
+      "ndcg_at_10": 0.946,
+      "base_mrr": 0.879,
       "lexical_mrr": 1.0
     },
     {
       "k": 100,
       "dense_weight": 0.5,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 100,
       "dense_weight": 1.0,
       "sparse_weight": 2.0,
-      "recall_at_1": 0.818,
-      "mrr_at_10": 0.892,
-      "ndcg_at_10": 0.919,
-      "base_mrr": 0.829,
+      "recall_at_1": 0.87,
+      "mrr_at_10": 0.918,
+      "ndcg_at_10": 0.938,
+      "base_mrr": 0.873,
       "lexical_mrr": 0.984
     },
     {
       "k": 100,
       "dense_weight": 2.0,
       "sparse_weight": 1.0,
-      "recall_at_1": 0.896,
-      "mrr_at_10": 0.934,
-      "ndcg_at_10": 0.951,
-      "base_mrr": 0.89,
+      "recall_at_1": 0.883,
+      "mrr_at_10": 0.928,
+      "ndcg_at_10": 0.946,
+      "base_mrr": 0.879,
       "lexical_mrr": 1.0
     }
   ],
   "failures": [
     {
-      "query": "en-06",
-      "category": "english",
-      "text": "Which symptoms mean severe dengue and need a hospital?",
-      "top1": "en3-2",
-      "rank_of_relevant": 2
-    },
-    {
       "query": "mx-08",
       "category": "mixed",
       "text": "WFH করতে কার permission লাগে?",
       "top1": "mx2-4",
-      "rank_of_relevant": 2
-    },
-    {
-      "query": "pu-02",
-      "category": "punctuation_unicode",
-      "text": "“Aman” rice: when is harvest (Nov/Dec)?",
-      "top1": "en1-1",
       "rank_of_relevant": 2
     },
     {
@@ -833,14 +815,14 @@
       "query": "xl-04",
       "category": "cross_lingual",
       "text": "How does the hilsa fishing ban work?",
-      "top1": "lx3-1",
-      "rank_of_relevant": 3
+      "top1": "lx6-4",
+      "rank_of_relevant": 4
     },
     {
       "query": "cf-03",
       "category": "confusable",
       "text": "নদীভাঙনে ঘরবাড়ি সরিয়ে নিতে হয় কেন?",
-      "top1": "bn4-3",
+      "top1": "bn2-3",
       "rank_of_relevant": 5
     },
     {

@@ -27,6 +27,26 @@ MULTIPART_OVERHEAD_BYTES = 1024 * 1024
 SEARCH_BODY_LIMIT_BYTES = 128 * 1024  # a 10,000-character query is at most ~40 KB of UTF-8
 
 
+def _start_reranker_preload(settings: Settings) -> "asyncio.Task[None] | None":
+    """Load the reranker in the background after start-up, only when reranking is enabled, so the
+    first reranked request does not pay for the model load. A failure is logged and requests
+    fall back with a reported reason; the server still starts."""
+    if not (settings.rerank_enabled and settings.rerank_preload):
+        return None
+
+    async def preload() -> None:
+        from app.reranking.registry import get_reranker
+
+        try:
+            await asyncio.to_thread(get_reranker(settings).warmup)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # reported by type only; requests will retry the load
+            logger.warning("reranker preload failed", extra={"error_type": type(error).__name__})
+
+    return asyncio.create_task(preload())
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.app_env)
@@ -43,12 +63,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             create_celery_app(settings, configure_logs=False)
         )
         app.state.search_gate = asyncio.Semaphore(settings.search_max_concurrent_queries)
+        app.state.rerank_gate = asyncio.Semaphore(settings.rerank_max_concurrent)
+        preload = _start_reranker_preload(settings)
         app.state.password_hasher = PasswordHasher(settings.bcrypt_cost_factor)
         app.state.jwt_service = JWTService(settings)
         logger.info("application started", extra={"version": __version__})
         try:
             yield
         finally:
+            if preload is not None:
+                preload.cancel()
             await redis.aclose()
             await engine.dispose()
             logger.info("application stopped")

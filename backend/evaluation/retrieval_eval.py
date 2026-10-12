@@ -47,6 +47,10 @@ from evaluation.dataset import Dataset, load_dataset
 from evaluation.metrics import QueryResult, answerability_auroc, strip_neutral, summarise
 from tests.helpers import create_user_in_db, db_autocommit, upgrade
 
+_EVAL_NAMESPACE = uuid.UUID(
+    "5c0a8f1e-6f0e-4d62-9a52-0c7f3f9b1d11"
+)  # fixed ids: ties break reproducibly
+
 
 @dataclass
 class EvalReport:
@@ -187,7 +191,7 @@ async def load_and_embed(
         user = await session.get(User, user_id)
         assert user is not None
         for document in dataset.documents:
-            doc_id = uuid.uuid4()
+            doc_id = uuid.uuid5(_EVAL_NAMESPACE, document.id)
             document_ids.append(doc_id)
             session.add(
                 Document(
@@ -200,7 +204,8 @@ async def load_and_embed(
             )  # fmt: skip
             await session.flush()
             for ordinal, passage in enumerate(document.passages):
-                section_id, chunk_id = uuid.uuid4(), uuid.uuid4()
+                section_id = uuid.uuid5(_EVAL_NAMESPACE, passage.id + ":section")
+                chunk_id = uuid.uuid5(_EVAL_NAMESPACE, passage.id + ":chunk")
                 session.add(
                     DocumentSection(
                         id=section_id, document_id=doc_id, ordinal=ordinal, kind="section",

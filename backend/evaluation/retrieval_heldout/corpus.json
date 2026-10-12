@@ -1,0 +1,218 @@
+{
+ "dataset": "rag-retrieval-heldout-synthetic",
+ "version": 1,
+ "license": "CC0-1.0",
+ "notes": "Original synthetic text written for this project. Written before any reranker was evaluated and used only for the final comparison, never for choosing a model or a setting.",
+ "documents": [
+  {
+   "id": "h1",
+   "title": "Library Services",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Lending",
+     "passage": {
+      "id": "h1-1",
+      "text": "The central library lends up to six books for twenty-one days, and members can renew a loan twice online unless another reader has reserved the book."
+     }
+    },
+    {
+     "heading": "Fines",
+     "passage": {
+      "id": "h1-2",
+      "text": "Late returns cost five taka per day for each book; the fee is waived during national holidays and during the final week of examinations."
+     }
+    },
+    {
+     "heading": "Reading hall",
+     "passage": {
+      "id": "h1-3",
+      "text": "The reading hall on the third floor stays open until midnight before examinations and offers charging points at every desk."
+     }
+    },
+    {
+     "heading": "Archive",
+     "passage": {
+      "id": "h1-4",
+      "text": "Rare manuscripts can only be viewed in the archive room by appointment, with cotton gloves provided at the entrance."
+     }
+    }
+   ]
+  },
+  {
+   "id": "h2",
+   "title": "Server Operations",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Disk alert",
+     "passage": {
+      "id": "h2-1",
+      "text": "Alert SRV-5102 fires when disk usage on the primary node passes ninety percent; the on-call engineer should archive old logs first."
+     }
+    },
+    {
+     "heading": "Replication alert",
+     "passage": {
+      "id": "h2-2",
+      "text": "Alert SRV-5120 fires when replication lag exceeds thirty seconds; check the network link before restarting the replica."
+     }
+    },
+    {
+     "heading": "Backups",
+     "passage": {
+      "id": "h2-3",
+      "text": "Nightly backups are written to the cold storage bucket at two in the morning and kept for thirty days."
+     }
+    },
+    {
+     "heading": "Key rotation",
+     "passage": {
+      "id": "h2-4",
+      "text": "To rotate the API signing key, create the new key, deploy it to every service, and only then revoke the old key."
+     }
+    }
+   ]
+  },
+  {
+   "id": "h3",
+   "title": "নদী ও নৌকা",
+   "language": "bn",
+   "sections": [
+    {
+     "heading": "বর্ষা",
+     "passage": {
+      "id": "h3-1",
+      "text": "পদ্মা নদীতে বর্ষাকালে স্রোত বেড়ে যায়, তাই ছোট নৌকাগুলো সন্ধ্যার আগেই তীরে ফিরে আসে।"
+     }
+    },
+    {
+     "heading": "পাল",
+     "passage": {
+      "id": "h3-2",
+      "text": "মাঝিরা পাল তুলে বাতাসের দিক বুঝে নৌকা চালান; উল্টো বাতাসে তাঁরা দাঁড় ব্যবহার করেন।"
+     }
+    },
+    {
+     "heading": "লঞ্চ",
+     "passage": {
+      "id": "h3-3",
+      "text": "ঢাকা থেকে বরিশাল যাওয়ার লঞ্চ রাতে ছাড়ে এবং ভোরে গন্তব্যে পৌঁছায়।"
+     }
+    },
+    {
+     "heading": "ভাঙন",
+     "passage": {
+      "id": "h3-4",
+      "text": "নদীর ভাঙনে প্রতিবছর অনেক পরিবার তাদের জমি হারায় এবং নতুন জায়গায় আশ্রয় নেয়।"
+     }
+    }
+   ]
+  },
+  {
+   "id": "h4",
+   "title": "স্বাস্থ্য ও পুষ্টি",
+   "language": "bn",
+   "sections": [
+    {
+     "heading": "পুষ্টি",
+     "passage": {
+      "id": "h4-1",
+      "text": "শিশুদের প্রতিদিন ডিম ও দুধ খাওয়ালে হাড় শক্ত হয় এবং বাড়ন্ত বয়সে পুষ্টির ঘাটতি কমে।"
+     }
+    },
+    {
+     "heading": "ডায়রিয়া",
+     "passage": {
+      "id": "h4-2",
+      "text": "ডায়রিয়া হলে খাবার স্যালাইন বারবার খাওয়াতে হয় এবং পানিশূন্যতার লক্ষণ দেখা দিলে হাসপাতালে নিতে হয়।"
+     }
+    },
+    {
+     "heading": "মাতৃস্বাস্থ্য",
+     "passage": {
+      "id": "h4-3",
+      "text": "গর্ভবতী নারীদের নিয়মিত আয়রন ট্যাবলেট খাওয়া এবং চিকিৎসকের পরামর্শ অনুযায়ী পরীক্ষা করানো উচিত।"
+     }
+    },
+    {
+     "heading": "টিকা",
+     "passage": {
+      "id": "h4-4",
+      "text": "টিকা দেওয়ার পর হালকা জ্বর হতে পারে, তাতে ভয়ের কিছু নেই এবং দুই দিনের মধ্যে তা সেরে যায়।"
+     }
+    }
+   ]
+  },
+  {
+   "id": "h5",
+   "title": "অফিস ও টেক",
+   "language": "mixed",
+   "sections": [
+    {
+     "heading": "Deadline",
+     "passage": {
+      "id": "h5-1",
+      "text": "Project deadline এক সপ্তাহ পিছিয়ে দিতে হলে আগে team lead-এর কাছ থেকে email approval নিতে হবে।"
+     }
+    },
+    {
+     "heading": "Laptop",
+     "passage": {
+      "id": "h5-2",
+      "text": "নতুন laptop পেতে হলে IT desk-এ ticket খুলুন; ticket নম্বর হবে IT-4410-এর মতো।"
+     }
+    },
+    {
+     "heading": "Zoom",
+     "passage": {
+      "id": "h5-3",
+      "text": "Zoom meeting-এর recording ৩০ দিন পরে নিজে থেকেই মুছে যায়, তাই দরকারি অংশ আগেই download করে রাখুন।"
+     }
+    },
+    {
+     "heading": "VPN",
+     "passage": {
+      "id": "h5-4",
+      "text": "VPN connect না হলে প্রথমে internet check করুন, তারপর client app restart করুন।"
+     }
+    }
+   ]
+  },
+  {
+   "id": "h6",
+   "title": "Travel Notes",
+   "language": "en",
+   "sections": [
+    {
+     "heading": "Ferry",
+     "passage": {
+      "id": "h6-1",
+      "text": "The ferry to Saint Martin's Island leaves Teknaf at nine in the morning and returns at three in the afternoon."
+     }
+    },
+    {
+     "heading": "Permit",
+     "passage": {
+      "id": "h6-2",
+      "text": "Visitors to the Sundarbans need a forest department permit, which the tour operator usually arranges."
+     }
+    },
+    {
+     "heading": "Tea",
+     "passage": {
+      "id": "h6-3",
+      "text": "Tea gardens in Sreemangal are at their greenest after the monsoon, and the local cafés serve seven-layer tea."
+     }
+    },
+    {
+     "heading": "Buses",
+     "passage": {
+      "id": "h6-4",
+      "text": "Buses to Cox's Bazar run all night, but the train is more comfortable on the Chattogram stretch."
+     }
+    }
+   ]
+  }
+ ]
+}

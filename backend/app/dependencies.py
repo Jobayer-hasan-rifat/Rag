@@ -30,6 +30,7 @@ from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.processing_queue import ProcessingQueue
+from app.services.rerank_service import RerankService
 from app.services.search_service import SearchService
 from app.storage.base import StorageProvider
 
@@ -233,6 +234,14 @@ def get_hybrid_search_service(
     )
 
 
+def get_rerank_service(request: Request, settings: SettingsDep) -> RerankService | None:
+    """None when reranking is switched off: nothing is created and no model is touched."""
+    if not settings.rerank_enabled:
+        return None
+    return RerankService(gate=request.app.state.rerank_gate, settings=settings)
+
+
+RerankServiceDep = Annotated[RerankService | None, Depends(get_rerank_service)]
 CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
 HybridSearchServiceDep = Annotated[HybridSearchService, Depends(get_hybrid_search_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
