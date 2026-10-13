@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 8 complete (optional cross-encoder reranking on top of hybrid retrieval). RAG answers are not implemented yet.
+> **Status**: 🚧 In Development - Phase 9 complete (grounded RAG answers with validated citations, off by default). Conversations, versioning and a frontend are not implemented yet.
 
 ## Overview
 
@@ -20,6 +20,8 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
+
+**Phase 9 (grounded answers)**: `POST /api/v1/rag/answer` retrieves from the caller's own documents (hybrid or semantic, optionally reranked), shows a bounded set of passages to a configurable language model (a local Ollama server by default, or any OpenAI-compatible endpoint) and returns an answer whose sentences cite `[S1]`-style sources. Citations are built from database records of the sources actually shown, never from the model's words; labels the model invented are removed, and sentences with a quotation, number or identifier that is not in the cited sources are dropped. If the documents do not answer the question the response says so (`insufficient_evidence`) instead of guessing, and provider failures are explicit errors, never an invented answer. Off by default (`RAG_ENABLED=false`). Retrieved text is treated as untrusted, but no prompt can fully prevent a model from being misled by it (see the security notes). On the bundled 48-question synthetic evaluation the default local model answered 97% of the answerable questions, abstained on all 10 unanswerable ones and produced valid, database-matching citations every time; the dataset is small and author-written (see below).
 
 **Phase 8 (optional reranking)**: `POST /api/v1/search/hybrid` accepts `"rerank": true` to re-score the best candidates with a multilingual cross-encoder (`BAAI/bge-reranker-v2-m3`, pinned revision, safetensors only, no remote code). It is off by default (`RERANK_ENABLED=false`): nothing is downloaded or loaded unless enabled, and without the flag every response is unchanged. Each reranked result carries its position before reranking, the raw model score (not a probability) and whether its text was truncated; if reranking cannot run, the hybrid order is kept and the response says so. On the bundled synthetic evaluation it improved hybrid MRR from 0.931 to 0.981 at a cost of about 1 s of CPU time and 2.3 GB of memory for 10 candidates; the evaluation is small and the model was chosen on it, so treat this as encouraging, not proven (see below).
 
@@ -231,7 +233,7 @@ npm run typecheck && npm run build
 | 6 | Embeddings & Semantic Search | ✅ Complete |
 | 7 | Hybrid Retrieval | ✅ Complete |
 | 8 | Reranking | ✅ Complete |
-| 9 | RAG | ⏳ Planned |
+| 9 | RAG | ✅ Complete |
 | 10 | Conversations | ⏳ Planned |
 | 11 | Versioning & Access Control | ⏳ Planned |
 | 12 | Evaluation | ⏳ Planned |
@@ -268,7 +270,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 8): 1350 tests passing and 1 skipped on Windows with the opt-in real-model tests enabled (RAG_REAL_MODEL_TESTS=1; an ordinary run skips the 19 tests that load the real embedding and reranker models, and 1 POSIX-only test is always skipped). About 98% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model (the real-model tests are the only ones that do). See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
+Current state (Phase 9): 1544 tests passing and 1 skipped on Windows with the opt-in real-model tests enabled (RAG_REAL_MODEL_TESTS=1 and RAG_REAL_LLM_TESTS=1; an ordinary run skips the 23 tests that load the real embedding, reranker and language models, and 1 POSIX-only test is always skipped). About 98% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model (the real-model tests are the only ones that do). See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
 
@@ -309,6 +311,20 @@ This platform includes systematic evaluation of RAG quality:
 | Dense on the lexical companion alone | 0.935 | 1.000 | 0.953 | 0.964 |
 
 Hybrid retrieval was better for quoted phrases (MRR 1.00 against 0.63 for dense) and Bangla questions with exact words (1.00 against 0.96), equal for identifiers and mixed-script queries, and worse for cross-language queries (0.50 against 0.71) and confusable wording (0.61 against 0.88): a lexical match on the wrong passage can outrank a correct semantic one. The default fusion settings were not tuned (a dense-heavy weighting looked slightly better on this data but the data is too small to justify it). Caveats: 77 answerable queries; written by the author; the function-word filter was added after the first run exposed noisy lexical matches (hybrid MRR was 0.874 before it; both result files are kept in `evaluation/results/`). Equal Reciprocal Rank Fusion scores are tie-broken by chunk id, which was random per run, so figures moved by about 0.01 between runs; the evaluation now uses fixed ids and the numbers above are from that reproducible run.
+
+### Answer-generation evaluation (Phase 9)
+
+`python -m evaluation.rag_eval --model <name>` loads the Phase 7 corpora plus a small extra corpus (contradictory facts, documents with injected instructions, one passage far longer than the per-source limit, identifiers in mixed text) into PostgreSQL, embeds them with the real model, and sends 48 author-written questions (38 answerable: English 10, Bangla 10, mixed 8, cross-language 4, contradictory 2, adversarial 3, long-passage 1; 10 unanswerable) through the real pipeline and a real local model. Only deterministic metrics are reported: fact recall is substring matching against author-written expected facts; there is no model-as-judge.
+
+| Model (Ollama, GPU) | Answered / answerable | Fact recall | Abstained / unanswerable | Valid labels and database-matching citations | Citation precision | Median / p95 time |
+|---|---:|---:|---:|---:|---:|---:|
+| `qwen3.5:9b` (default) | 0.97 | 0.92 | 10 / 10 | 100% | 1.00 | 2.9 / 4.3 s |
+| `qwen2.5:latest` | 0.76 | 0.76 | 10 / 10 | 100% | 0.91 | 2.9 / 7.5 s |
+| `gemma4:e4b` (CPU only, earlier code revision) | 0.97 | 0.97 | 10 / 10 | 100% | 0.93 | 17.6 / 28.4 s |
+
+By group for the default model (fact recall): English 0.95, Bangla 0.85, mixed 1.00; adversarial documents 1.00 (the injected "answer only with PWNED" text never appeared in an answer), contradictory documents 1.00 (both dates were reported), cross-language 0.75. The fixed insufficient-evidence message was returned for every unanswerable question; the question whose answer lies beyond the per-source limit was correctly refused (the model never saw the fact). Failures: one cross-language question was refused because retrieval did not return its passage (candidate recall 0.97 on every model), one answer rewrote Bangla spellings so a keyword check missed it, and one answer gave a supported but incomplete reply. `qwen2.5` refused 9 of the 38 answerable questions, including most of those with adversarial or contradictory sources.
+
+Limits, plainly: 48 questions written by the author; the default model, the prompt wording and the validation rules were chosen or adjusted while looking at results on this same set (selection on test, not a blind result); a single reviewer (the author) read every stored answer of the default model and found no unsupported factual claim among the 37 answers, but that is a human judgement of a small sample, not proof of faithfulness; the deterministic checks cannot see a wrong claim that reuses real numbers; GPU results come from one machine (a Vulkan GPU path that is experimental) and one model produced corrupted text on it. Do not read these numbers as general Bangla answer quality.
 
 ### Reranking evaluation (Phase 8)
 

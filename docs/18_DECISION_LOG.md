@@ -1012,6 +1012,89 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 ---
 
+### DEC-056: Generation Providers: Local Ollama and OpenAI-Compatible HTTP
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: a small async `LLMProvider` interface with two `httpx` implementations: `ollama` (local, default for development) and `openai_compatible` (hosted or self-hosted, explicit opt-in).
+
+**Alternatives**: running models in-process with transformers (large weights, long load, memory in the API process); vendor SDKs (extra dependencies, lock-in); a single hosted provider.
+
+**Reason**: a local server keeps documents on the machine and needs no paid API; one OpenAI-compatible adapter covers OpenAI, LM Studio, vLLM and most gateways. The application never downloads or loads model files itself, so the model-trust rules of earlier phases are not weakened.
+
+---
+
+### DEC-057: Prompt Structure and Delimiting
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: instructions in a versioned file (`answer_v1`) sent as the system message; the question and sources in the user message as `<question>` and `<source id="S1" document=... page=... heading=...>` blocks with XML-escaped text and neutralised marker-like strings.
+
+**Reason**: CLAUDE.md requires prompts outside the code and versioned; escaping gives a stable boundary the model can rely on and sources cannot break. It is a mitigation, not a guarantee.
+
+---
+
+### DEC-058: Citation Contract: Labels, Database-Built Citations, Local Validation
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: per-request labels `S1..Sn`; the model writes inline `[S1]` markers and a `citations` list; the application validates the output locally and builds every citation object from the database record behind a valid label, with a bounded excerpt of what the model saw. Unknown labels are removed; sentences without a valid label are dropped; if the model lists sources but writes no inline markers the listed labels apply to the answer as a whole and the response says so (`citation_granularity: answer`).
+
+**Alternatives**: trusting provider structured output (not available for every model; models violated the schema in testing: a code fence, a missing field, labels as `[S1]`); asking the model for page numbers or quotations (fabrication risk).
+
+**Reason**: provider guarantees are not a security property; a first evaluation run showed one model filling the `citations` array but omitting inline markers in most answers, which strict sentence-level validation turned into false abstentions; the answer-level fallback keeps those answers and states the weaker guarantee.
+
+---
+
+### DEC-059: Deterministic Support Checks (Quotations and Literals)
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: after label validation, a sentence is dropped if it contains a double-quoted passage that is not in a single cited source, or a number or identifier (any script's digits folded to ASCII, matched as a whole token) that is not in the cited sources.
+
+**Reason**: these are the claims most damaging when invented and the only ones checkable without a second model. The independent review found and fixed substring matching, non-Latin digits, spliced quotations and a text-mutating clean-up.
+
+**Consequences**: sentences without digits or quotes are only checked for having a valid label; a real number attached to a wrong claim passes; a correct answer that computes or spells out a number can be dropped. No model-as-judge is used anywhere.
+
+---
+
+### DEC-060: Context Budget Measured on the Rendered Prompt
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: token estimates are conservative (ASCII 3 characters per token, every other character one token) and are applied to the escaped body plus the actual opening tag of each block; the total is bounded by `RAG_CONTEXT_TOKEN_BUDGET` and by the model window minus output, system prompt and question; settings must fit `LLM_CONTEXT_TOKENS`; the provider's reported `input_tokens` is checked against the window (a prompt that filled it is rejected).
+
+**Reason**: the application has no tokenizer for the generation model; a silent truncation by the provider could remove the instructions. The review showed a fixed per-block overhead and unescaped measurement could overflow the window.
+
+---
+
+### DEC-061: Generation in the API Process Behind a Gate; No Queue
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: the request calls the provider directly (async HTTP) after releasing the database connection, behind a concurrency gate (`LLM_MAX_CONCURRENT`, default 1) with a queue timeout and the provider timeout.
+
+**Reason**: the model runs in another process; the API only waits on I/O, so no worker is needed. A local CPU-bound model serialises anyway, so concurrency 1 is the honest default.
+
+---
+
+### DEC-062: Failures Are Explicit; Insufficient Evidence Is a Normal Answer
+
+**Date**: 2026-10-13
+**Status**: Accepted
+
+**Chosen Option**: provider timeouts, outages, rate limits and busy slots are 503 `GENERATION_UNAVAILABLE` with a reason; unusable output (after one retry) or a window-filling prompt is 502 `GENERATION_FAILED`; no retrieval result, a model abstention or a fully rejected answer is a 200 with `insufficient_evidence: true` and a fixed message; retrieval degradation is reported separately from the answer.
+
+**Reason**: an answer service must never fabricate when its parts fail, and callers must be able to tell "no evidence" from "service problem".
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

@@ -64,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.search_gate = asyncio.Semaphore(settings.search_max_concurrent_queries)
         app.state.rerank_gate = asyncio.Semaphore(settings.rerank_max_concurrent)
+        app.state.rag_gate = asyncio.Semaphore(settings.llm_max_concurrent)
         preload = _start_reranker_preload(settings)
         app.state.password_hasher = PasswordHasher(settings.bcrypt_cost_factor)
         app.state.jwt_service = JWTService(settings)
@@ -98,6 +99,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         rules={
             ("POST", "/api/v1/search/semantic"): SEARCH_BODY_LIMIT_BYTES,
             ("POST", "/api/v1/search/hybrid"): SEARCH_BODY_LIMIT_BYTES,
+            ("POST", "/api/v1/rag/answer"): SEARCH_BODY_LIMIT_BYTES,
         },
         error_factory=RequestTooLargeError,
     )

@@ -747,3 +747,37 @@ Default when reranking is enabled: `BAAI/bge-reranker-v2-m3` at revision `953dc6
 with the embedding model also loaded), 4 s to load from a warm file cache (about 33 s from the Docker volume), 1.0-1.2 s
 to score 10 candidates and 2.2-3.2 s for 30; GPU is supported (`RERANK_DEVICE=auto|cuda|mps`) but was not measured.
 No new dependency: it uses `transformers` and `torch`, already installed for embeddings.
+
+## Phase 9 Generation Provider
+
+No new dependency: providers use `httpx`, already a dependency. Two providers behind one interface:
+
+- **`ollama` (default for development).** A local server (`/api/chat`). Nothing leaves the machine; the application never
+  downloads a model (the operator pulls one); `num_ctx` is always sent so the server cannot silently shrink the window;
+  `think: false` stops reasoning models from spending the output budget on hidden thoughts; structured output is requested
+  with the answer JSON schema. Needs enough RAM or GPU memory for the chosen model (see the measurements below).
+- **`openai_compatible` (hosted, explicit opt-in).** `POST {base}/chat/completions` with an optional bearer key from
+  `LLM_API_KEY`. The question and the selected passages are sent to that endpoint: this is a privacy decision for the
+  operator. A key is never sent over plain http to a non-local host, and a remote endpoint without a key is refused at
+  start-up.
+
+Both: configurable model id, temperature (default 0.1), output-token limit (default 400), context window, timeout, and
+concurrency; `trust_env` is off so prompts are never routed through an environment proxy; redirects are not followed;
+provider error bodies are never logged or returned.
+
+**Measured resource use (Phase 9, one Windows desktop: Ryzen 5 5600 with 6 cores, 16 GB RAM, Radeon RX 6700 XT with 12 GB).**
+These are measurements on that machine, not promises for another one.
+
+| Model (Ollama, 4,096-token window) | Size loaded | Where it ran | Median / p95 generation time |
+|---|---:|---|---:|
+| `qwen3.5:9b` (default) | 8.6 GB | 100% GPU (Vulkan) | 2.9 / 4.3 s |
+| `qwen2.5:latest` (7B) | 4.9 GB | 100% GPU (Vulkan) | 2.9 / 7.4 s |
+| `qwen2.5:latest` (7B) | 4.6 GB | 100% CPU, 6 threads | 40 / 61 s |
+| `gemma4:e4b` | 10 GB | 100% CPU | 17.6 / 28.4 s |
+
+Local inference on a CPU only is slow (tens of seconds per answer) and practical only for experiments; plan for a GPU or a
+smaller model, or use a hosted OpenAI-compatible endpoint (a privacy trade-off). GPU notes for this machine: Ollama's ROCm
+backend does not support this card on Windows, so it ran on the CPU until the experimental Vulkan backend was enabled
+(`OLLAMA_VULKAN=1`; a variable set in the user environment only reaches Ollama if it is started from a new session). On
+Vulkan `gemma4:e4b` only partly fit in video memory and produced corrupted text, so it was evaluated on the CPU; check any
+model's output on your GPU before relying on it. The first request after a model is unloaded pays its load time (13 to 61 s).

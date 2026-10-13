@@ -100,6 +100,18 @@ def fake_rerankers() -> Iterator[None]:
     reset_reranker_cache()
 
 
+@pytest.fixture(autouse=True)
+def fake_llm_provider() -> Iterator[None]:
+    """Register the deterministic generation provider (and forget created ones) for every test."""
+    from app.llm.registry import register_llm_provider, reset_llm_cache, unregister_llm_provider
+    from tests.llm_fakes import FakeLLM
+
+    register_llm_provider("test_llm", FakeLLM)
+    yield
+    unregister_llm_provider("test_llm")
+    reset_llm_cache()
+
+
 @pytest.fixture
 def make_settings() -> SettingsFactory:
     def factory(**overrides: Any) -> Settings:
@@ -130,6 +142,10 @@ def make_settings() -> SettingsFactory:
             "rerank_model": "test-fake",
             "rerank_model_revision": "test-revision-1",
             "rerank_preload": False,
+            # answer generation is off unless a test turns it on, and only ever with a fake
+            "llm_provider": "test_llm",
+            "llm_model": "test-model",
+            "llm_base_url": "http://localhost:11434",
         }
         values.update(overrides)
         return Settings(_env_file=None, **values)

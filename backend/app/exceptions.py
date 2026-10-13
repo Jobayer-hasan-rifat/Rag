@@ -146,6 +146,41 @@ class RerankingDisabledError(AppError):
         super().__init__("Reranking is not enabled on this server")
 
 
+class RagDisabledError(AppError):
+    """Answer generation was requested but this deployment has it switched off."""
+
+    status_code = 503
+    code = "RAG_DISABLED"
+
+    def __init__(self) -> None:
+        super().__init__("Answer generation is not enabled on this server")
+
+
+class GenerationUnavailableError(AppError):
+    """The generation provider cannot answer right now. No answer is invented."""
+
+    status_code = 503
+    code = "GENERATION_UNAVAILABLE"
+
+    def __init__(self, reason: str, *, retry_after: int | None = None) -> None:
+        headers = {"Retry-After": str(retry_after)} if retry_after else None
+        super().__init__(
+            "The answer generation service is temporarily unavailable",
+            details={"reason": reason},
+            headers=headers,
+        )
+
+
+class GenerationFailedError(AppError):
+    """The provider answered, but not with an output the application can validate."""
+
+    status_code = 502
+    code = "GENERATION_FAILED"
+
+    def __init__(self) -> None:
+        super().__init__("The generated answer could not be validated, so no answer is returned")
+
+
 class QuotaExceededError(AppError):
     status_code = 403
     code = "QUOTA_EXCEEDED"

@@ -2,11 +2,15 @@ import re
 from functools import lru_cache
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.embeddings.constants import VECTOR_DIMENSION
+
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "host.docker.internal"})
+_PROMPT_RESERVE_TOKENS = 700  # instructions and question, estimated conservatively
 
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
 _PLACEHOLDER_MARKERS = ("change_this", "changeme", "your-secret")
@@ -107,6 +111,23 @@ class Settings(BaseSettings):
     rerank_cache_dir: str | None = None
     rerank_allow_download: bool = True
     rerank_torch_threads: int | None = Field(default=None, ge=1, le=256)
+    llm_provider: str = "ollama"
+    llm_base_url: str = "http://localhost:11434"
+    llm_model: str = "qwen3.5:9b"
+    llm_api_key: SecretStr | None = None
+    llm_temperature: float = Field(default=0.1, ge=0.0, le=1.0)
+    llm_max_output_tokens: int = Field(default=400, ge=16, le=4096)
+    llm_context_tokens: int = Field(default=4096, ge=512, le=131072)
+    llm_timeout_seconds: int = Field(default=120, ge=5, le=900)
+    llm_max_concurrent: int = Field(default=1, ge=1, le=16)
+    llm_structured_output: Literal["json_schema", "json_object", "none"] = "json_schema"
+    rag_enabled: bool = False
+    rag_retrieval_mode: Literal["hybrid", "semantic"] = "hybrid"
+    rag_candidates: int = Field(default=10, ge=1, le=100)
+    rag_max_sources: int = Field(default=5, ge=1, le=20)
+    rag_max_chunk_tokens: int = Field(default=600, ge=50, le=4000)
+    rag_context_token_budget: int = Field(default=2400, ge=200, le=100000)
+    rag_queue_timeout_seconds: int = Field(default=15, ge=1, le=300)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -115,6 +136,7 @@ class Settings(BaseSettings):
     rate_limit_window_seconds: int = Field(default=60, ge=1)
     rate_limit_upload_attempts: int = Field(default=20, ge=1)
     rate_limit_search_attempts: int = Field(default=60, ge=1)
+    rate_limit_rag_attempts: int = Field(default=10, ge=1)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -126,6 +148,7 @@ class Settings(BaseSettings):
         "search_hnsw_ef_search",
         "rerank_cache_dir",
         "rerank_torch_threads",
+        "llm_api_key",
         mode="before",
     )
     @classmethod
@@ -222,9 +245,34 @@ class Settings(BaseSettings):
                 "RERANK_MODEL_REVISION must be a full 40-character commit hash so the exact "
                 "model files are reproducible"
             )
+        if self.rag_enabled:
+            self._check_rag_settings()
         if self.hybrid_dense_weight == 0 and self.hybrid_sparse_weight == 0:
             raise ValueError("HYBRID_DENSE_WEIGHT and HYBRID_SPARSE_WEIGHT cannot both be zero")
         return self
+
+    def _check_rag_settings(self) -> None:
+        """Static checks of the generation settings: nothing here contacts the provider."""
+        url = urlparse(self.llm_base_url)
+        if url.scheme not in ("http", "https") or not url.hostname:
+            raise ValueError("LLM_BASE_URL must be an http(s) URL")
+        if url.username or url.password:
+            raise ValueError("LLM_BASE_URL must not contain credentials; use LLM_API_KEY")
+        local = url.hostname in _LOCAL_HOSTS
+        if self.llm_api_key is not None and url.scheme != "https" and not local:
+            raise ValueError("LLM_API_KEY is never sent over plain http to a remote host")
+        if self.llm_provider == "openai_compatible" and not local and self.llm_api_key is None:
+            raise ValueError("LLM_API_KEY is required for a remote openai_compatible endpoint")
+        if self.rag_max_sources > self.rag_candidates:
+            raise ValueError("RAG_MAX_SOURCES must not exceed RAG_CANDIDATES")
+        reserve = (
+            self.rag_context_token_budget + self.llm_max_output_tokens + _PROMPT_RESERVE_TOKENS
+        )
+        if reserve > self.llm_context_tokens:
+            raise ValueError(
+                "RAG_CONTEXT_TOKEN_BUDGET + LLM_MAX_OUTPUT_TOKENS + "
+                f"{_PROMPT_RESERVE_TOKENS} must fit in LLM_CONTEXT_TOKENS"
+            )
 
     @property
     def embedding_soft_time_limit_seconds(self) -> int:

@@ -1099,3 +1099,30 @@ graph LR
 - Candidates are exactly what retrieval returned for the requesting user; ownership and `ready` were enforced before.
 
 Decisions: DEC-051 to DEC-055.
+
+## Retrieval-Augmented Generation (Phase 9)
+
+```mermaid
+graph LR
+    Q[Question] --> A[Authorised retrieval: hybrid or semantic]
+    A --> R[Optional reranking]
+    R --> D[Release DB connection]
+    D --> C[Context builder: dedupe, budget, labels S1..Sn]
+    C --> P[Prompt: rules in system message, escaped sources in user message]
+    P --> L[LLM provider: Ollama or OpenAI-compatible]
+    L --> V[Parse and validate: labels, quotes, numbers]
+    V --> O[Answer + citations built from database records]
+```
+
+- **Retrieval** is the existing owner-scoped, `ready`-only pipeline (and the optional Phase 8 reranker); the RAG service adds
+  no search of its own, so no unauthorised text can exist in the pipeline.
+- **Context builder** (`app/rag/context.py`) is separate from the handler and the provider: deterministic selection,
+  near-duplicate removal, a per-source and a total token budget measured on the escaped, rendered text, stable labels.
+- **Prompt** (`app/rag/prompt.py`, `prompts/answer_v1.txt`): the instructions are a versioned file; the question and the
+  sources travel in the user message as data.
+- **Provider** (`app/llm/`): a small async interface with two HTTP implementations (local Ollama; any OpenAI-compatible
+  endpoint). No fallback between providers, no vendor SDK.
+- **Validation** (`app/rag/grounding.py`): deterministic, local, independent of what the provider claims.
+- The database connection is released before generation; generation runs behind a concurrency gate with a timeout.
+
+Decisions: DEC-056 to DEC-062.

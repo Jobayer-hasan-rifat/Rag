@@ -1018,3 +1018,108 @@ X-RateLimit-Reset: 1602083200
 ---
 
 *This API specification will be implemented across Phase 1-16. Each endpoint's implementation will include proper error handling, validation, and authorization.*
+
+## Answer Generation (Phase 9)
+
+### POST /rag/answer
+
+Answers a question from the caller's own searchable documents, with citations that point at the sources the language
+model was actually shown. Off by default (`RAG_ENABLED=false`): then every call is `503 RAG_DISABLED` and no provider is
+created. Nothing is stored (no conversation history).
+
+**Authentication**: Required. Rate limited per user with its own budget (`RATE_LIMIT_RAG_ATTEMPTS`, default 10 per
+window); a disabled endpoint does not spend it. The body is capped at 128 KiB.
+
+**Request Body**:
+```json
+{
+  "question": "When are Aman rice seedlings transplanted?",
+  "document_ids": ["uuid1"],
+  "collection_id": "uuid2",
+  "retrieval": "hybrid",
+  "rerank": false,
+  "max_sources": 5,
+  "max_answer_tokens": 300
+}
+```
+
+Only `question` is required (at most `SEARCH_MAX_QUERY_CHARS` characters). `retrieval` is `hybrid` or `semantic`
+(server default `RAG_RETRIEVAL_MODE`). `rerank: true` re-scores the candidates with the Phase 8 cross-encoder and needs
+`RERANK_ENABLED=true` (otherwise `422 RERANKING_DISABLED`); if reranking fails, retrieval order is used and `rerank` appears
+in `retrieval.degraded`. `max_sources` and `max_answer_tokens` may only lower the server limits (`RAG_MAX_SOURCES`,
+`LLM_MAX_OUTPUT_TOKENS`); asking for more is a 422. Filters that name other users' documents or collections are the same
+404 as missing ones, before any model is called.
+
+**Response** (200):
+```json
+{
+  "data": {
+    "answer": "Farmers transplant Aman rice seedlings in July [S1].",
+    "insufficient_evidence": false,
+    "insufficient_reason": null,
+    "citations": [
+      {
+        "label": "S1",
+        "document_id": "uuid",
+        "chunk_id": "uuid",
+        "document_name": "rice.txt",
+        "chunk_index": 0,
+        "section_ordinal": 0,
+        "page_number": null,
+        "heading": "Planting",
+        "heading_path": ["Monsoon Rice Farming", "Planting"],
+        "start_char": 0,
+        "end_char": 172,
+        "excerpt": "Farmers transplant Aman rice seedlings in July, when monsoon rain has filled the fields...",
+        "excerpt_truncated": true,
+        "source_truncated": false
+      }
+    ],
+    "retrieval": {
+      "mode": "hybrid", "candidates": 10, "dense_candidates": 10, "sparse_candidates": 7,
+      "retrievers_used": ["dense", "sparse"], "degraded": [], "reranked": false,
+      "embedding_model": "intfloat/multilingual-e5-small", "model_revision": "614241f6..."
+    },
+    "context": {
+      "sources_supplied": 5, "duplicates_dropped": 0, "truncated_sources": 0,
+      "estimated_input_tokens": 700, "budget_tokens": 2400
+    },
+    "generation": {
+      "provider": "ollama", "model": "qwen3.5:9b", "prompt_version": "answer_v1", "attempts": 1,
+      "input_tokens": 790, "output_tokens": 38, "finish_reason": "stop", "latency_ms": 14200
+    },
+    "validation": {
+      "unknown_labels_removed": 0, "uncited_sentences_removed": 0, "fabricated_quotes_removed": 0,
+      "unsupported_literals_removed": 0, "citation_granularity": "sentence"
+    },
+    "timings": {"retrieval_ms": 31, "rerank_ms": 0, "context_ms": 0, "generation_ms": 14210, "total_ms": 14245}
+  },
+  "meta": {"request_id": "uuid", "timestamp": "2026-10-13T00:00:00Z"}
+}
+```
+
+**Citation contract.** The model is shown the selected chunks as `S1`, `S2`, ... for this request only and must write
+`[S1]`-style markers after every factual sentence. The application validates the output locally whatever the provider
+promised: the JSON is parsed strictly; markers for labels that were not supplied are removed and never become
+citations; a sentence with no valid label is dropped; a sentence with a double-quoted passage that is not in one of its
+cited sources, or with a number or identifier (any script's digits) that is not in them as a whole token, is dropped.
+Each citation object is built from the database record of the chunk behind the label (document id, chunk id, document
+name, page for formats that have pages and `null` otherwise, section, heading, offsets) plus a bounded `excerpt` of the
+text the model saw; nothing in it comes from the model's own words. `source_truncated` is true when the chunk was longer
+than `RAG_MAX_CHUNK_TOKENS` and its end was not shown. If a model lists `citations` but writes no inline markers at all,
+the listed (valid) labels apply to the whole answer and `validation.citation_granularity` is `answer` instead of
+`sentence`.
+
+**Insufficient evidence.** When nothing was retrieved (`no_sources`; the model is not called), when retrieval was degraded
+and found nothing (`retrieval_degraded`), when the model says the sources do not answer the question (`model_abstained`), or
+when every sentence of its answer failed validation (`no_supported_sentences`), the response is 200 with
+`insufficient_evidence: true`, an empty `citations` list and a fixed message in the language of the question. The model's
+own unvalidated text is never returned.
+
+**Failures** (never an invented answer): `503 GENERATION_UNAVAILABLE` with `details.reason` `timeout`, `unavailable`,
+`rate_limited` (plus `Retry-After` when the provider gave one) or `busy` (all generation slots taken for
+`RAG_QUEUE_TIMEOUT_SECONDS`); `502 GENERATION_FAILED` when the provider rejected the request, answered with something that
+is not a usable answer object twice in a row, or reported a prompt that filled its context window; `503 RAG_DISABLED`; plus the
+usual 401, 404, 413, 422 and 429.
+
+**Not returned**: the prompt, the system instructions, the provider URL or key, raw model output, other users' data.

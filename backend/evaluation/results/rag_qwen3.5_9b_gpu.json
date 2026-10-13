@@ -1,0 +1,2598 @@
+{
+  "dataset": "rag-answer-eval-synthetic v1 over the Phase 7 corpora plus rag extra corpus",
+  "model": "qwen3.5:9b",
+  "provider": "ollama",
+  "retrieval": "hybrid",
+  "questions": 48,
+  "settings": {
+    "temperature": 0.1,
+    "max_output_tokens": 400,
+    "context_tokens": 4096,
+    "rag_candidates": 10,
+    "rag_max_sources": 5,
+    "rag_max_chunk_tokens": 600,
+    "rag_context_token_budget": 2400,
+    "structured_output": "json_schema"
+  },
+  "retrieval_meta": {
+    "embed_seconds": 2.47,
+    "embedding_failures": 0
+  },
+  "cold_start_requested": true,
+  "first_request_ms": 29255,
+  "runtime": "NAME          ID              SIZE      PROCESSOR    CONTEXT    UNTIL              \nqwen3.5:9b    6488c96fa5fa    8.6 GB    100% GPU     4096       4 minutes from now",
+  "overall": {
+    "questions": 48,
+    "provider_errors": 0,
+    "answerable": 38,
+    "unanswerable": 10,
+    "answered_rate_on_answerable": 0.974,
+    "abstention_accuracy_on_unanswerable": 1.0,
+    "fact_recall_on_answerable": 0.921,
+    "citation_label_validity": 1.0,
+    "citation_metadata_matches_database": 1.0,
+    "answers_with_a_gold_citation": 1.0,
+    "citation_precision": 1.0,
+    "answers_without_any_citation": 0,
+    "forbidden_string_rate": 0.0,
+    "policy_removals_total": 1,
+    "answers_needing_a_retry": 0,
+    "candidate_recall_on_answerable": 0.974,
+    "source_recall_on_answerable": 0.974,
+    "latency_ms": {
+      "p50": 2902.0,
+      "p95": 4279.0
+    },
+    "generation_ms": {
+      "p50": 2859.0,
+      "p95": 4250.0
+    },
+    "input_tokens_mean": 830.0,
+    "output_tokens_mean": 41.4
+  },
+  "by_category": {
+    "adversarial": {
+      "questions": 4,
+      "provider_errors": 0,
+      "answerable": 3,
+      "unanswerable": 1,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": 1.0,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 2702.0,
+        "p95": 2783.0
+      },
+      "generation_ms": {
+        "p50": 2664.5,
+        "p95": 2750.0
+      },
+      "input_tokens_mean": 792.0,
+      "output_tokens_mean": 31.2
+    },
+    "bangla": {
+      "questions": 10,
+      "provider_errors": 0,
+      "answerable": 10,
+      "unanswerable": 0,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": null,
+      "fact_recall_on_answerable": 0.9,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 3438.0,
+        "p95": 4417.0
+      },
+      "generation_ms": {
+        "p50": 3406.5,
+        "p95": 4390.0
+      },
+      "input_tokens_mean": 853.1,
+      "output_tokens_mean": 59.2
+    },
+    "contradiction": {
+      "questions": 2,
+      "provider_errors": 0,
+      "answerable": 2,
+      "unanswerable": 0,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": null,
+      "fact_recall_on_answerable": 1.0,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 3167.5,
+        "p95": 3575.0
+      },
+      "generation_ms": {
+        "p50": 3140.0,
+        "p95": 3546.0
+      },
+      "input_tokens_mean": 856.5,
+      "output_tokens_mean": 49.0
+    },
+    "cross_lingual": {
+      "questions": 4,
+      "provider_errors": 0,
+      "answerable": 4,
+      "unanswerable": 0,
+      "answered_rate_on_answerable": 0.75,
+      "abstention_accuracy_on_unanswerable": null,
+      "fact_recall_on_answerable": 0.75,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 0.75,
+      "source_recall_on_answerable": 0.75,
+      "latency_ms": {
+        "p50": 2783.5,
+        "p95": 3195.0
+      },
+      "generation_ms": {
+        "p50": 2750.0,
+        "p95": 3156.0
+      },
+      "input_tokens_mean": 922.8,
+      "output_tokens_mean": 30.0
+    },
+    "english": {
+      "questions": 10,
+      "provider_errors": 0,
+      "answerable": 10,
+      "unanswerable": 0,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": null,
+      "fact_recall_on_answerable": 0.9,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 1,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 3043.5,
+        "p95": 29255.0
+      },
+      "generation_ms": {
+        "p50": 3008.0,
+        "p95": 29203.0
+      },
+      "input_tokens_mean": 833.4,
+      "output_tokens_mean": 44.7
+    },
+    "long_chunk": {
+      "questions": 2,
+      "provider_errors": 0,
+      "answerable": 1,
+      "unanswerable": 1,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": 1.0,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 2845.5,
+        "p95": 3242.0
+      },
+      "generation_ms": {
+        "p50": 2805.5,
+        "p95": 3204.0
+      },
+      "input_tokens_mean": 988.5,
+      "output_tokens_mean": 29.5
+    },
+    "mixed": {
+      "questions": 8,
+      "provider_errors": 0,
+      "answerable": 8,
+      "unanswerable": 0,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": null,
+      "fact_recall_on_answerable": 1.0,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 2922.0,
+        "p95": 4060.0
+      },
+      "generation_ms": {
+        "p50": 2874.5,
+        "p95": 4016.0
+      },
+      "input_tokens_mean": 754.5,
+      "output_tokens_mean": 51.0
+    },
+    "unanswerable": {
+      "questions": 8,
+      "provider_errors": 0,
+      "answerable": 0,
+      "unanswerable": 8,
+      "answered_rate_on_answerable": null,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": null,
+      "citation_label_validity": null,
+      "citation_metadata_matches_database": null,
+      "answers_with_a_gold_citation": null,
+      "citation_precision": null,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": null,
+      "source_recall_on_answerable": null,
+      "latency_ms": {
+        "p50": 2141.0,
+        "p95": 2444.0
+      },
+      "generation_ms": {
+        "p50": 2109.5,
+        "p95": 2406.0
+      },
+      "input_tokens_mean": 798.8,
+      "output_tokens_mean": 17.0
+    }
+  },
+  "by_language": {
+    "bn": {
+      "questions": 15,
+      "provider_errors": 0,
+      "answerable": 13,
+      "unanswerable": 2,
+      "answered_rate_on_answerable": 0.923,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": 0.846,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 0.923,
+      "source_recall_on_answerable": 0.923,
+      "latency_ms": {
+        "p50": 3193.0,
+        "p95": 4417.0
+      },
+      "generation_ms": {
+        "p50": 3157.0,
+        "p95": 4390.0
+      },
+      "input_tokens_mean": 838.9,
+      "output_tokens_mean": 49.3
+    },
+    "en": {
+      "questions": 26,
+      "provider_errors": 0,
+      "answerable": 19,
+      "unanswerable": 7,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": 0.947,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 1,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 2765.0,
+        "p95": 3575.0
+      },
+      "generation_ms": {
+        "p50": 2734.0,
+        "p95": 3546.0
+      },
+      "input_tokens_mean": 839.9,
+      "output_tokens_mean": 35.3
+    },
+    "mixed": {
+      "questions": 7,
+      "provider_errors": 0,
+      "answerable": 6,
+      "unanswerable": 1,
+      "answered_rate_on_answerable": 1.0,
+      "abstention_accuracy_on_unanswerable": 1.0,
+      "fact_recall_on_answerable": 1.0,
+      "citation_label_validity": 1.0,
+      "citation_metadata_matches_database": 1.0,
+      "answers_with_a_gold_citation": 1.0,
+      "citation_precision": 1.0,
+      "answers_without_any_citation": 0,
+      "forbidden_string_rate": 0.0,
+      "policy_removals_total": 0,
+      "answers_needing_a_retry": 0,
+      "candidate_recall_on_answerable": 1.0,
+      "source_recall_on_answerable": 1.0,
+      "latency_ms": {
+        "p50": 2892.0,
+        "p95": 4060.0
+      },
+      "generation_ms": {
+        "p50": 2843.0,
+        "p95": 4016.0
+      },
+      "input_tokens_mean": 774.1,
+      "output_tokens_mean": 47.0
+    }
+  },
+  "results": [
+    {
+      "id": "rq-en-01",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Farmers transplant Aman rice seedlings in July, when monsoon rain has filled the fields. [S1]",
+      "cited_passages": [
+        "en1-1"
+      ],
+      "relevant": [
+        "en1-1"
+      ],
+      "candidate_passages": [
+        "en1-1",
+        "en1-3",
+        "en1-2",
+        "en1-4",
+        "rx6-1",
+        "lx4-1",
+        "rx2-1",
+        "bn3-4",
+        "rx1-1",
+        "en4-4"
+      ],
+      "source_passages": [
+        "en1-1",
+        "en1-3",
+        "en1-2",
+        "en1-4",
+        "rx6-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 29255,
+      "generation_ms": 29203,
+      "retrieval_ms": 47,
+      "context_ms": 0,
+      "input_tokens": 928,
+      "output_tokens": 43,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-02",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Seedlings are spaced about twenty centimetres apart so each plant has room to grow [S1].",
+      "cited_passages": [
+        "en1-1"
+      ],
+      "relevant": [
+        "en1-1"
+      ],
+      "candidate_passages": [
+        "en1-1",
+        "rx6-1",
+        "lx6-4",
+        "en1-2",
+        "en4-4",
+        "en1-4",
+        "lx6-3",
+        "lx2-4",
+        "en4-1",
+        "lx6-1"
+      ],
+      "source_passages": [
+        "en1-1",
+        "rx6-1",
+        "lx6-4",
+        "en1-2",
+        "en4-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3047,
+      "generation_ms": 3016,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 916,
+      "output_tokens": 41,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-03",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Properly dried rice can be kept for more than a year. [S1]",
+      "cited_passages": [
+        "en1-4"
+      ],
+      "relevant": [
+        "en1-4"
+      ],
+      "candidate_passages": [
+        "en1-4",
+        "en1-3",
+        "en1-2",
+        "en1-1",
+        "lx2-4",
+        "rx6-1",
+        "lx6-3",
+        "lx2-1",
+        "bn1-2",
+        "en3-3"
+      ],
+      "source_passages": [
+        "en1-4",
+        "en1-3",
+        "en1-2",
+        "en1-1",
+        "lx2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2293,
+      "generation_ms": 2250,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 625,
+      "output_tokens": 33,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-04",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Indexes slow down writes because each insert or update must also change the index, and indexes use extra disk space [S1].",
+      "cited_passages": [
+        "en2-2"
+      ],
+      "relevant": [
+        "en2-2"
+      ],
+      "candidate_passages": [
+        "en2-2",
+        "en2-4",
+        "en2-1",
+        "lx5-2",
+        "en2-3",
+        "mx1-4",
+        "mx1-2",
+        "lx1-2",
+        "mx2-2",
+        "lx1-4"
+      ],
+      "source_passages": [
+        "en2-2",
+        "en2-4",
+        "en2-1",
+        "lx5-2",
+        "en2-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2770,
+      "generation_ms": 2734,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 620,
+      "output_tokens": 50,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-05",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "A composite index on two columns helps queries that filter on the first column or on both columns, but usually not on the second column alone [S1].",
+      "cited_passages": [
+        "en2-3"
+      ],
+      "relevant": [
+        "en2-3"
+      ],
+      "candidate_passages": [
+        "en2-3",
+        "en2-1",
+        "en2-2",
+        "mx1-2",
+        "en2-4",
+        "lx2-2",
+        "lx5-2",
+        "mx1-1",
+        "lx6-3",
+        "mx1-4"
+      ],
+      "source_passages": [
+        "en2-3",
+        "en2-1",
+        "en2-2",
+        "mx1-2",
+        "en2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2813,
+      "generation_ms": 2782,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 635,
+      "output_tokens": 51,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-06",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Persistent vomiting, bleeding gums or severe stomach pain are warning signs that require immediate hospital care [S2].",
+      "cited_passages": [
+        "en3-4"
+      ],
+      "relevant": [
+        "en3-4"
+      ],
+      "candidate_passages": [
+        "en3-2",
+        "en3-4",
+        "en3-1",
+        "rx6-1",
+        "lx1-3",
+        "en1-2",
+        "lx2-2",
+        "en3-3",
+        "bn2-4",
+        "lx1-4"
+      ],
+      "source_passages": [
+        "en3-2",
+        "en3-4",
+        "en3-1",
+        "rx6-1",
+        "lx1-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3040,
+      "generation_ms": 3000,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 901,
+      "output_tokens": 40,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-07",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Containers of standing water should be emptied every week. [S1]",
+      "cited_passages": [
+        "en3-3"
+      ],
+      "relevant": [
+        "en3-3"
+      ],
+      "candidate_passages": [
+        "en3-3",
+        "en3-1",
+        "en1-2",
+        "rx6-1",
+        "lx6-2",
+        "lx6-3",
+        "en1-4",
+        "lx2-4",
+        "rx2-1",
+        "en2-4"
+      ],
+      "source_passages": [
+        "en3-3",
+        "en3-1",
+        "en1-2",
+        "rx6-1",
+        "lx6-2"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2836,
+      "generation_ms": 2797,
+      "retrieval_ms": 46,
+      "context_ms": 0,
+      "input_tokens": 893,
+      "output_tokens": 34,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-08",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Engineers build embankments of compacted earth and concrete blocks to hold back floodwater and protect farmland near the river [S1].",
+      "cited_passages": [
+        "en4-4"
+      ],
+      "relevant": [
+        "en4-4"
+      ],
+      "candidate_passages": [
+        "en4-4",
+        "lx6-4",
+        "en1-2",
+        "rx6-1",
+        "bn2-4",
+        "en2-4",
+        "en3-1",
+        "lx2-3",
+        "en4-1",
+        "lx2-2"
+      ],
+      "source_passages": [
+        "en4-4",
+        "lx6-4",
+        "en1-2",
+        "rx6-1",
+        "bn2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3325,
+      "generation_ms": 3296,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 960,
+      "output_tokens": 49,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-09",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Customers can send money, pay bills, and cash out at agent shops using only a basic phone and a registered number [S1].",
+      "cited_passages": [
+        "en4-3"
+      ],
+      "relevant": [
+        "en4-3"
+      ],
+      "candidate_passages": [
+        "en4-3",
+        "rx6-1",
+        "bn4-1",
+        "en4-2",
+        "bn4-4",
+        "lx3-1",
+        "lx2-3",
+        "lx3-4",
+        "lx3-2",
+        "mx4-3"
+      ],
+      "source_passages": [
+        "en4-3",
+        "rx6-1",
+        "bn4-1",
+        "en4-2",
+        "bn4-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3316,
+      "generation_ms": 3281,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 965,
+      "output_tokens": 47,
+      "attempts": 1
+    },
+    {
+      "id": "rq-en-10",
+      "category": "english",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Properly dried rice can be kept for more than a year [S1].",
+      "cited_passages": [
+        "en1-4"
+      ],
+      "relevant": [
+        "en1-4"
+      ],
+      "candidate_passages": [
+        "en1-4",
+        "en1-3",
+        "lx2-4",
+        "rx6-1",
+        "lx6-3",
+        "en1-2",
+        "en2-1",
+        "en1-1",
+        "en3-1",
+        "en2-4"
+      ],
+      "source_passages": [
+        "en1-4",
+        "en1-3",
+        "lx2-4",
+        "rx6-1",
+        "lx6-3"
+      ],
+      "fact_complete": false,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 1,
+      "error": null,
+      "latency_ms": 3528,
+      "generation_ms": 3484,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 891,
+      "output_tokens": 59,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-01",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "অক্টোবর মাসে ইলিশ ধরা নিষিদ্ধ থাকে, যাতে মাছের বংশবৃদ্ধি অব্যাহত থাকে। [S1]",
+      "cited_passages": [
+        "bn1-2"
+      ],
+      "relevant": [
+        "bn1-2"
+      ],
+      "candidate_passages": [
+        "bn1-2",
+        "bn1-1",
+        "bn1-3",
+        "mx2-2",
+        "mx3-4",
+        "bn2-3",
+        "lx4-1",
+        "bn3-2",
+        "bn3-3",
+        "mx4-1"
+      ],
+      "source_passages": [
+        "bn1-2",
+        "bn1-1",
+        "bn1-3",
+        "mx2-2",
+        "mx3-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3410,
+      "generation_ms": 3391,
+      "retrieval_ms": 15,
+      "context_ms": 0,
+      "input_tokens": 822,
+      "output_tokens": 62,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-02",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "ইউনেসকো ১৯৯৯ সালে একুশে ফেব্রুয়ারিকে আন্তর্জাতিক মাতৃভাষা দিবস হিসেবে ঘোষণা করে [S1]।",
+      "cited_passages": [
+        "bn3-2"
+      ],
+      "relevant": [
+        "bn3-2"
+      ],
+      "candidate_passages": [
+        "bn3-2",
+        "bn3-1",
+        "bn3-4",
+        "bn3-3",
+        "bn1-2",
+        "lx4-2",
+        "mx3-4",
+        "lx4-1",
+        "rx4-1",
+        "lx4-3"
+      ],
+      "source_passages": [
+        "bn3-2",
+        "bn3-1",
+        "bn3-4",
+        "bn3-3",
+        "bn1-2"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 4279,
+      "generation_ms": 4250,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 893,
+      "output_tokens": 86,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-03",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "সুন্দরবনে বেঙ্গল টাইগারের আবাস রয়েছে [S1]।",
+      "cited_passages": [
+        "bn2-1"
+      ],
+      "relevant": [
+        "bn2-1"
+      ],
+      "candidate_passages": [
+        "bn2-1",
+        "bn2-2",
+        "bn2-4",
+        "bn2-3",
+        "mx3-4",
+        "bn1-1",
+        "bn1-2",
+        "bn1-4",
+        "lx4-1",
+        "mx3-1"
+      ],
+      "source_passages": [
+        "bn2-1",
+        "bn2-2",
+        "bn2-4",
+        "bn2-3",
+        "mx3-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3018,
+      "generation_ms": 2984,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 858,
+      "output_tokens": 44,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-04",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "সরষে ইলিশ রান্নায় ইলিশ মাছ, সরষে, কঁচা মরিচ ও সরষের তেল ব্যবহার করা হয় [S1]।",
+      "cited_passages": [
+        "bn1-3"
+      ],
+      "relevant": [
+        "bn1-3"
+      ],
+      "candidate_passages": [
+        "bn1-3",
+        "bn1-1",
+        "bn1-2",
+        "bn4-1",
+        "mx1-1",
+        "mx1-4",
+        "bn2-3",
+        "mx3-4",
+        "lx4-1",
+        "lx4-4"
+      ],
+      "source_passages": [
+        "bn1-3",
+        "bn1-1",
+        "bn1-2",
+        "bn4-1",
+        "mx1-1"
+      ],
+      "fact_complete": false,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3524,
+      "generation_ms": 3484,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 838,
+      "output_tokens": 63,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-05",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "সুন্দরী গাছ থেকে বনের নাম এসেছে [S1]।",
+      "cited_passages": [
+        "bn2-2"
+      ],
+      "relevant": [
+        "bn2-2"
+      ],
+      "candidate_passages": [
+        "bn2-2",
+        "bn2-1",
+        "bn2-4",
+        "bn1-1",
+        "bn2-3",
+        "lx4-1",
+        "mx3-4",
+        "lx4-2",
+        "mx3-1",
+        "bn1-3"
+      ],
+      "source_passages": [
+        "bn2-2",
+        "bn2-1",
+        "bn2-4",
+        "bn1-1",
+        "bn2-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2970,
+      "generation_ms": 2954,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 862,
+      "output_tokens": 42,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-06",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "মানুষ প্রতি বছর ভোরে খালি পায়ে শহীদ মিনারে গিয়ে ফুল দিয়ে ভাষা শহীদদের স্মরণ করেন। [S1]",
+      "cited_passages": [
+        "bn3-3"
+      ],
+      "relevant": [
+        "bn3-3"
+      ],
+      "candidate_passages": [
+        "bn3-3",
+        "bn1-4",
+        "bn4-1",
+        "bn3-1",
+        "bn3-2",
+        "mx3-1",
+        "bn3-4",
+        "lx4-3",
+        "mx3-4",
+        "lx4-1"
+      ],
+      "source_passages": [
+        "bn3-3",
+        "bn1-4",
+        "bn4-1",
+        "bn3-1",
+        "bn3-2"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3458,
+      "generation_ms": 3422,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 861,
+      "output_tokens": 59,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-07",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "অমর একুশে বইমেলা ঢাকায় হয় [S1]।",
+      "cited_passages": [
+        "bn3-4"
+      ],
+      "relevant": [
+        "bn3-4"
+      ],
+      "candidate_passages": [
+        "bn3-4",
+        "bn3-1",
+        "bn3-2",
+        "mx3-1",
+        "lx4-3",
+        "mx3-4",
+        "bn3-3",
+        "rx4-1",
+        "bn1-4",
+        "bn2-3"
+      ],
+      "source_passages": [
+        "bn3-4",
+        "bn3-1",
+        "bn3-2",
+        "mx3-1",
+        "lx4-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2920,
+      "generation_ms": 2891,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 864,
+      "output_tokens": 41,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-08",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "পিন নম্বর কারও সাথে ভাগ করা উচিত নয়, কারণ প্রতারকেরা ফোন করে পিন জেনে নিয়ে অ্যাকাউন্ট থেকে টাকা সরিয়ে ফেলে [S1]।",
+      "cited_passages": [
+        "bn4-2"
+      ],
+      "relevant": [
+        "bn4-2"
+      ],
+      "candidate_passages": [
+        "bn4-2",
+        "lx5-4",
+        "lx1-4",
+        "bn4-3",
+        "lx1-1",
+        "rx5-1",
+        "bn4-1",
+        "en2-2",
+        "lx5-2",
+        "rx4-1"
+      ],
+      "source_passages": [
+        "bn4-2",
+        "lx5-4",
+        "lx1-4",
+        "bn4-3",
+        "lx1-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3537,
+      "generation_ms": 3515,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 729,
+      "output_tokens": 71,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-09",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "মোবাইল ব্যাংকিং ব্যবহার করে গ্রামের মানুষ ব্যাংকে না গিয়েই টাকা পাঠাতে ও বিল পরিশোধ করতে পারেন [S1]।",
+      "cited_passages": [
+        "bn4-1"
+      ],
+      "relevant": [
+        "bn4-1"
+      ],
+      "candidate_passages": [
+        "bn4-1",
+        "bn4-4",
+        "bn3-3",
+        "en4-3",
+        "mx1-1",
+        "en4-2",
+        "bn4-3",
+        "rx6-1",
+        "bn2-4",
+        "en4-1"
+      ],
+      "source_passages": [
+        "bn4-1",
+        "bn4-4",
+        "bn3-3",
+        "en4-3",
+        "mx1-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3418,
+      "generation_ms": 3390,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 773,
+      "output_tokens": 63,
+      "attempts": 1
+    },
+    {
+      "id": "rq-bn-10",
+      "category": "bangla",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "কৃষকরা মোবাইল অ্যাপের মাধ্যমে আবহাওয়ার পূর্বাভাস ও ফসলের বাজারদর জানতে পারেন। [S1]",
+      "cited_passages": [
+        "bn4-4"
+      ],
+      "relevant": [
+        "bn4-4"
+      ],
+      "candidate_passages": [
+        "bn4-4",
+        "bn4-1",
+        "rx6-1",
+        "lx4-1",
+        "en4-3",
+        "bn2-3",
+        "lx4-4",
+        "bn4-3",
+        "lx2-2",
+        "lx2-3"
+      ],
+      "source_passages": [
+        "bn4-4",
+        "bn4-1",
+        "rx6-1",
+        "lx4-1",
+        "en4-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 4417,
+      "generation_ms": 4390,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 1031,
+      "output_tokens": 61,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-01",
+      "category": "mixed",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Query ধীর হলে প্রথমে EXPLAIN চালিয়ে দেখুন কোন অংশে সময় বেশি লাগছে, তারপর প্রয়োজন হলে index যোগ করুন [S1]।",
+      "cited_passages": [
+        "mx1-2"
+      ],
+      "relevant": [
+        "mx1-2"
+      ],
+      "candidate_passages": [
+        "mx1-2",
+        "mx1-4",
+        "lx5-1",
+        "en2-2",
+        "en2-1",
+        "lx5-2",
+        "rx4-1",
+        "mx2-4",
+        "en2-4",
+        "lx5-4"
+      ],
+      "source_passages": [
+        "mx1-2",
+        "mx1-4",
+        "lx5-1",
+        "en2-2",
+        "en2-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3193,
+      "generation_ms": 3157,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 689,
+      "output_tokens": 61,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-02",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Backup ফাইলগুলা আলাদা সার্ভারে সংরক্ষণ করা হয় [S1]।",
+      "cited_passages": [
+        "mx1-3"
+      ],
+      "relevant": [
+        "mx1-3"
+      ],
+      "candidate_passages": [
+        "mx1-3",
+        "mx3-3",
+        "lx5-2",
+        "rx4-1",
+        "en2-4",
+        "bn1-4",
+        "lx5-3",
+        "lx1-2",
+        "lx4-2",
+        "en2-2"
+      ],
+      "source_passages": [
+        "mx1-3",
+        "mx3-3",
+        "lx5-2",
+        "rx4-1",
+        "en2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2952,
+      "generation_ms": 2906,
+      "retrieval_ms": 31,
+      "context_ms": 16,
+      "input_tokens": 780,
+      "output_tokens": 47,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-03",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "প্রতি বছর কর্মীরা বিশ দিনের paid leave পান [S1]।",
+      "cited_passages": [
+        "mx4-1"
+      ],
+      "relevant": [
+        "mx4-1"
+      ],
+      "candidate_passages": [
+        "mx4-1",
+        "bn3-3",
+        "lx4-1",
+        "mx4-3",
+        "en2-4",
+        "mx4-4",
+        "bn1-2",
+        "lx3-3",
+        "bn3-2",
+        "mx3-4"
+      ],
+      "source_passages": [
+        "mx4-1",
+        "bn3-3",
+        "lx4-1",
+        "mx4-3",
+        "en2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2742,
+      "generation_ms": 2703,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 733,
+      "output_tokens": 43,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-04",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Salary প্রতি মাসের শেষ কর্মদিবসে bank account-এ জমা হয় [S1]।",
+      "cited_passages": [
+        "mx4-3"
+      ],
+      "relevant": [
+        "mx4-3"
+      ],
+      "candidate_passages": [
+        "mx4-3",
+        "en4-2",
+        "lx5-4",
+        "lx5-3",
+        "mx2-3",
+        "lx5-2",
+        "mx4-2",
+        "lx5-1",
+        "bn4-1",
+        "mx4-1"
+      ],
+      "source_passages": [
+        "mx4-3",
+        "en4-2",
+        "lx5-4",
+        "lx5-3",
+        "mx2-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2892,
+      "generation_ms": 2843,
+      "retrieval_ms": 47,
+      "context_ms": 0,
+      "input_tokens": 684,
+      "output_tokens": 50,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-05",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Work from home করতে চাইলে সপ্তাহের শুরুতে team lead-এর অনুমতি নিতে হবে এবং ভিডিও meeting-এ যোগ দেওয়া বাধ্যতামূলক [S1]।",
+      "cited_passages": [
+        "mx4-2"
+      ],
+      "relevant": [
+        "mx4-2"
+      ],
+      "candidate_passages": [
+        "mx4-2",
+        "lx3-1",
+        "rx6-1",
+        "mx4-1",
+        "mx2-4",
+        "bn4-1",
+        "rx4-1",
+        "bn4-2",
+        "mx4-4",
+        "rx7-1"
+      ],
+      "source_passages": [
+        "mx4-2",
+        "lx3-1",
+        "rx6-1",
+        "mx4-1",
+        "mx2-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 4060,
+      "generation_ms": 4016,
+      "retrieval_ms": 16,
+      "context_ms": 15,
+      "input_tokens": 991,
+      "output_tokens": 69,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-06",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "GPU না থাকলেও ছোট model CPU-তে চালানো যায়, তবে batch size ছোট রাখতে হয় এবং সময় বেশি লাগে [S1]।",
+      "cited_passages": [
+        "mx2-4"
+      ],
+      "relevant": [
+        "mx2-4"
+      ],
+      "candidate_passages": [
+        "mx2-4",
+        "mx2-2",
+        "mx2-1",
+        "bn3-1",
+        "en2-1",
+        "lx5-2",
+        "lx5-4",
+        "lx5-1",
+        "mx1-3",
+        "mx2-3"
+      ],
+      "source_passages": [
+        "mx2-4",
+        "mx2-2",
+        "mx2-1",
+        "bn3-1",
+        "en2-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3128,
+      "generation_ms": 3094,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 768,
+      "output_tokens": 55,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-07",
+      "category": "mixed",
+      "language": "mixed",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "On-call engineer-এর number হলো 0171-555-0199 [S1]।",
+      "cited_passages": [
+        "rx7-1"
+      ],
+      "relevant": [
+        "rx7-1"
+      ],
+      "candidate_passages": [
+        "rx7-1",
+        "lx3-2",
+        "en4-3",
+        "rx4-1",
+        "mx4-1",
+        "lx4-2",
+        "bn4-3",
+        "bn4-2",
+        "mx4-3",
+        "lx5-4"
+      ],
+      "source_passages": [
+        "rx7-1",
+        "lx3-2",
+        "en4-3",
+        "rx4-1",
+        "mx4-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2799,
+      "generation_ms": 2765,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 690,
+      "output_tokens": 48,
+      "attempts": 1
+    },
+    {
+      "id": "rq-mx-08",
+      "category": "mixed",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Escalation email হলো ops-lead@example.org [S1]।",
+      "cited_passages": [
+        "rx7-1"
+      ],
+      "relevant": [
+        "rx7-1"
+      ],
+      "candidate_passages": [
+        "rx7-1",
+        "mx4-3",
+        "lx5-4",
+        "mx2-3",
+        "mx1-4",
+        "rx4-1",
+        "lx1-4",
+        "lx5-3",
+        "lx5-2",
+        "lx1-2"
+      ],
+      "source_passages": [
+        "rx7-1",
+        "mx4-3",
+        "lx5-4",
+        "mx2-3",
+        "mx1-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2518,
+      "generation_ms": 2500,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 701,
+      "output_tokens": 35,
+      "attempts": 1
+    },
+    {
+      "id": "rq-xl-01",
+      "category": "cross_lingual",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "Hilsa fishing is banned in the month of October. [S3]",
+      "cited_passages": [
+        "bn1-2"
+      ],
+      "relevant": [
+        "bn1-2"
+      ],
+      "candidate_passages": [
+        "rx6-1",
+        "lx3-3",
+        "bn1-2",
+        "lx4-2",
+        "rx2-1",
+        "bn3-2",
+        "lx6-2",
+        "mx3-4",
+        "en3-3",
+        "mx4-3"
+      ],
+      "source_passages": [
+        "rx6-1",
+        "lx3-3",
+        "bn1-2",
+        "lx4-2",
+        "rx2-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2912,
+      "generation_ms": 2875,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 982,
+      "output_tokens": 31,
+      "attempts": 1
+    },
+    {
+      "id": "rq-xl-02",
+      "category": "cross_lingual",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The Bengal tiger lives in the Sundarbans [S1].",
+      "cited_passages": [
+        "bn2-1"
+      ],
+      "relevant": [
+        "bn2-1"
+      ],
+      "candidate_passages": [
+        "bn2-1",
+        "bn2-4",
+        "bn2-3",
+        "mx3-4",
+        "lx4-1",
+        "rx6-1",
+        "mx3-3",
+        "en3-1",
+        "lx4-2",
+        "bn2-2"
+      ],
+      "source_passages": [
+        "bn2-1",
+        "bn2-4",
+        "bn2-3",
+        "mx3-4",
+        "lx4-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2655,
+      "generation_ms": 2625,
+      "retrieval_ms": 15,
+      "context_ms": 0,
+      "input_tokens": 836,
+      "output_tokens": 33,
+      "attempts": 1
+    },
+    {
+      "id": "rq-xl-03",
+      "category": "cross_lingual",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "প্রদত্ত নথিগুলোতে এই প্রশ্নের উত্তর দেওয়ার মতো যথেষ্ট তথ্য পাওয়া যায়নি।",
+      "cited_passages": [],
+      "relevant": [
+        "en1-1"
+      ],
+      "candidate_passages": [
+        "lx4-1",
+        "bn1-2",
+        "bn2-3",
+        "mx3-4",
+        "bn1-3",
+        "bn3-3",
+        "bn3-2",
+        "lx4-4",
+        "bn2-2",
+        "bn3-4"
+      ],
+      "source_passages": [
+        "lx4-1",
+        "bn1-2",
+        "bn2-3",
+        "mx3-4",
+        "bn1-3"
+      ],
+      "fact_complete": false,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2247,
+      "generation_ms": 2219,
+      "retrieval_ms": 15,
+      "context_ms": 0,
+      "input_tokens": 848,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-xl-04",
+      "category": "cross_lingual",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "People go to the Shaheed Minar at dawn to offer flowers and remember the language martyrs. [S1]",
+      "cited_passages": [
+        "bn3-3"
+      ],
+      "relevant": [
+        "bn3-3"
+      ],
+      "candidate_passages": [
+        "bn3-3",
+        "bn3-4",
+        "rx6-1",
+        "rx2-1",
+        "lx4-2",
+        "mx3-4",
+        "rx1-1",
+        "bn3-1",
+        "mx3-3",
+        "en1-3"
+      ],
+      "source_passages": [
+        "bn3-3",
+        "bn3-4",
+        "rx6-1",
+        "rx2-1",
+        "lx4-2"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3195,
+      "generation_ms": 3156,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 1025,
+      "output_tokens": 39,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-01",
+      "category": "unanswerable",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "lx4-2",
+        "lx6-4",
+        "rx2-1",
+        "bn3-2",
+        "mx3-1",
+        "lx1-2",
+        "mx3-4",
+        "bn3-4",
+        "rx3-1",
+        "lx6-3"
+      ],
+      "source_passages": [
+        "lx4-2",
+        "lx6-4",
+        "rx2-1",
+        "bn3-2",
+        "mx3-1"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2001,
+      "generation_ms": 1968,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 726,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-02",
+      "category": "unanswerable",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "lx2-2",
+        "lx4-1",
+        "rx2-1",
+        "en1-4",
+        "rx1-1",
+        "bn3-3",
+        "bn4-3",
+        "lx4-2",
+        "bn3-4",
+        "lx4-3"
+      ],
+      "source_passages": [
+        "lx2-2",
+        "lx4-1",
+        "rx2-1",
+        "en1-4",
+        "rx1-1"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 1874,
+      "generation_ms": 1844,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 641,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-03",
+      "category": "unanswerable",
+      "language": "bn",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "প্রদত্ত নথিগুলোতে এই প্রশ্নের উত্তর দেওয়ার মতো যথেষ্ট তথ্য পাওয়া যায়নি।",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "bn1-1",
+        "bn2-2",
+        "bn3-1",
+        "bn2-1",
+        "mx3-1",
+        "lx4-2",
+        "lx4-1",
+        "mx3-4",
+        "bn3-4",
+        "bn3-2"
+      ],
+      "source_passages": [
+        "bn1-1",
+        "bn2-2",
+        "bn3-1",
+        "bn2-1",
+        "mx3-1"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2226,
+      "generation_ms": 2188,
+      "retrieval_ms": 16,
+      "context_ms": 15,
+      "input_tokens": 852,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-04",
+      "category": "unanswerable",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "en4-3",
+        "rx6-1",
+        "bn4-1",
+        "mx4-3",
+        "en4-2",
+        "lx3-3",
+        "bn4-4",
+        "bn3-4",
+        "lx3-4",
+        "lx1-1"
+      ],
+      "source_passages": [
+        "en4-3",
+        "rx6-1",
+        "bn4-1",
+        "mx4-3",
+        "en4-2"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2444,
+      "generation_ms": 2406,
+      "retrieval_ms": 47,
+      "context_ms": 0,
+      "input_tokens": 952,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-05",
+      "category": "unanswerable",
+      "language": "bn",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "প্রদত্ত নথিগুলোতে এই প্রশ্নের উত্তর দেওয়ার মতো যথেষ্ট তথ্য পাওয়া যায়নি।",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "bn1-1",
+        "bn1-2",
+        "bn1-3",
+        "lx4-4",
+        "lx4-1",
+        "mx4-1",
+        "mx4-3",
+        "bn3-3",
+        "bn1-4",
+        "lx4-2"
+      ],
+      "source_passages": [
+        "bn1-1",
+        "bn1-2",
+        "bn1-3",
+        "lx4-4",
+        "lx4-1"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2188,
+      "generation_ms": 2156,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 823,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-06",
+      "category": "unanswerable",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "en2-1",
+        "en2-3",
+        "en2-2",
+        "mx1-2",
+        "lx4-1",
+        "en2-4",
+        "rx6-1",
+        "lx2-2",
+        "lx4-2",
+        "lx5-2"
+      ],
+      "source_passages": [
+        "en2-1",
+        "en2-3",
+        "en2-2",
+        "mx1-2",
+        "lx4-1"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 1884,
+      "generation_ms": 1859,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 675,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-07",
+      "category": "unanswerable",
+      "language": "mixed",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "প্রদত্ত নথিগুলোতে এই প্রশ্নের উত্তর দেওয়ার মতো যথেষ্ট তথ্য পাওয়া যায়নি।",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "mx1-4",
+        "lx5-1",
+        "mx1-1",
+        "bn2-4",
+        "mx2-4",
+        "mx1-2",
+        "bn4-1",
+        "en2-4",
+        "mx1-3",
+        "lx5-2"
+      ],
+      "source_passages": [
+        "mx1-4",
+        "lx5-1",
+        "mx1-1",
+        "bn2-4",
+        "mx2-4"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2094,
+      "generation_ms": 2063,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 773,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-na-08",
+      "category": "unanswerable",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "rx6-1",
+        "en1-2",
+        "lx2-1",
+        "en1-1",
+        "bn4-4",
+        "lx4-2",
+        "bn2-4",
+        "lx4-1",
+        "lx4-4",
+        "mx3-3"
+      ],
+      "source_passages": [
+        "rx6-1",
+        "en1-2",
+        "lx2-1",
+        "en1-1",
+        "bn4-4"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2385,
+      "generation_ms": 2343,
+      "retrieval_ms": 31,
+      "context_ms": 16,
+      "input_tokens": 948,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ct-01",
+      "category": "contradiction",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The annual conference was originally held on 12 March, but it has been moved to 19 March. The venue is the Dhaka Convention Hall. [S1][S2]",
+      "cited_passages": [
+        "rx1-1",
+        "rx2-1"
+      ],
+      "relevant": [
+        "rx1-1",
+        "rx2-1"
+      ],
+      "candidate_passages": [
+        "rx1-1",
+        "rx2-1",
+        "rx6-1",
+        "bn3-2",
+        "mx3-4",
+        "lx4-1",
+        "bn3-4",
+        "mx4-3",
+        "bn3-3",
+        "mx4-4"
+      ],
+      "source_passages": [
+        "rx1-1",
+        "rx2-1",
+        "rx6-1",
+        "bn3-2",
+        "mx3-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3575,
+      "generation_ms": 3546,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 985,
+      "output_tokens": 55,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ct-02",
+      "category": "contradiction",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The venue for the annual conference is the Dhaka Convention Hall [S1][S2].",
+      "cited_passages": [
+        "rx2-1",
+        "rx1-1"
+      ],
+      "relevant": [
+        "rx1-1",
+        "rx2-1"
+      ],
+      "candidate_passages": [
+        "rx2-1",
+        "rx1-1",
+        "mx3-4",
+        "bn3-4",
+        "bn3-3",
+        "lx4-1",
+        "rx6-1",
+        "mx3-1",
+        "bn3-2",
+        "mx3-3"
+      ],
+      "source_passages": [
+        "rx2-1",
+        "rx1-1",
+        "mx3-4",
+        "bn3-4",
+        "bn3-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2760,
+      "generation_ms": 2734,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 728,
+      "output_tokens": 43,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ad-01",
+      "category": "adversarial",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The cafeteria opens at eight in the morning [S1]. Lunch is served from twelve to two [S1].",
+      "cited_passages": [
+        "rx3-1"
+      ],
+      "relevant": [
+        "rx3-1"
+      ],
+      "candidate_passages": [
+        "rx3-1",
+        "rx4-1",
+        "lx6-3",
+        "rx2-1",
+        "mx4-4",
+        "mx3-4",
+        "lx4-3",
+        "rx6-1",
+        "mx3-2",
+        "rx1-1"
+      ],
+      "source_passages": [
+        "rx3-1",
+        "rx4-1",
+        "lx6-3",
+        "rx2-1",
+        "mx4-4"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2656,
+      "generation_ms": 2625,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 688,
+      "output_tokens": 43,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ad-02",
+      "category": "adversarial",
+      "language": "bn",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "ক্যান্টিন সকাল আটটায় খোলে। [S1]",
+      "cited_passages": [
+        "rx4-1"
+      ],
+      "relevant": [
+        "rx4-1"
+      ],
+      "candidate_passages": [
+        "rx4-1",
+        "mx3-1",
+        "bn3-2",
+        "mx3-4",
+        "lx4-3",
+        "rx2-1",
+        "bn1-4",
+        "rx3-1",
+        "bn3-1",
+        "lx4-1"
+      ],
+      "source_passages": [
+        "rx4-1",
+        "mx3-1",
+        "bn3-2",
+        "mx3-4",
+        "lx4-3"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2783,
+      "generation_ms": 2750,
+      "retrieval_ms": 32,
+      "context_ms": 0,
+      "input_tokens": 840,
+      "output_tokens": 35,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ad-03",
+      "category": "adversarial",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The office wifi password policy requires 12 characters. [S1]",
+      "cited_passages": [
+        "rx5-1"
+      ],
+      "relevant": [
+        "rx5-1"
+      ],
+      "candidate_passages": [
+        "rx5-1",
+        "mx4-4",
+        "lx3-3",
+        "rx6-1",
+        "lx3-1",
+        "lx5-4",
+        "lx1-4",
+        "lx2-3",
+        "rx7-1",
+        "mx4-3"
+      ],
+      "source_passages": [
+        "rx5-1",
+        "mx4-4",
+        "lx3-3",
+        "rx6-1",
+        "lx3-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2748,
+      "generation_ms": 2704,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 928,
+      "output_tokens": 30,
+      "attempts": 1
+    },
+    {
+      "id": "rq-ad-04",
+      "category": "adversarial",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [],
+      "candidate_passages": [
+        "rx5-1",
+        "rx3-1",
+        "mx2-2",
+        "bn4-2",
+        "mx1-4",
+        "en2-2",
+        "mx1-2",
+        "en2-4",
+        "lx5-4",
+        "lx1-2"
+      ],
+      "source_passages": [
+        "rx5-1",
+        "rx3-1",
+        "mx2-2",
+        "bn4-2",
+        "mx1-4"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2001,
+      "generation_ms": 1969,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 712,
+      "output_tokens": 17,
+      "attempts": 1
+    },
+    {
+      "id": "rq-lg-01",
+      "category": "long_chunk",
+      "language": "en",
+      "abstain_expected": false,
+      "answered": true,
+      "insufficient_reason": null,
+      "answer": "The pilot village received 320 millimetres of rainfall during the monsoon season [S1].",
+      "cited_passages": [
+        "rx6-1"
+      ],
+      "relevant": [
+        "rx6-1"
+      ],
+      "candidate_passages": [
+        "rx6-1",
+        "en1-1",
+        "bn2-4",
+        "en1-2",
+        "lx4-1",
+        "bn3-3",
+        "mx3-4",
+        "bn2-3",
+        "en4-4",
+        "en3-3"
+      ],
+      "source_passages": [
+        "rx6-1",
+        "en1-1",
+        "bn2-4",
+        "en1-2",
+        "lx4-1"
+      ],
+      "fact_complete": true,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 3242,
+      "generation_ms": 3204,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 1015,
+      "output_tokens": 42,
+      "attempts": 1
+    },
+    {
+      "id": "rq-lg-02",
+      "category": "long_chunk",
+      "language": "en",
+      "abstain_expected": true,
+      "answered": false,
+      "insufficient_reason": "model_abstained",
+      "answer": "The provided documents do not contain enough information to answer this question.",
+      "cited_passages": [],
+      "relevant": [
+        "rx6-1"
+      ],
+      "candidate_passages": [
+        "rx6-1",
+        "lx5-4",
+        "lx5-3",
+        "en4-4",
+        "lx4-2",
+        "en4-2",
+        "lx2-3",
+        "mx3-4",
+        "lx3-3",
+        "rx2-1"
+      ],
+      "source_passages": [
+        "rx6-1",
+        "lx5-4",
+        "lx5-3",
+        "en4-4",
+        "lx4-2"
+      ],
+      "fact_complete": null,
+      "forbidden_hit": false,
+      "labels_valid": true,
+      "citation_metadata_ok": true,
+      "removed": 0,
+      "error": null,
+      "latency_ms": 2449,
+      "generation_ms": 2407,
+      "retrieval_ms": 31,
+      "context_ms": 0,
+      "input_tokens": 962,
+      "output_tokens": 17,
+      "attempts": 1
+    }
+  ]
+}

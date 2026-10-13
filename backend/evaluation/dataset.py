@@ -7,6 +7,7 @@ from pathlib import Path
 DATA_DIR = Path(__file__).resolve().parent / "retrieval"
 LEXICAL_DIR = Path(__file__).resolve().parent / "retrieval_lexical"
 HELDOUT_DIR = Path(__file__).resolve().parent / "retrieval_heldout"
+RAG_DIR = Path(__file__).resolve().parent / "rag"
 
 
 @dataclass(frozen=True)
@@ -115,3 +116,73 @@ def load_combined() -> tuple[Dataset, frozenset[str]]:
     )
     validate(merged)
     return merged, frozenset(q.id for q in lexical.queries)
+
+
+@dataclass(frozen=True)
+class RagQuestion:
+    id: str
+    category: str
+    question: str
+    relevant: tuple[str, ...]
+    expected: list[list[str]]  # groups of alternative substrings; all groups must match
+    abstain: bool  # the documents do not answer it
+    forbidden: list[str]
+
+
+def load_rag_corpus() -> Dataset:
+    """The retrieval corpora plus the RAG extra documents, searched together (no queries)."""
+    base, lexical = load_dataset(DATA_DIR), load_dataset(LEXICAL_DIR)
+    extra = load_corpus_only(RAG_DIR)
+    merged = Dataset(documents=base.documents + lexical.documents + extra.documents, queries=())
+    validate(merged)
+    return merged
+
+
+def load_corpus_only(directory: Path) -> Dataset:
+    corpus = json.loads((directory / "corpus.json").read_text(encoding="utf-8"))
+    documents = tuple(
+        EvalDocument(
+            id=d["id"],
+            title=d["title"],
+            language=d["language"],
+            passages=tuple(
+                Passage(
+                    id=s["passage"]["id"],
+                    document_id=d["id"],
+                    document_title=d["title"],
+                    language=d["language"],
+                    heading=s["heading"],
+                    text=s["passage"]["text"],
+                )
+                for s in d["sections"]
+            ),
+        )
+        for d in corpus["documents"]
+    )
+    return Dataset(documents=documents, queries=())
+
+
+def load_rag_questions() -> list[RagQuestion]:
+    data = json.loads((RAG_DIR / "questions.json").read_text(encoding="utf-8"))
+    known = {p.id for p in load_rag_corpus().passages}
+    questions = [
+        RagQuestion(
+            id=q["id"],
+            category=q["category"],
+            question=q["question"],
+            relevant=tuple(q["relevant"]),
+            expected=q["expected"],
+            abstain=q["abstain"],
+            forbidden=q["forbidden"],
+        )
+        for q in data["questions"]
+    ]
+    ids = [q.id for q in questions]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate question ids")
+    for q in questions:
+        if set(q.relevant) - known:
+            raise ValueError(f"question {q.id} references unknown passages")
+        if q.abstain == bool(q.expected):
+            raise ValueError(f"question {q.id}: expected facts and abstain are inconsistent")
+    return questions

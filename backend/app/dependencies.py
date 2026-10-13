@@ -30,6 +30,7 @@ from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.hybrid_search_service import HybridSearchService
 from app.services.processing_queue import ProcessingQueue
+from app.services.rag_service import RagService
 from app.services.rerank_service import RerankService
 from app.services.search_service import SearchService
 from app.storage.base import StorageProvider
@@ -242,6 +243,23 @@ def get_rerank_service(request: Request, settings: SettingsDep) -> RerankService
 
 
 RerankServiceDep = Annotated[RerankService | None, Depends(get_rerank_service)]
+
+
+def get_rag_service(
+    request: Request,
+    hybrid: Annotated[HybridSearchService, Depends(get_hybrid_search_service)],
+    rerank: Annotated[RerankService | None, Depends(get_rerank_service)],
+    settings: SettingsDep,
+) -> RagService | None:
+    """None when answer generation is switched off: no provider is created or contacted."""
+    if not settings.rag_enabled:
+        return None
+    return RagService(
+        hybrid=hybrid, rerank=rerank, gate=request.app.state.rag_gate, settings=settings
+    )
+
+
+RagServiceDep = Annotated[RagService | None, Depends(get_rag_service)]
 CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
 HybridSearchServiceDep = Annotated[HybridSearchService, Depends(get_hybrid_search_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
@@ -272,3 +290,12 @@ async def enforce_search_rate_limit(
     await limiter.check(
         "search:user", str(user.id), max_attempts=settings.rate_limit_search_attempts
     )
+
+
+async def enforce_rag_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    """Each answer costs a language-model call, so it has its own, tighter per-user budget."""
+    if not settings.rag_enabled:
+        return  # a disabled endpoint answers 503 without spending the user's allowance
+    await limiter.check("rag:user", str(user.id), max_attempts=settings.rate_limit_rag_attempts)

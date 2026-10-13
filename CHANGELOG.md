@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 9: Retrieval-Augmented Generation
+
+- Generation-provider layer (`app/llm/`): an async `LLMProvider` interface with a local Ollama provider and an OpenAI-compatible provider over `httpx` (no vendor SDK); configurable model, temperature, output and context limits, timeout and concurrency; keys only from the environment, never over plain http to a remote host, no environment proxy, no redirects, provider bodies never logged or returned
+- `POST /api/v1/rag/answer`: authenticated, own rate limit, 128 KiB body cap, owner-scoped hybrid or semantic retrieval with optional Phase 8 reranking, bounded context, validated answer with citations built from database records, explicit insufficient-evidence and failure responses, retrieval and reranking degradation reported separately; off by default (`RAG_ENABLED=false`)
+- Context builder (`app/rag/context.py`): deterministic selection, near-duplicate removal, per-source and total token budgets measured on the escaped prompt text, stable labels `S1..Sn`; versioned prompt file (`app/rag/prompts/answer_v1.txt`); XML-escaped sources with neutralised marker-like text
+- Local output validation (`app/rag/grounding.py`): strict JSON parsing, unknown labels removed, uncited sentences, unsupported quotations and unsupported numbers or identifiers dropped, answer-level citation fallback reported as such
+- `LLM_*`, `RAG_*` and `RATE_LIMIT_RAG_ATTEMPTS` settings in `.env.example` and Compose (the container reaches a host Ollama through `host.docker.internal`)
+- Answer-generation evaluation (`python -m evaluation.rag_eval`) with a 48-question dataset (`evaluation/rag/`) including unanswerable, contradictory and adversarial cases, deterministic metrics and stored results for three local models
+
+### Changed
+
+- `HybridSearchService.search` accepts a server-set candidate limit (used by reranking and RAG); the semantic and hybrid endpoints are unchanged
+
 ### Added - Phase 8: Optional Reranking
 
 - Cross-encoder reranking layer (`app/reranking/`): a `Reranker` interface independent of the embedding provider, a transformers-based multilingual cross-encoder (pinned revision, safetensors only, no remote code, architecture and single-output validation), pure ordering logic with deterministic ties, a registry that loads one model per process lazily, and `python -m app.reranking.download`
@@ -284,7 +297,7 @@ This project uses semantic versioning. Version numbers follow MAJOR.MINOR.PATCH 
 | 0.6.0 | Phase 6 Complete | Embeddings and semantic search working (hybrid search follows) |
 | 0.7.0 | Phase 7 Complete | Hybrid retrieval working (reranking follows) |
 | 0.8.0 | Phase 8 Complete | Optional reranking working (RAG follows) |
-| 0.9.0 | Phase 9 Complete | Conversations working |
+| 0.9.0 | Phase 9 Complete | Grounded RAG answers working (conversations follow) |
 | 0.10.0 | Phase 10 Complete | Versioning & access control working |
 | 0.11.0 | Phase 11 Complete | Evaluation framework working |
 | 0.12.0 | Phase 12 Complete | Frontend working |

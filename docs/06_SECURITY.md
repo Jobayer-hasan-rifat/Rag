@@ -641,3 +641,27 @@ pip-audit -r requirements.txt
   `load_ms`); never the query, passages or library error messages.
 - **Residual.** Reranking is CPU-heavy; a user can spend the shared search budget faster. The deployment can turn it
   off, cap candidates or lower the timeout.
+
+## Answer Generation Security (Phase 9)
+
+- **Authorization comes first and is unchanged.** The model only ever receives chunks that the owner-scoped, `ready`-only
+  retrieval returned for the requesting user; labels are assigned by the server; citation metadata is read from the database
+  record behind a label. Nothing a caller or the model writes can add a source.
+- **Retrieved text is untrusted data, even from the user's own documents.** The system instructions are a fixed file; the
+  question and sources are in the user message, XML-escaped (so a source cannot close a tag), with marker-like text
+  neutralised (so a source cannot forge `[S1]`) and attribute values (document names, headings) escaped and bounded. The
+  prompt tells the model that sources are evidence, not instructions. **This does not make injection impossible**: a model can
+  still be misled by text it is shown. The defence that does not depend on model obedience is the deterministic output
+  validation: invented labels, quotations not found in a cited source, and numbers or identifiers not found in a cited source
+  are removed, so an obeyed injection cannot produce a citation to a source that was not shown or a fabricated figure with a
+  valid-looking label. It can still produce a fluent, cited sentence that misstates a real source or an uncited-looking
+  instruction-following sentence that happens to reuse real words; that residual risk is why answers carry citations the
+  reader can check.
+- **No actions.** The model has no tools; nothing in a document triggers a request, a write or a lookup.
+- **Provider safety.** The key is a `SecretStr`, never in a repr, a log, an error or the response; never sent over plain http
+  to a remote host; the base URL may not contain credentials; no environment proxy; no redirects; timeouts and a concurrency
+  gate; one retry only for unusable output.
+- **Privacy.** With a hosted provider the question and selected passages leave the deployment. Local providers keep them
+  on the machine. Documented in the stack notes and the deployment settings.
+- **Logging.** One `rag answer` event with counts, token usage and timings; never the question, passages, prompt, answer or key.
+- **Failure.** Provider problems are explicit 502/503 responses without provider details.

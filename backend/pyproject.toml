@@ -50,6 +50,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+"app.rag" = ["prompts/*.txt"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -77,7 +80,7 @@ known-third-party = ["alembic"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S608", "RUF001", "RUF002", "RUF003"]  # tests use deliberate Unicode
 "benchmarks/**" = ["S311", "S106", "RUF001", "RUF002", "RUF003"]  # seeded data, throwaway DB
-"evaluation/**" = ["S101", "S106", "RUF001", "RUF002", "RUF003"]  # tooling, deliberate Unicode
+"evaluation/**" = ["S101", "S106", "S603", "S607", "RUF001", "RUF002", "RUF003"]  # tooling, deliberate Unicode
 
 [tool.black]
 line-length = 100

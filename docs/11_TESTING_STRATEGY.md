@@ -674,3 +674,18 @@ limit, every fallback reason, degraded retriever plus reranking, log hygiene, pr
 real-model tests (`RAG_REAL_MODEL_TESTS=1`) for the pinned cross-encoder.
 
 **Phase 8 results (2026-10-13)**: 1351 tests; 1350 pass with RAG_REAL_MODEL_TESTS=1 (19 real-model tests for the embedding model and the reranker are skipped in an ordinary run, and 1 POSIX-permissions test is skipped on Windows); about 98% line coverage; ruff, black and mypy clean; pip-audit reports no known vulnerabilities.
+
+**Phase 9 additions (2026-10-13)**: unit tests for the provider layer (request shape and usage parsing for Ollama and
+OpenAI-compatible APIs over a mock transport, every error mapping, key and prompt hygiene in logs, redirects, proxies,
+registry), settings validation, the token estimate, context selection (limits, duplicates, determinism, truncation, budget
+measured on the escaped text, long attributes), prompt construction (escaping, label neutralisation, attribute injection),
+the grounding checks (parsing, sentence splitting, labels, answer-level fallback, quotations, numbers in several scripts,
+whole-token matching, Bengali digits and Unicode normalisation), and the evaluation metrics and dataset; API tests with a
+deterministic fake provider through the real retrieval (contract, disabled mode, validation and limits, abstention, invented
+labels, fabricated quotes and figures, every provider failure, malformed output and retry, ownership isolation including what
+text reached the model, filters, injection documents and a model that obeys them, no database connection held during
+generation, Bangla and mixed-language flows, normalisation, context bounds, retrieval options, reranking and its fallback,
+degraded retrieval, log hygiene, rate limits, body cap); and opt-in real-provider tests (`RAG_REAL_LLM_TESTS=1`, a running
+Ollama with the model already pulled).
+
+**Phase 9 results (2026-10-13)**: 1545 tests; 1544 pass with the opt-in real-model tests enabled (the real embedding, reranker and local language-model tests are skipped in an ordinary run, and 1 POSIX-permissions test is skipped on Windows); about 98% line coverage; ruff, black and mypy clean, also in an environment without the ML libraries (as in CI); pip-audit reports no known vulnerabilities.
