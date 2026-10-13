@@ -7,16 +7,10 @@ from app.dependencies import CurrentUser, RagServiceDep, enforce_rag_rate_limit
 from app.exceptions import RagDisabledError
 from app.schemas.common import ErrorResponse, ResponseEnvelope
 from app.schemas.rag import (
-    CitationResponse,
     RagAnswerRequest,
     RagAnswerResponse,
-    RagContextInfo,
-    RagGenerationInfo,
-    RagRetrievalInfo,
-    RagTimings,
-    RagValidationInfo,
 )
-from app.services.rag_service import Citation, RagOutcome
+from app.services.rag_presenter import build_response
 
 router = APIRouter(prefix="/rag", tags=["rag"])
 
@@ -28,82 +22,6 @@ _ERRORS: dict[int | str, dict[str, Any]] = {
     502: {"model": ErrorResponse, "description": "The generated output could not be validated"},
     503: {"model": ErrorResponse, "description": "Answer generation is disabled or unavailable"},
 }
-
-
-def _citation(item: Citation) -> CitationResponse:
-    record = item.block.record
-    return CitationResponse(
-        label=item.block.label,
-        document_id=record.document_id,
-        chunk_id=record.chunk_id,
-        document_name=record.document_name,
-        chunk_index=record.chunk_index,
-        section_ordinal=record.section_ordinal,
-        page_number=record.page_number,
-        heading=record.heading,
-        heading_path=list(record.heading_path),
-        start_char=record.start_char,
-        end_char=record.end_char,
-        excerpt=item.excerpt,
-        excerpt_truncated=item.excerpt_truncated,
-        source_truncated=item.block.truncated,
-    )
-
-
-def _response(outcome: RagOutcome) -> RagAnswerResponse:
-    retrieval = outcome.retrieval
-    diagnostics = retrieval.diagnostics
-    grounded = outcome.grounded
-    generation = None
-    if outcome.generation is not None:
-        result = outcome.generation.result
-        generation = RagGenerationInfo(
-            provider=outcome.generation.provider,
-            model=outcome.generation.model,
-            prompt_version=outcome.generation.prompt_version,
-            attempts=outcome.generation.attempts,
-            input_tokens=result.input_tokens,
-            output_tokens=result.output_tokens,
-            finish_reason=result.finish_reason,
-            latency_ms=result.latency_ms,
-        )
-    return RagAnswerResponse(
-        answer=outcome.answer,
-        insufficient_evidence=outcome.insufficient,
-        insufficient_reason=outcome.insufficient_reason,
-        citations=[_citation(item) for item in outcome.citations],
-        retrieval=RagRetrievalInfo(
-            mode=outcome.mode,
-            candidates=len(retrieval.results),
-            dense_candidates=diagnostics.dense_candidates,
-            sparse_candidates=diagnostics.sparse_candidates,
-            retrievers_used=list(diagnostics.retrievers_used),
-            degraded=outcome.degraded,
-            reranked=outcome.reranked,
-            embedding_model=retrieval.config.model,
-            model_revision=retrieval.config.revision,
-        ),
-        context=RagContextInfo(
-            sources_supplied=len(outcome.context.blocks),
-            duplicates_dropped=outcome.context.duplicates_dropped,
-            truncated_sources=outcome.context.truncated_blocks,
-            estimated_input_tokens=outcome.context.estimated_tokens,
-            budget_tokens=outcome.context.budget_tokens,
-        ),
-        generation=generation,
-        validation=(
-            None
-            if grounded is None
-            else RagValidationInfo(
-                unknown_labels_removed=grounded.removed_unknown_labels,
-                uncited_sentences_removed=grounded.removed_uncited_sentences,
-                fabricated_quotes_removed=grounded.removed_fabricated_quotes,
-                unsupported_literals_removed=grounded.removed_unsupported_literals,
-                citation_granularity=grounded.granularity,
-            )
-        ),
-        timings=RagTimings(**outcome.timings),
-    )
 
 
 @router.post(
@@ -141,4 +59,4 @@ async def answer(
         max_sources=body.max_sources,
         max_answer_tokens=body.max_answer_tokens,
     )
-    return envelope(request, _response(outcome))
+    return envelope(request, build_response(outcome))

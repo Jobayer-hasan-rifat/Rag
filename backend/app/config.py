@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from app.embeddings.constants import VECTOR_DIMENSION
 
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "host.docker.internal"})
+_TURN_SLACK_SECONDS = 90  # retrieval, validation and database time around the model calls
 _PROMPT_RESERVE_TOKENS = 700  # instructions and question, estimated conservatively
 
 _COMMIT_SHA = re.compile(r"[0-9a-f]{40}")
@@ -128,6 +129,14 @@ class Settings(BaseSettings):
     rag_max_chunk_tokens: int = Field(default=600, ge=50, le=4000)
     rag_context_token_budget: int = Field(default=2400, ge=200, le=100000)
     rag_queue_timeout_seconds: int = Field(default=15, ge=1, le=300)
+    conversation_history_turns: int = Field(default=4, ge=0, le=20)
+    conversation_history_token_budget: int = Field(default=400, ge=0, le=20000)
+    conversation_history_message_tokens: int = Field(default=150, ge=20, le=2000)
+    conversation_followup_max_words: int = Field(default=8, ge=1, le=100)
+    conversation_retrieval_context_turns: int = Field(default=1, ge=0, le=5)
+    conversation_max_per_user: int = Field(default=1000, ge=1, le=100000)
+    conversation_max_messages: int = Field(default=400, ge=2, le=10000)
+    conversation_processing_stale_seconds: int = Field(default=480, ge=30, le=7200)
     worker_max_tasks_per_child: int = Field(default=50, ge=1)
     worker_max_memory_per_child_kb: int = Field(default=1_000_000, ge=50_000)
 
@@ -137,6 +146,8 @@ class Settings(BaseSettings):
     rate_limit_upload_attempts: int = Field(default=20, ge=1)
     rate_limit_search_attempts: int = Field(default=60, ge=1)
     rate_limit_rag_attempts: int = Field(default=10, ge=1)
+    rate_limit_conversation_messages: int = Field(default=10, ge=1)
+    rate_limit_conversation_manage: int = Field(default=120, ge=1)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -263,15 +274,30 @@ class Settings(BaseSettings):
             raise ValueError("LLM_API_KEY is never sent over plain http to a remote host")
         if self.llm_provider == "openai_compatible" and not local and self.llm_api_key is None:
             raise ValueError("LLM_API_KEY is required for a remote openai_compatible endpoint")
+        worst_turn = (
+            self.rag_queue_timeout_seconds
+            + 2 * self.llm_timeout_seconds  # one retry of an unusable completion
+            + self.rerank_timeout_seconds
+            + _TURN_SLACK_SECONDS
+        )
+        if self.conversation_processing_stale_seconds <= worst_turn:
+            raise ValueError(
+                "CONVERSATION_PROCESSING_STALE_SECONDS must exceed the slowest possible turn "
+                f"({worst_turn} s with the current timeouts)"
+            )
         if self.rag_max_sources > self.rag_candidates:
             raise ValueError("RAG_MAX_SOURCES must not exceed RAG_CANDIDATES")
         reserve = (
-            self.rag_context_token_budget + self.llm_max_output_tokens + _PROMPT_RESERVE_TOKENS
+            self.rag_context_token_budget
+            + self.llm_max_output_tokens
+            + self.conversation_history_token_budget
+            + _PROMPT_RESERVE_TOKENS
         )
         if reserve > self.llm_context_tokens:
             raise ValueError(
                 "RAG_CONTEXT_TOKEN_BUDGET + LLM_MAX_OUTPUT_TOKENS + "
-                f"{_PROMPT_RESERVE_TOKENS} must fit in LLM_CONTEXT_TOKENS"
+                f"CONVERSATION_HISTORY_TOKEN_BUDGET + {_PROMPT_RESERVE_TOKENS} must fit in "
+                "LLM_CONTEXT_TOKENS"
             )
 
     @property

@@ -665,3 +665,20 @@ pip-audit -r requirements.txt
   on the machine. Documented in the stack notes and the deployment settings.
 - **Logging.** One `rag answer` event with counts, token usage and timings; never the question, passages, prompt, answer or key.
 - **Failure.** Provider problems are explicit 502/503 responses without provider details.
+
+## Conversation Security (Phase 10)
+
+- **Ownership.** Every query filters on the caller's id; a foreign and a missing conversation are the same 404. The
+  database also enforces it: a message cannot reference another user's conversation. No request body carries an owner,
+  role or status; unknown fields are rejected. Administrators have no extra access.
+- **History is untrusted.** Stored questions and answers are read back as data: escaped, delimited, bounded, with citation
+  markers removed, under a system prompt that says history is not evidence. Citations are validated only against the
+  passages retrieved for the current question, so earlier text can never become a source. Retrieval is authorised again for
+  every question; document filters are not inherited.
+- **Retries and concurrency.** One question per conversation is in flight at a time; idempotency keys cannot be replayed
+  for a different request; a superseded request cannot store an answer.
+- **Data minimisation.** Citations are stored as references without text. Deleting a document removes its name and headings
+  from stored references; deleting a conversation or account removes its messages.
+- **Logging.** Events carry ids, counts and timings only, never questions, answers, titles, idempotency keys or prompts.
+- **Abuse limits.** Separate rate limits for generation and management, 128 KiB body cap, per-user and per-conversation
+  caps, bounded page sizes.

@@ -1126,3 +1126,28 @@ graph LR
 - The database connection is released before generation; generation runs behind a concurrency gate with a timeout.
 
 Decisions: DEC-056 to DEC-062.
+
+## Conversations (Phase 10)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as ConversationService
+    participant D as PostgreSQL
+    participant R as RagService
+    C->>S: POST /conversations/{id}/messages
+    S->>D: Tx A: lock conversation, store question (processing), read bounded history, commit
+    S->>R: answer(question, history)  (no transaction, no connection)
+    R-->>S: validated answer and citations
+    S->>D: Tx B: lock conversation, mark question answered (fenced), store answer, commit
+    S-->>C: question + answer
+```
+
+The conversation service is the only new orchestrator: it owns persistence, ordering and recovery and calls the
+existing `RagService` for retrieval, generation and validation. The two transactions are short; the model call between
+them holds no database resources. A partial unique index allows one `processing` question per conversation, so
+concurrent submissions are decided by the database. A question that is still `processing` after
+`CONVERSATION_PROCESSING_STALE_SECONDS` is marked `failed` (`interrupted`) the next time the conversation is used. An
+attempt counter on the question fences the second transaction: a request that was superseded cannot store an answer.
+History is read from the database by the server, never taken from the client, and enters the prompt only through the
+bounded, escaped history block (see DEC-067).

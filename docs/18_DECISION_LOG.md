@@ -1095,6 +1095,65 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 ---
 
+### DEC-063: Conversations Are Hard-Deleted; Messages Cascade
+
+**Date**: 2026-10-14
+**Status**: Accepted (supersedes the earlier "soft delete first" note for conversations)
+
+**Chosen Option**: deleting a conversation removes it and its messages in one statement; deleting an account cascades; deleting a document rewrites stored citation references to that document so only identifiers remain. The stored answer text stays until its conversation is deleted.
+
+**Reason**: a soft-deleted conversation keeps personal text the user asked to remove and needs a retention job to purge it, which adds a background process with no benefit to the user. A user who deletes a conversation expects it to be gone.
+
+**Consequences**: there is no undo. A retention period can be added later as a purge of old conversations without a schema change.
+
+---
+
+### DEC-064: Two Message Rows Per Exchange, Ownership Enforced by the Database
+
+**Date**: 2026-10-14
+**Status**: Accepted
+
+**Chosen Option**: a question is a `user` message and its answer an `assistant` message that points at it (`reply_to_id`, unique). Each message carries `user_id` through a composite foreign key `(conversation_id, user_id)` to the conversation; sequence numbers are unique per conversation; citations are references in jsonb.
+
+**Reason**: an application bug cannot attach a message to another user's conversation, or create two answers to one question. Storing references instead of retrieved text keeps document content out of the conversation tables.
+
+---
+
+### DEC-065: A Turn Is Synchronous, in Two Short Transactions, With No Queue
+
+**Date**: 2026-10-14
+**Status**: Accepted
+
+**Chosen Option**: the first transaction locks the conversation row, stores the question as `processing` (a partial unique index allows one in-flight question per conversation), reads the bounded history and commits. Retrieval and generation then run with no transaction or connection held. The second transaction stores the answer; it is fenced by an attempt counter so an interrupted or superseded request cannot overwrite a newer one. A failure marks the question `failed` with a reason and stores no answer. An in-flight question older than `CONVERSATION_PROCESSING_STALE_SECONDS` (validated to exceed the slowest possible turn) is marked `failed` when the conversation is next used.
+
+**Reason**: generation already runs in the API process behind a gate (DEC-061); a queue would add a broker round trip, a polling API and a second failure path without making the model faster. The unique index makes concurrent submissions deterministic: one wins, the other gets `409 CONVERSATION_BUSY`.
+
+**Consequences**: a client disconnect does not cancel a generation that already started; the answer is stored and visible on the next read.
+
+---
+
+### DEC-066: Idempotency Keys Are Per Conversation and Cover the Whole Request
+
+**Date**: 2026-10-14
+**Status**: Accepted
+
+**Chosen Option**: the optional `Idempotency-Key` is unique per conversation and bound to a hash of the normalised question, filters, retrieval mode, rerank flag and limits. An answered key replays the stored result without calling the model (even if a filtered document was deleted since); a failed one is retried on the same question; an in-flight one is `409`; a different request under the same key is `409`.
+
+**Reason**: a client that times out must be able to retry without creating a duplicate question or paying for a second generation.
+
+---
+
+### DEC-067: History Is Untrusted Context, Never Evidence
+
+**Date**: 2026-10-14
+**Status**: Accepted
+
+**Chosen Option**: the last `CONVERSATION_HISTORY_TURNS` answered exchanges are added to the prompt as an escaped, token-bounded, delimited block under a new prompt version (`answer_v2`) that states it is not evidence. Citation markers are stripped from earlier answers and "no answer was found" replaces an abstention. Citations are validated only against this turn's retrieved sources. A question shorter than `CONVERSATION_FOLLOWUP_MAX_WORDS` words is retrieved together with the previous question so a follow-up like "and in July?" finds the right passages. Filters are not inherited and every retrieval is authorised for the caller again.
+
+**Reason**: history makes follow-ups understandable but must not let an earlier model answer (or text a user pasted) become a source, override the rules, or widen what a request may read.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

@@ -689,3 +689,15 @@ degraded retrieval, log hygiene, rate limits, body cap); and opt-in real-provide
 Ollama with the model already pulled).
 
 **Phase 9 results (2026-10-13)**: 1545 tests; 1544 pass with the opt-in real-model tests enabled (the real embedding, reranker and local language-model tests are skipped in an ordinary run, and 1 POSIX-permissions test is skipped on Windows); about 98% line coverage; ruff, black and mypy clean, also in an environment without the ML libraries (as in CI); pip-audit reports no known vulnerabilities.
+
+**Phase 10 additions (2026-10-14)**: schema tests against a real database (ownership key, cascades, one answer per
+question, one in-flight question, idempotency uniqueness, citation and content bounds, migration up and down); unit
+tests for title cleaning, fingerprints and the history selector; API tests for every endpoint (ownership, 404
+equivalence, no admin access, forged fields, pagination bounds), history policy (never evidence, escaping, bounds,
+per-turn filters), failures and recovery (provider errors, store failure, crashed worker, stale takeover), idempotency
+(replay, retry, reuse, in-flight, replay after a document was deleted), concurrency (a second question while one runs,
+independent conversations), citation lifecycle (deleted document, unsearchable chunk) and log redaction.
+
+**Phase 10 results (2026-10-14)**: 1681 tests; 1657 pass and 24 are skipped in an ordinary Windows run (the opt-in
+real-model tests and 1 POSIX-only test); ruff, black and mypy clean; the dependency audit reports no known
+vulnerabilities.

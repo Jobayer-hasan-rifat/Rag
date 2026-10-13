@@ -22,6 +22,7 @@ from app.rag.rendering import render_source as render_block
 __all__ = [
     "ANSWER_SCHEMA",
     "PROMPT_VERSION",
+    "PROMPT_VERSION_HISTORY",
     "build_user_message",
     "load_system_prompt",
     "neutralise_labels",
@@ -29,6 +30,7 @@ __all__ = [
     "render_source",
 ]
 PROMPT_VERSION = "answer_v1"
+PROMPT_VERSION_HISTORY = "answer_v2"  # the same rules plus the conversation-history rule
 _PROMPT_DIR = Path(__file__).parent / "prompts"
 
 ANSWER_SCHEMA: dict[str, Any] = {
@@ -58,10 +60,13 @@ def render_source(block: ContextBlock) -> str:
     return render_block(block.label, block.record, block.text)
 
 
-def build_user_message(question: str, blocks: list[ContextBlock]) -> str:
+def build_user_message(
+    question: str, blocks: list[ContextBlock], history_block: str | None = None
+) -> str:
     sources = "\n".join(render_source(block) for block in blocks)
+    history = f"{history_block}\n\n" if history_block else ""
     return (
-        f"<question>\n{html.escape(question, quote=False)}\n</question>\n\n"
+        f"{history}<question>\n{html.escape(question, quote=False)}\n</question>\n\n"
         f"<sources>\n{sources}\n</sources>\n\n"
         "Answer the question using only the sources above."
     )

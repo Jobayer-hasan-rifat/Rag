@@ -100,6 +100,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ("POST", "/api/v1/search/semantic"): SEARCH_BODY_LIMIT_BYTES,
             ("POST", "/api/v1/search/hybrid"): SEARCH_BODY_LIMIT_BYTES,
             ("POST", "/api/v1/rag/answer"): SEARCH_BODY_LIMIT_BYTES,
+            ("POST", "/api/v1/conversations"): SEARCH_BODY_LIMIT_BYTES,
+            ("PATCH", "/api/v1/conversations/{id}"): SEARCH_BODY_LIMIT_BYTES,
+            ("POST", "/api/v1/conversations/{id}/messages"): SEARCH_BODY_LIMIT_BYTES,
         },
         error_factory=RequestTooLargeError,
     )

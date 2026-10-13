@@ -162,3 +162,15 @@ def test_default_chunking_sizes_are_accepted(make_settings: SettingsFactory) -> 
     settings = make_settings()
     assert (settings.chunking_max_chars, settings.chunking_overlap_chars) == (1000, 150)
     assert settings.chunking_min_chars == 20 and settings.chunking_max_chunks == 50_000
+
+
+def test_the_stale_window_must_exceed_the_slowest_possible_turn(
+    make_settings: SettingsFactory,
+) -> None:
+    with pytest.raises(ValidationError, match="CONVERSATION_PROCESSING_STALE_SECONDS"):
+        make_settings(
+            rag_enabled=True,
+            conversation_processing_stale_seconds=30,
+            llm_timeout_seconds=120,
+            rag_queue_timeout_seconds=15,
+        )

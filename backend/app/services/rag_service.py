@@ -1,6 +1,7 @@
 import asyncio
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from app.config import Settings
@@ -31,9 +32,17 @@ from app.rag.grounding import (
     insufficient_message,
     parse_model_output,
 )
+from app.rag.history import (
+    HistorySelection,
+    HistoryTurn,
+    render_history,
+    retrieval_query,
+    select_history,
+)
 from app.rag.prompt import (
     ANSWER_SCHEMA,
     PROMPT_VERSION,
+    PROMPT_VERSION_HISTORY,
     build_user_message,
     load_system_prompt,
 )
@@ -79,6 +88,8 @@ class RagOutcome:
     generation: GenerationDetails | None
     grounded: GroundedAnswer | None
     timings: dict[str, int] = field(default_factory=dict)
+    history: HistorySelection | None = None  # turns shown to the model (conversations only)
+    retrieval_extended: bool = False  # the retrieval query included an earlier question
 
 
 class RagService:
@@ -116,6 +127,22 @@ class RagService:
             )
         return sources, tokens
 
+    def validate(
+        self,
+        question: str,
+        *,
+        max_sources: int | None,
+        max_answer_tokens: int | None,
+        rerank: bool,
+    ) -> str:
+        """The cheap request checks of `answer`, without touching the database or the model.
+        Returns the normalised question. Raises the same errors `answer` would."""
+        text = prepare_query(question, self._settings)
+        self._limits(max_sources, max_answer_tokens)
+        if rerank and self._rerank is None:
+            raise RerankingDisabledError()
+        return text
+
     async def answer(
         self,
         actor: User,
@@ -127,6 +154,7 @@ class RagService:
         rerank: bool,
         max_sources: int | None,
         max_answer_tokens: int | None,
+        history: Sequence[HistoryTurn] = (),
     ) -> RagOutcome:
         started = time.monotonic()
         settings = self._settings
@@ -135,13 +163,35 @@ class RagService:
         mode = retrieval or settings.rag_retrieval_mode
         if rerank and self._rerank is None:
             raise RerankingDisabledError()
-        system_prompt = load_system_prompt(PROMPT_VERSION)
+        prompt_version = PROMPT_VERSION_HISTORY if history else PROMPT_VERSION
+        system_prompt = load_system_prompt(prompt_version)
+        selection_of_history: HistorySelection | None = None
+        history_block: str | None = None
+        retrieval_text, extended = text, False
+        if history:
+            selection_of_history = select_history(
+                history,
+                max_turns=settings.conversation_history_turns,
+                budget_tokens=settings.conversation_history_token_budget,
+                message_tokens=settings.conversation_history_message_tokens,
+            )
+            if selection_of_history.turns:
+                history_block = render_history(selection_of_history.turns)
+            retrieval_text, extended = retrieval_query(
+                text,
+                [turn.question for turn in history],
+                max_words=settings.conversation_followup_max_words,
+                turns=settings.conversation_retrieval_context_turns,
+                max_chars=settings.search_max_query_chars,
+            )
+        history_tokens = estimate_tokens(history_block) if history_block else 0
         budget = min(
             settings.rag_context_token_budget,
             settings.llm_context_tokens
             - answer_tokens
             - estimate_tokens(system_prompt)
             - estimate_tokens(text)
+            - history_tokens
             - 300,
         )
         if budget < MIN_CONTEXT_TOKENS:
@@ -152,7 +202,7 @@ class RagService:
         )
         outcome = await self._hybrid.search(
             actor,
-            query=text,
+            query=retrieval_text,
             top_k=None,
             document_ids=document_ids,
             collection_id=collection_id,
@@ -169,7 +219,7 @@ class RagService:
         if rerank and ranked and self._rerank is not None:
             rerank_started = time.monotonic()
             result = await self._rerank.rerank(
-                text,
+                retrieval_text,
                 [RerankInput(r.chunk_id, r.text, rank) for r, rank in ranked],
                 top_k=len(ranked),
             )
@@ -197,7 +247,7 @@ class RagService:
         else:
             generation_started = time.monotonic()
             generation, grounded = await self._generate(
-                text, selection.blocks, system_prompt, answer_tokens
+                text, selection.blocks, system_prompt, answer_tokens, prompt_version, history_block
             )
             generation_ms = round((time.monotonic() - generation_started) * 1000)
             reason = None if grounded.answerable else grounded.reason
@@ -234,10 +284,18 @@ class RagService:
             generation=generation,
             grounded=grounded,
             timings=timings,
+            history=selection_of_history,
+            retrieval_extended=extended,
         )
 
     async def _generate(
-        self, question: str, blocks: list[ContextBlock], system_prompt: str, answer_tokens: int
+        self,
+        question: str,
+        blocks: list[ContextBlock],
+        system_prompt: str,
+        answer_tokens: int,
+        prompt_version: str,
+        history_block: str | None,
     ) -> tuple[GenerationDetails, GroundedAnswer]:
         settings = self._settings
         try:
@@ -247,7 +305,7 @@ class RagService:
             raise GenerationUnavailableError("unavailable") from None
         request = GenerationRequest(
             system=system_prompt,
-            user=build_user_message(question, blocks),
+            user=build_user_message(question, blocks, history_block),
             max_output_tokens=answer_tokens,
             json_schema=ANSWER_SCHEMA if settings.llm_structured_output != "none" else None,
         )
@@ -274,7 +332,7 @@ class RagService:
                     continue
                 grounded = ground_answer(parsed, blocks)
                 details = GenerationDetails(
-                    settings.llm_provider, settings.llm_model, PROMPT_VERSION, attempt, result
+                    settings.llm_provider, settings.llm_model, prompt_version, attempt, result
                 )
                 return details, grounded
         finally:

@@ -11,6 +11,7 @@ from app.config import Settings
 from app.core.documents.lifecycle import DocumentStatus, ensure_transition
 from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
+from app.db.repositories.conversation_repository import ConversationRepository
 from app.db.repositories.document_repository import (
     CollectionRef,
     DocumentFilters,
@@ -80,8 +81,10 @@ class DocumentService:
         storage: StorageProvider,
         processing_queue: ProcessingQueue,
         settings: Settings,
+        conversations: ConversationRepository | None = None,
     ) -> None:
         self._session = session
+        self._conversations = conversations
         self._documents = documents
         self._collections = collections
         self._chunks = chunks
@@ -230,6 +233,9 @@ class DocumentService:
                 extra={"document_id": str(document.id)},
             )
         await self._documents.delete(document)
+        if self._conversations is not None:
+            # stored citations of this document keep only identifiers once it is gone
+            await self._conversations.scrub_document_citations(actor.id, document_id)
         await self._session.commit()
         logger.info(
             "document deleted", extra={"user_id": str(actor.id), "document_id": str(document_id)}

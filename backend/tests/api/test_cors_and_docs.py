@@ -52,6 +52,9 @@ def test_openapi_documents_versioned_routes_only(offline_client: TestClient) -> 
         "/api/v1/search/semantic",
         "/api/v1/search/hybrid",
         "/api/v1/rag/answer",
+        "/api/v1/conversations",
+        "/api/v1/conversations/{conversation_id}",
+        "/api/v1/conversations/{conversation_id}/messages",
     }
 
 

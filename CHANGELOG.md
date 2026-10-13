@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 10: Persistent Conversations
+
+- `conversations` and `messages` tables (migration `0008`, reversible): ownership enforced by a composite foreign key, per-conversation sequence numbers, one answer per question, one in-flight question per conversation, idempotency keys unique per conversation, citations stored as references only, cascade on conversation and account deletion
+- `/api/v1/conversations`: create, list (paginated, newest activity first), read with a bounded message page, rename, delete, and `POST /{id}/messages`; every endpoint is owner-scoped (a foreign conversation is the same 404 as a missing one), bodies are capped at 128 KiB, message generation has its own rate limit
+- Conversation service on top of the existing RAG service: question stored first, no transaction or connection held while retrieving or generating, answer stored in a second short transaction; failures keep the question as `failed` and store no answer; stale in-flight questions are marked interrupted; `Idempotency-Key` replay and retry
+- Bounded, escaped, delimited conversation history under prompt version `answer_v2`; short follow-ups are retrieved together with the previous question; filters are per question; citations are validated per answer
+- Deterministic titles (no model call), NFC-normalised and stripped of control and invisible format characters
+- Deleting a document removes its name and headings from stored citation references
+- `CONVERSATION_*` and `RATE_LIMIT_CONVERSATION_*` settings in `.env.example` and Compose; a validated stale-turn window
+- `python -m benchmarks.conversation_baseline` measures list and history latency, database statements per turn and the effect of history
+
+### Changed
+
+- Conversations are hard-deleted (DEC-063); the response builders for answers moved into a shared presenter used by both `/rag/answer` and conversations; `/rag/answer` behaviour is unchanged
+
 ### Added - Phase 9: Retrieval-Augmented Generation
 
 - Generation-provider layer (`app/llm/`): an async `LLMProvider` interface with a local Ollama provider and an OpenAI-compatible provider over `httpx` (no vendor SDK); configurable model, temperature, output and context limits, timeout and concurrency; keys only from the environment, never over plain http to a remote host, no environment proxy, no redirects, provider bodies never logged or returned

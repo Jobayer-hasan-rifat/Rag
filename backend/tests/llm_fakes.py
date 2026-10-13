@@ -1,5 +1,6 @@
 """Deterministic generation providers for tests. The application never ships these."""
 
+import asyncio
 import json
 import re
 from collections.abc import Callable
@@ -45,11 +46,14 @@ class FakeLLM:
         self.requests: list[GenerationRequest] = []
         self.script: Callable[[GenerationRequest], str] | None = None
         self.on_call: Callable[[], None] | None = None  # runs while "generating"
+        self.delay = 0.0  # seconds the call takes (without blocking the event loop)
 
     async def generate(self, request: GenerationRequest) -> GenerationResult:
         self.requests.append(request)
         if self.on_call is not None:
             self.on_call()
+        if self.delay:
+            await asyncio.sleep(self.delay)
         if self.script is not None:
             text = self.script(request)
         else:

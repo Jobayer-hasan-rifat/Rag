@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 
 from starlette.requests import Request
@@ -5,6 +6,11 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.responses import error_response
 from app.exceptions import AppError, FileTooLargeError
+
+
+def _compile_path(path: str) -> re.Pattern[str]:
+    segments = ["[^/]+" if s.startswith("{") else re.escape(s) for s in path.split("/")]
+    return re.compile("^" + "/".join(segments) + "$")
 
 
 class BodySizeLimitMiddleware:
@@ -24,14 +30,27 @@ class BodySizeLimitMiddleware:
         error_factory: Callable[[int], AppError] = FileTooLargeError,
     ) -> None:
         self.app = app
-        self._rules = rules
+        self._rules = {k: v for k, v in rules.items() if "{" not in k[1]}
+        # a `{name}` segment in a rule path matches any single path segment
+        self._patterns = [
+            (method, _compile_path(path), limit)
+            for (method, path), limit in rules.items()
+            if "{" in path
+        ]
         self._overhead = overhead_bytes
         self._error_factory = error_factory
 
+    def _limit_for(self, scope: Scope) -> int | None:
+        exact = self._rules.get((scope["method"], scope["path"]))
+        if exact is not None:
+            return exact
+        for method, pattern, limit in self._patterns:
+            if scope["method"] == method and pattern.match(scope["path"]):
+                return limit
+        return None
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        limit = (
-            self._rules.get((scope["method"], scope["path"])) if scope["type"] == "http" else None
-        )
+        limit = self._limit_for(scope) if scope["type"] == "http" else None
         if limit is None:
             await self.app(scope, receive, send)
             return

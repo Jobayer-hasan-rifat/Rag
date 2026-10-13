@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from app.config import Settings
 from app.db.repositories.chunk_repository import ChunkRepository
 from app.db.repositories.collection_repository import CollectionRepository
+from app.db.repositories.conversation_repository import ConversationRepository
 from app.db.repositories.document_repository import DocumentRepository
 from app.db.repositories.embedding_repository import EmbeddingRepository
 from app.db.repositories.lexical_repository import LexicalRepository
@@ -26,6 +27,7 @@ from app.security.rate_limit import RateLimiter
 from app.security.token_denylist import TokenDenylist
 from app.services.auth_service import AuthContext, AuthService
 from app.services.collection_service import CollectionService
+from app.services.conversation_service import ConversationService
 from app.services.document_service import DocumentService
 from app.services.health_service import HealthService
 from app.services.hybrid_search_service import HybridSearchService
@@ -194,6 +196,7 @@ def get_document_service(
         storage=storage,
         processing_queue=processing_queue,
         settings=settings,
+        conversations=ConversationRepository(session),
     )
 
 
@@ -260,6 +263,25 @@ def get_rag_service(
 
 
 RagServiceDep = Annotated[RagService | None, Depends(get_rag_service)]
+
+
+def get_conversation_service(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    rag: Annotated[RagService | None, Depends(get_rag_service)],
+    settings: SettingsDep,
+) -> ConversationService:
+    return ConversationService(
+        session=session,
+        conversations=ConversationRepository(session),
+        documents=DocumentRepository(session),
+        collections=CollectionRepository(session),
+        embeddings=EmbeddingRepository(session),
+        rag=rag,
+        settings=settings,
+    )
+
+
+ConversationServiceDep = Annotated[ConversationService, Depends(get_conversation_service)]
 CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
 HybridSearchServiceDep = Annotated[HybridSearchService, Depends(get_hybrid_search_service)]
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
@@ -299,3 +321,26 @@ async def enforce_rag_rate_limit(
     if not settings.rag_enabled:
         return  # a disabled endpoint answers 503 without spending the user's allowance
     await limiter.check("rag:user", str(user.id), max_attempts=settings.rate_limit_rag_attempts)
+
+
+async def enforce_conversation_message_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    """Each message costs a language-model call: its own budget, separate from management calls."""
+    if not settings.rag_enabled:
+        return
+    await limiter.check(
+        "conversation_message:user",
+        str(user.id),
+        max_attempts=settings.rate_limit_conversation_messages,
+    )
+
+
+async def enforce_conversation_manage_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    await limiter.check(
+        "conversation_manage:user",
+        str(user.id),
+        max_attempts=settings.rate_limit_conversation_manage,
+    )

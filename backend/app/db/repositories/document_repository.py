@@ -72,6 +72,18 @@ class DocumentRepository:
         await self._session.refresh(document)
         return document
 
+    async def lock_existing_ids(self, user_id: uuid.UUID, ids: set[uuid.UUID]) -> set[uuid.UUID]:
+        """The caller's documents among `ids` that still exist, locked against deletion until the
+        transaction ends (a concurrent delete waits, then scrubs what was stored meanwhile)."""
+        if not ids:
+            return set()
+        result = await self._session.execute(
+            select(Document.id)
+            .where(Document.user_id == user_id, Document.id.in_(ids))
+            .with_for_update(read=True)
+        )
+        return set(result.scalars().all())
+
     async def get(self, document_id: uuid.UUID) -> Document | None:
         return await self._session.get(Document, document_id)
 

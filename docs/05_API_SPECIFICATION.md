@@ -673,141 +673,7 @@ Query documents using RAG.
 
 ## Conversation Endpoints
 
-### GET /conversations
-
-List user's conversations.
-
-**Authentication**: Required
-
-**Query Parameters**:
-- `page` (int, default: 1): Page number
-- `page_size` (int, default: 20): Items per page
-
-**Response** (200):
-```json
-{
-  "data": [
-    {
-      "id": "uuid",
-      "title": "ML Discussion",
-      "message_count": 5,
-      "created_at": "2026-10-07T20:26:49.575Z",
-      "updated_at": "2026-10-07T20:26:49.575Z"
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "page_size": 20,
-    "total_items": 10,
-    "total_pages": 1,
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
----
-
-### POST /conversations
-
-Create a new conversation.
-
-**Authentication**: Required
-
-**Request Body**:
-```json
-{
-  "title": "ML Discussion"
-}
-```
-
-**Response** (201):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "title": "ML Discussion",
-    "message_count": 0,
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
----
-
-### GET /conversations/{id}
-
-Get conversation with messages.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Conversation ID
-
-**Query Parameters**:
-- `limit` (int, default: 50): Number of messages
-
-**Response** (200):
-```json
-{
-  "data": {
-    "id": "uuid",
-    "title": "ML Discussion",
-    "messages": [
-      {
-        "id": "uuid",
-        "role": "user",
-        "content": "What is machine learning?",
-        "created_at": "2026-10-07T20:26:49.575Z"
-      },
-      {
-        "id": "uuid",
-        "role": "assistant",
-        "content": "Machine learning is...",
-        "citations": [
-          {
-            "document_name": "ml_overview.pdf",
-            "page_number": 1
-          }
-        ],
-        "created_at": "2026-10-07T20:26:49.575Z"
-      }
-    ],
-    "created_at": "2026-10-07T20:26:49.575Z",
-    "updated_at": "2026-10-07T20:26:49.575Z"
-  },
-  "meta": {
-    "request_id": "uuid",
-    "timestamp": "2026-10-07T20:26:49.575Z"
-  }
-}
-```
-
-**Errors**:
-- 404: Conversation not found
-- 403: Not authorized
-
----
-
-### DELETE /conversations/{id}
-
-Delete conversation.
-
-**Authentication**: Required
-
-**Path Parameters**:
-- `id` (uuid): Conversation ID
-
-**Response** (204): No content
-
-**Errors**:
-- 404: Conversation not found
-- 403: Not authorized
+Implemented in Phase 10; see **Conversations (Phase 10)** at the end of this document.
 
 ---
 
@@ -1123,3 +989,59 @@ is not a usable answer object twice in a row, or reported a prompt that filled i
 usual 401, 404, 413, 422 and 429.
 
 **Not returned**: the prompt, the system instructions, the provider URL or key, raw model output, other users' data.
+
+## Conversations (Phase 10)
+
+Persistent, user-owned conversations. Every endpoint needs a bearer token and is scoped to the caller: another user's
+conversation and a missing one are the same `404 NOT_FOUND`; there is no administrator access and no owner, role or
+status field in any request body (unknown fields are `422`). Success bodies use the usual `{"data": ..., "meta": ...}`
+envelope; errors keep the Phase 9 contract.
+
+| Method and path | Purpose | Success |
+|---|---|---|
+| `POST /api/v1/conversations` | Create (`{"title": "..."}` optional) | 201 |
+| `GET /api/v1/conversations?page=&page_size=` | List, newest activity first (ties by id), `page_size` 1-100 | 200 |
+| `GET /api/v1/conversations/{id}?page=&page_size=&order=asc\|desc` | The conversation and one bounded page of messages | 200 |
+| `PATCH /api/v1/conversations/{id}` | Rename (`{"title": "..."}`) | 200 |
+| `DELETE /api/v1/conversations/{id}` | Delete the conversation and all its messages | 204 |
+| `POST /api/v1/conversations/{id}/messages` | Ask a question; the answer is generated and stored | 201 (200 on replay) |
+
+**Titles** are normalised (Unicode NFC), stripped of control, bidirectional-override and other invisible format
+characters, trimmed, and limited to 200 characters. A conversation created without a title is "New conversation" until
+its first question, then titled with the first 60 characters of that question cut at a word boundary. A title set by
+the user is never replaced. No model is called for titles.
+
+**Messages.** A question is a `user` message and its answer an `assistant` message (`reply_to_id` points at the
+question). Messages have a per-conversation `sequence`, a `status` (`processing`, `answered`, `failed` for questions;
+`complete` for answers) and, for a failed question, a `failure_reason`. `GET /{id}` returns at most `page_size`
+messages (default 20, maximum 100).
+
+**Asking.** The body is `{"content": "...", "document_ids": [...], "collection_id": "...", "retrieval": "hybrid|semantic",
+"rerank": false, "max_sources": 5, "max_answer_tokens": 400}`; only `content` is required. Document filters apply to
+that one question and are not remembered. The response holds the `conversation` summary, the `user_message`, the
+`assistant_message` (with `citations`, `insufficient_evidence` and `details` as in `POST /rag/answer`) and `replayed`.
+Citations are validated for this answer exactly as in Phase 9. Stored citations are references; the `excerpt` is read
+from the chunk when a message is shown, so `source_available` is false (and the excerpt absent) once the chunk is gone,
+and `removed` is true with only identifiers left once its document was deleted.
+
+**Idempotency.** An optional `Idempotency-Key` header (1-64 of `A-Z a-z 0-9 _ . : -`, scoped to the conversation) makes
+a retry safe: an answered key returns the stored result with `200` and `replayed: true` without calling the model; a key
+whose question failed is retried on the same question (no duplicate); a key whose question is still being answered is
+`409 MESSAGE_IN_PROGRESS`; the same key with a different question, filters or options is `409 IDEMPOTENCY_KEY_REUSED`.
+Without a key a retry is a new question.
+
+**Failures.** The question is stored before generation and is never lost. If generation fails the Phase 9 error is
+returned (`503 GENERATION_UNAVAILABLE`, `502 GENERATION_FAILED`, ...) with `details.message_id`, the question is marked
+`failed`, and no assistant message is stored. A request that dies mid-answer leaves a question that is marked
+`failed` (`interrupted`) the next time the conversation is used after `CONVERSATION_PROCESSING_STALE_SECONDS`.
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `CONVERSATION_BUSY` | 409 | Another question in this conversation is being answered (one at a time) |
+| `MESSAGE_IN_PROGRESS` | 409 | This idempotency key's question is still being answered |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | The key was used for a different request |
+| `CONVERSATION_LIMIT` | 409 | Too many conversations for the user, or the conversation is full |
+
+**Limits.** Request bodies are capped at 128 KiB. Message generation is rate limited separately
+(`RATE_LIMIT_CONVERSATION_MESSAGES`, default 10 per window) from management calls (`RATE_LIMIT_CONVERSATION_MANAGE`,
+default 120). Message sending requires `RAG_ENABLED`; managing and reading conversations does not.

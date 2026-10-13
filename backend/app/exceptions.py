@@ -181,6 +181,39 @@ class GenerationFailedError(AppError):
         super().__init__("The generated answer could not be validated, so no answer is returned")
 
 
+class ConversationBusyError(ConflictError):
+    """Another question in this conversation is still being answered."""
+
+    code = "CONVERSATION_BUSY"
+
+    def __init__(self) -> None:
+        super().__init__("Another message in this conversation is still being answered")
+
+
+class MessageInProgressError(ConflictError):
+    """The same message (idempotency key) is being processed by another request."""
+
+    code = "MESSAGE_IN_PROGRESS"
+
+    def __init__(self) -> None:
+        super().__init__("This message is already being processed; retry shortly")
+
+
+class IdempotencyKeyReusedError(ConflictError):
+    """An idempotency key was reused with a different request."""
+
+    code = "IDEMPOTENCY_KEY_REUSED"
+
+    def __init__(self) -> None:
+        super().__init__("This idempotency key was already used with a different request")
+
+
+class ConversationLimitError(ConflictError):
+    """A per-user or per-conversation size limit was reached."""
+
+    code = "CONVERSATION_LIMIT"
+
+
 class QuotaExceededError(AppError):
     status_code = 403
     code = "QUOTA_EXCEEDED"

@@ -732,3 +732,30 @@ All schema changes through Alembic migrations:
   index; the extension is left installed.
 - Storage: the generated column and index add roughly 11% of the chunk table size at 100,000 chunks (11 MB index
   beside a 98 MB table), plus the stored vectors.
+
+## Conversations (Phase 10, migration `0008`)
+
+**`conversations`**: `id` (uuid pk), `user_id` (fk users, `ON DELETE CASCADE`), `title` (1-200 characters, no control
+characters), `title_customised`, `next_sequence` (allocator, at least 1), `last_activity_at`, `created_at`,
+`updated_at`. `UNIQUE (id, user_id)` is the target of the messages' ownership key. Index
+`(user_id, last_activity_at DESC, id DESC)` serves the list.
+
+**`messages`**: `id`, `conversation_id`, `user_id`, `sequence`, `role` (`user` | `assistant`), `status`
+(`processing` | `answered` | `failed` for questions, `complete` for answers), `content` (1-20000 characters),
+`reply_to_id`, `idempotency_key`, `request_hash`, `failure_reason`, `attempts` (fencing counter), `scope`,
+`citations` (jsonb array of at most 50 references), `meta` (jsonb), timestamps.
+
+Constraints that carry the rules:
+
+- `FOREIGN KEY (conversation_id, user_id) REFERENCES conversations (id, user_id) ON DELETE CASCADE`: a message always
+  belongs to the conversation's owner and is deleted with it.
+- `FOREIGN KEY (reply_to_id, conversation_id) REFERENCES messages (id, conversation_id) ON DELETE CASCADE` and
+  `UNIQUE (reply_to_id)`: an answer belongs to a question in the same conversation, and a question has one answer.
+- `UNIQUE (conversation_id, sequence)`.
+- Partial unique index on `(conversation_id)` where `role = 'user' AND status = 'processing'`: one in-flight question.
+- Partial unique index on `(conversation_id, idempotency_key)` where the key is not null.
+- Checks: role/status/reply consistency, `failure_reason` present exactly when `status = 'failed'`, idempotency columns
+  only on questions and only as a pair, citations only on answers, bounded content and citation count.
+
+Citations hold references (label, document and chunk ids, name, offsets, page, heading) and never retrieved text; the
+excerpt is read from the chunk when a message is displayed. `downgrade` drops both tables and their indexes.
