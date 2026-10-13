@@ -94,6 +94,12 @@ files = ["app", "tests", "alembic/env.py"]
 module = ["celery.*", "testcontainers.*", "fitz.*", "pymupdf.*", "docx.*", "fontTools.*"]
 ignore_missing_imports = true
 
+# The ML runtime (requirements-ml.txt) is not installed in the lint/test job, and these modules are
+# only imported inside functions, so the type checker must not require them.
+[[tool.mypy.overrides]]
+module = ["torch.*", "sentence_transformers.*", "transformers.*"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = ["app.parsers.*", "tests.pdf_factory"]
 disallow_untyped_calls = false

@@ -50,6 +50,7 @@ def test_a_model_without_exactly_one_output_is_refused(labels: int) -> None:
 def test_a_missing_model_with_downloads_disabled_fails_safely_without_the_network(
     tmp_path: Any,
 ) -> None:
+    pytest.importorskip("transformers")  # needs the ML runtime, absent from the lint/test job
     config = RerankerConfig("cross_encoder", "no-such-org/no-such-reranker", "0" * 40, 512)
     reranker = CrossEncoderReranker(
         config, RerankRuntime(device="cpu", cache_dir=str(tmp_path), allow_download=False)
@@ -104,7 +105,8 @@ def test_a_load_that_can_never_work_is_remembered_and_not_retried(
 ) -> None:
     import json
 
-    from transformers import AutoConfig
+    transformers = pytest.importorskip("transformers")
+    AutoConfig = transformers.AutoConfig
 
     (tmp_path / "config.json").write_text(
         json.dumps(
