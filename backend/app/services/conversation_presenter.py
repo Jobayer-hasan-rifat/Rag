@@ -22,10 +22,15 @@ def conversation_response(view: ConversationView) -> ConversationResponse:
 
 def _citation(stored: dict, view: MessageView) -> MessageCitation:  # type: ignore[type-arg]
     chunk = view.chunks.get(uuid.UUID(stored["chunk_id"]))
+    wanted = stored.get("version_id")
+    if chunk is not None and wanted and str(chunk.version_id) != wanted:
+        chunk = None  # defence in depth: text of another version is never shown for this citation
     shown, cut = excerpt(chunk.text) if chunk is not None else (None, None)
     return MessageCitation(
         label=stored["label"],
         document_id=stored["document_id"],
+        version_id=wanted,
+        version_number=stored.get("version_number"),
         chunk_id=stored["chunk_id"],
         document_name=stored.get("document_name"),
         chunk_index=stored.get("chunk_index"),
@@ -40,6 +45,7 @@ def _citation(stored: dict, view: MessageView) -> MessageCitation:  # type: igno
         source_truncated=stored.get("source_truncated"),
         source_available=chunk is not None,
         removed=bool(stored.get("removed")),
+        superseded=chunk is not None and not chunk.version_active,
     )
 
 

@@ -51,6 +51,10 @@ class SearchHitResponse(BaseModel):
         "percentage, and not comparable across models."
     )
     distance: float = Field(description="Cosine distance, 1 - score, in [0, 2]")
+    version_id: uuid.UUID | None = Field(
+        default=None, description="The exact document version this chunk belongs to"
+    )
+    version_number: int | None = None
 
 
 class SearchInfo(BaseModel):
@@ -104,6 +108,10 @@ class HybridHitResponse(BaseModel):
     rank: int
     chunk_id: uuid.UUID
     document_id: uuid.UUID
+    version_id: uuid.UUID | None = Field(
+        default=None, description="The exact document version this chunk belongs to"
+    )
+    version_number: int | None = None
     document_name: str
     chunk_index: int
     section_ordinal: int

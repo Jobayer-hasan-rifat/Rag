@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 11: Document Versions
+
+- `document_families` and per-document versions (migration `0009`, reversible while every document has one version): stable document id, `version_number`, `is_active` and `is_current` flags with partial unique indexes, an owner foreign key, and a trigger that only lets a ready version become active. Existing documents are backfilled as version 1 with the same id
+- `POST /api/v1/documents/{id}/versions`, `GET .../versions`, `GET .../versions/{version_id}`, `POST .../retry`, `POST .../activate` and `DELETE .../versions/{version_id}`; owner-only, rate limited, validated; documents report `version_id`, `version_number`, `version_count`, `active_version_id` and `latest_version`
+- Atomic activation under the family lock when a version becomes ready and is newer than the active one; a failed replacement or a late older job never changes the active version; deleting a document removes every version and file
+- Retrieval (dense, keyword, hydration) returns only ready, active versions; filters name documents; results and citations report `version_id` and `version_number`
+- Conversation citations resolve against the exact cited version (`superseded` flag; no cross-version text); deleting a version or document scrubs stored references
+- `MAX_VERSIONS_PER_DOCUMENT` setting; structured logs for version upload, activation, retry and deletion
+- `python benchmarks/versioning_baseline.py` measures listing, version listing and retrieval eligibility queries
+
+### Changed
+
+- `document_collections` references the document (family), not a version; `DUPLICATE_DOCUMENT` reports the document id; the first search/answer/citation fields gain `version_id` and `version_number` (additive)
+
 ### Added - Phase 10: Persistent Conversations
 
 - `conversations` and `messages` tables (migration `0008`, reversible): ownership enforced by a composite foreign key, per-conversation sequence numbers, one answer per question, one in-flight question per conversation, idempotency keys unique per conversation, citations stored as references only, cascade on conversation and account deletion

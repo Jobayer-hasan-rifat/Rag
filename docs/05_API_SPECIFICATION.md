@@ -1045,3 +1045,48 @@ returned (`503 GENERATION_UNAVAILABLE`, `502 GENERATION_FAILED`, ...) with `deta
 **Limits.** Request bodies are capped at 128 KiB. Message generation is rate limited separately
 (`RATE_LIMIT_CONVERSATION_MESSAGES`, default 10 per window) from management calls (`RATE_LIMIT_CONVERSATION_MANAGE`,
 default 120). Message sending requires `RAG_ENABLED`; managing and reading conversations does not.
+
+## Document Versions (Phase 11)
+
+A document's `id` is stable across versions. `GET /documents`, `GET /documents/{id}` and the other document endpoints
+describe the document's **current version** (the active one, or the newest while none is active). New fields on the
+document: `version_id`, `version_number`, `version_count`, `active_version_id` (null until a version is ready) and
+`latest_version` (`id`, `version_number`, `status`, `failure_reason`; present only when the newest version is not the
+shown one, for example a replacement that is processing or failed). `searchable` is true only for a ready, active
+version. `created_at` is when the shown version was uploaded. The listing shows one row per document. `PATCH` renames
+the current version. `GET .../download` and `GET .../chunks` read the current version. `DELETE /documents/{id}` removes
+every version, its files, chunks and vectors, and is safe to repeat. `POST /documents/{id}/retry` retries the newest
+version if it failed.
+
+| Method and path | Purpose | Success |
+|---|---|---|
+| `GET /documents/{id}/versions?page=&page_size=` | List versions, newest first | 200 |
+| `POST /documents/{id}/versions` (multipart `file`) | Upload a replacement as a new version | 201 (200 if unchanged) |
+| `GET /documents/{id}/versions/{version_id}` | Inspect one version: status, failure reason, flags, counts | 200 |
+| `POST /documents/{id}/versions/{version_id}/retry` | Re-queue a failed version (no new version) | 202 |
+| `POST /documents/{id}/versions/{version_id}/activate` | Make a retained ready version active (restore); repeating is harmless | 200 |
+| `DELETE /documents/{id}/versions/{version_id}` | Delete a retained version | 204 |
+
+Version operations are strictly the owner's: another user's document or version, a version id under the wrong document, and
+an administrator's request are all `404`. Uploading a version uses the upload rate limit, size limit, file validation and
+quota (every retained version counts); retry and activate use the retry rate limit.
+
+**Upload result** `{"version": {...}, "created": true}`. Identical content already stored as a version of this document
+returns that version with `created: false` and `200` (an old version re-uploaded is not activated: its `is_active` says so, and `activate` restores it); identical content in another document of the same user is
+`409 DUPLICATE_DOCUMENT` (`details.existing_document_id`). A document holds at most `MAX_VERSIONS_PER_DOCUMENT` versions
+(`409 VERSION_LIMIT`).
+
+**Activation.** A new version becomes active when it is ready and newer than the active version. Until then the previous
+version stays active and searchable; if the replacement fails, nothing changes for search. `409 VERSION_STATE_CONFLICT`:
+activating a version that is not ready, deleting the active version, or deleting the only version.
+
+**Search and answers.** `document_ids` and `collection_id` name documents; a version id is a `404`. Results and citations
+add `version_id` and `version_number`; `document_id` is the stable id and `document_name` the name of that version.
+Conversation citations add `superseded` (the cited version is retained but no longer active; its excerpt is still that
+version's own text) and use the existing `removed` flag once the version or document is deleted. Stored citations from
+before versions existed have `version_id: null` and refer to the document's first version.
+
+| Code | HTTP | Meaning |
+|---|---|---|
+| `VERSION_LIMIT` | 409 | The document already has the maximum number of versions |
+| `VERSION_STATE_CONFLICT` | 409 | The version's state does not allow the operation |

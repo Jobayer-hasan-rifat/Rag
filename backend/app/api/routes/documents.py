@@ -19,12 +19,16 @@ from app.dependencies import (
     enforce_upload_rate_limit,
 )
 from app.exceptions import RequestValidationFailedError
+from app.models.document import Document
 from app.schemas.common import ErrorResponse, PagedResponse, ResponseEnvelope
 from app.schemas.document import (
     ChunkResponse,
     CollectionSummary,
     DocumentResponse,
     DocumentUpdate,
+    VersionResponse,
+    VersionSummary,
+    VersionUploadResponse,
 )
 from app.services.document_service import DocumentView
 
@@ -60,8 +64,23 @@ _UPLOAD_OPENAPI: dict[str, Any] = {
 
 def _to_response(view: DocumentView) -> DocumentResponse:
     document = view.document
+    latest = view.latest
     return DocumentResponse(
-        id=document.id,
+        id=document.family_id,
+        version_id=document.id,
+        version_number=document.version_number,
+        version_count=view.version_count,
+        active_version_id=document.id if document.is_active else None,
+        latest_version=(
+            None
+            if latest is None
+            else VersionSummary(
+                id=latest.id,
+                version_number=latest.version_number,
+                status=latest.status,
+                failure_reason=latest.failure_reason,
+            )
+        ),
         filename=document.filename,
         file_type=document.file_type,
         content_type=document.content_type,
@@ -78,10 +97,36 @@ def _to_response(view: DocumentView) -> DocumentResponse:
         chunking_version=document.chunking_version,
         embedded_chunk_count=document.embedded_chunk_count,
         embedding_completed_at=document.embedding_completed_at,
-        searchable=document.status == DocumentStatus.READY,
+        searchable=document.status == DocumentStatus.READY and document.is_active,
         collections=[CollectionSummary(id=ref.id, name=ref.name) for ref in view.collections],
         created_at=document.created_at,
         updated_at=document.updated_at,
+    )
+
+
+def _to_version(version: Document) -> VersionResponse:
+    return VersionResponse(
+        id=version.id,
+        document_id=version.family_id,
+        version_number=version.version_number,
+        filename=version.filename,
+        file_type=version.file_type,
+        content_type=version.content_type,
+        file_size=version.file_size,
+        checksum_sha256=version.checksum_sha256,
+        status=version.status,
+        error_message=version.error_message,
+        failure_reason=version.failure_reason,
+        is_active=version.is_active,
+        is_current=version.is_current,
+        searchable=version.status == DocumentStatus.READY and version.is_active,
+        chunk_count=version.chunk_count,
+        embedded_chunk_count=version.embedded_chunk_count,
+        processing_started_at=version.processing_started_at,
+        processing_completed_at=version.processing_completed_at,
+        embedding_completed_at=version.embedding_completed_at,
+        created_at=version.created_at,
+        updated_at=version.updated_at,
     )
 
 
@@ -266,4 +311,157 @@ async def delete_document(
     document_id: uuid.UUID, user: CurrentUser, service: DocumentServiceDep
 ) -> Response:
     await service.delete(user, document_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- versions ----------------------------------------------------------------------------------
+
+
+@router.get(
+    "/{document_id}/versions",
+    summary="List a document's versions (newest first)",
+    responses=_ERRORS,
+)
+async def list_versions(
+    document_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+    page: PageParam = 1,
+    page_size: PageSizeParam = DEFAULT_PAGE_SIZE,
+) -> PagedResponse[VersionResponse]:
+    versions, total = await service.list_versions(user, document_id, page=page, page_size=page_size)
+    return paged(
+        request, [_to_version(v) for v in versions], page=page, page_size=page_size, total=total
+    )
+
+
+@router.post(
+    "/{document_id}/versions",
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload a replacement as a new version (multipart/form-data)",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["file"],
+                        "properties": {"file": {"type": "string", "format": "binary"}},
+                    }
+                }
+            },
+        }
+    },
+    responses={
+        **_ERRORS,
+        200: {"model": ResponseEnvelope[VersionUploadResponse], "description": "Unchanged"},
+        409: {"model": ErrorResponse, "description": "Duplicate of another document, or limit"},
+        413: {"model": ErrorResponse, "description": "File too large"},
+        415: {"model": ErrorResponse, "description": "Unsupported or mismatched file type"},
+        429: {"model": ErrorResponse, "description": "Too many uploads"},
+    },
+    dependencies=[Depends(enforce_upload_rate_limit)],
+)
+async def upload_version(
+    document_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+) -> ResponseEnvelope[VersionUploadResponse]:
+    form = await request.form(max_files=1, max_fields=1)
+    try:
+        upload = form.get("file")
+        if not isinstance(upload, UploadFile):
+            raise RequestValidationFailedError("A 'file' part is required")
+        result = await service.upload_version(
+            actor=user,
+            document_id=document_id,
+            filename=upload.filename,
+            content_type=upload.content_type,
+            file=upload.file,
+        )
+    finally:
+        await form.close()
+    if not result.created:
+        response.status_code = status.HTTP_200_OK
+    return envelope(
+        request, VersionUploadResponse(version=_to_version(result.version), created=result.created)
+    )
+
+
+@router.get(
+    "/{document_id}/versions/{version_id}", summary="Inspect one version", responses=_ERRORS
+)
+async def get_version(
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+) -> ResponseEnvelope[VersionResponse]:
+    return envelope(request, _to_version(await service.get_version(user, document_id, version_id)))
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/retry",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Re-queue processing of a failed version",
+    responses={
+        **_ERRORS,
+        409: {"model": ErrorResponse, "description": "Only failed versions can be retried"},
+        429: {"model": ErrorResponse, "description": "Too many requests"},
+    },
+    dependencies=[Depends(enforce_retry_rate_limit)],
+)
+async def retry_version(
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+) -> ResponseEnvelope[VersionResponse]:
+    version = await service.retry_version(user, document_id, version_id)
+    return envelope(request, _to_version(version))
+
+
+@router.post(
+    "/{document_id}/versions/{version_id}/activate",
+    summary="Make a retained, ready version the active one (restore)",
+    responses={
+        **_ERRORS,
+        409: {"model": ErrorResponse, "description": "Only a ready version can be activated"},
+        429: {"model": ErrorResponse, "description": "Too many requests"},
+    },
+    dependencies=[Depends(enforce_retry_rate_limit)],
+)
+async def activate_version(
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+) -> ResponseEnvelope[VersionResponse]:
+    version = await service.activate_version(user, document_id, version_id)
+    return envelope(request, _to_version(version))
+
+
+@router.delete(
+    "/{document_id}/versions/{version_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete one retained version (not the active or the only one)",
+    responses={
+        **_ERRORS,
+        409: {"model": ErrorResponse, "description": "The active or only version"},
+    },
+)
+async def delete_version(
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    user: CurrentUser,
+    service: DocumentServiceDep,
+) -> Response:
+    await service.delete_version(user, document_id, version_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

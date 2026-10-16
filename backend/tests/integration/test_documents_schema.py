@@ -33,8 +33,11 @@ from tests.helpers import (
 pytestmark = pytest.mark.integration
 
 INSERT_DOC = (
-    "INSERT INTO documents (id, user_id, filename, storage_key, file_type, content_type, "
-    "file_size, checksum_sha256) VALUES (:id, :u, 'f.pdf', :k, :t, 'application/pdf', :s, :c)"
+    "WITH f AS (INSERT INTO document_families (id, user_id) VALUES (:id, :u)) "
+    "INSERT INTO documents (id, user_id, family_id, is_current, filename, storage_key, "
+    "file_type, content_type, "
+    "file_size, checksum_sha256) "
+    "VALUES (:id, :u, :id, true, 'f.pdf', :k, :t, 'application/pdf', :s, :c)"
 )
 
 
@@ -218,7 +221,9 @@ def test_deletion_cascades_follow_the_documented_behaviour(database_url: str) ->
     _link(database_url, doc, collection, alice)
     _link(database_url, keep, collection, alice)
 
-    db_execute(database_url, "DELETE FROM documents WHERE id = :i", i=doc)
+    # membership belongs to the document (family): deleting the document removes it
+    db_execute(database_url, "DELETE FROM document_families WHERE id = :i", i=doc)
+    assert db_scalar(database_url, "SELECT count(*) FROM documents WHERE id = :i", i=doc) == 0
     assert db_scalar(database_url, "SELECT count(*) FROM document_collections") == 1
 
     db_execute(database_url, "DELETE FROM collections WHERE id = :i", i=collection)

@@ -1154,6 +1154,54 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 ---
 
+### DEC-068: A Document Row Is a Version; a Family Is the Stable Document
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: the existing `documents` table keeps one row per uploaded file with its pipeline, chunks and vectors, and is treated as the version table. A new `document_families` table holds the stable identity (id, owner, version counter); collection membership moves to it. Existing document ids become family ids and first-version ids at the same time.
+
+**Reason**: the pipeline, the workers, the state machine, recovery and every chunk and vector table already hang off that row, so a citation's chunk id already names an exact version. Splitting processing state into a second table would have rewritten the pipeline and its tests for no behavioural gain, and would have changed every public id.
+
+**Consequences**: code that handles a version row says `document` for historical reasons; the API names are the stable ones (`document_id` is the family, `version_id` the row). The downgrade cannot represent more than one version per document.
+
+---
+
+### DEC-069: Activation Policy, Content Identity and Identical Uploads
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: content identity is the SHA-256 of the bytes, unique per user across all versions (never across users, never by file name or time). A replacement is a new version; identical bytes for the same document return that version (200), for another document are a duplicate (409). A version becomes active when it is ready and newer than the active one, in the transaction that marks it ready; restoring an older ready version is explicit. The active flag is one partial unique index per document, a trigger allows only ready versions to be made active, and activation is serialised by the family row lock.
+
+**Reason**: the previous version must keep serving until a replacement is fully processed, a failed replacement must change nothing, and a worker that finishes late must not undo a newer upload. The rules are enforced by constraints where a constraint can express them.
+
+---
+
+### DEC-070: Superseded Versions Are Retained Until Explicitly Deleted
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: no automatic retention or cleanup. A superseded version keeps its file, chunks and vectors; the owner deletes a version (not the active or the only one) or the whole document. A per-document version cap and the per-user storage quota bound growth.
+
+**Reason**: stored answers cite chunks of the version they used, and restore needs the vectors; deleting either silently would break citations or rollback. No requirement asks for automatic deletion, and automatic destructive behaviour needs one.
+
+**Consequences**: every retained version counts against the user's quota. A retention policy can be added later as an explicit job.
+
+---
+
+### DEC-071: Citations Name the Version and Resolve Only Against It
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: new stored citations add `version_id` and `version_number`; older ones (no `version_id`) refer to the document's first version. The excerpt is read from the cited chunk at display time, flagged `superseded` when the version is no longer active, refused when the chunk belongs to another version, and reduced to identifiers when the version or document is deleted (stored rows are scrubbed in the deleting transaction; legacy references match by version id only when no `version_id` is stored). Old answers are never rewritten, and no excerpt is stored.
+
+**Reason**: an answer must stay tied to the text it used, and must never be shown as if it were grounded in a newer version. Re-chunking the same version still replaces its chunk ids, so such a citation loses its text but keeps its identifiers.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

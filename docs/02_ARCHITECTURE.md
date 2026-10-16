@@ -1151,3 +1151,52 @@ concurrent submissions are decided by the database. A question that is still `pr
 attempt counter on the question fences the second transaction: a request that was superseded cannot store an answer.
 History is read from the database by the server, never taken from the client, and enters the prompt only through the
 bounded, escaped history block (see DEC-067).
+
+## Document Versions (Phase 11)
+
+```mermaid
+erDiagram
+    users ||--o{ document_families : owns
+    document_families ||--|{ documents : "has versions"
+    document_families ||--o{ document_collections : "member of"
+    documents ||--o{ document_sections : has
+    documents ||--o{ document_chunks : has
+    document_chunks ||--o{ chunk_embeddings : has
+```
+
+**Identity.** A *document* (the public id used by collections, search filters, citations and the API) is a row of
+`document_families`. Each row of `documents` is one *version* of it: an uploaded file with its own content hash,
+processing state, sections, chunks and vectors. Every document that existed before versions became the first version of
+a family with the same id. The pipeline (parsing, chunking, embedding, retries, recovery) is unchanged and works on
+versions.
+
+**Flags.** `documents.is_active` marks the version that retrieval may use; at most one per document (partial unique
+index) and only a `ready` version can become active (trigger). `is_current` marks the version the document is shown as:
+the active one, otherwise the newest. An active version is always current (check constraint).
+
+**Policy.**
+- A replacement upload creates a new version; identical bytes are never stored twice for one user (content hash, kept
+  unique per user). The same bytes for the same document return that version unchanged (200); for another document they
+  are a duplicate (409).
+- A version becomes active when it becomes ready if it is newer than the active version (or none is active), in the same
+  transaction that marks it ready. An older job finishing late never replaces a newer active version, and a failed or
+  unfinished replacement never changes which version is active or searchable.
+- Restoring (activating) a retained ready version is explicit; a newer upload that becomes ready later activates itself.
+- Superseded versions are retained, with their file, chunks and vectors, until the owner deletes that version or the
+  document. Nothing is deleted automatically. The active and the only version cannot be deleted on their own.
+- Reprocessing (re-chunk, re-embed) works on the same version row and is not a new version.
+
+**Concurrency.** Version creation, activation, restore and version deletion lock the document's family row
+(`FOR UPDATE`); the embedding worker takes the same lock before marking a version ready, so lock order is always family
+then version. Activation clears the previous flags before setting the new ones. No database transaction is held while a
+file is parsed, a vector computed or an answer generated. A version deleted while a worker handles it makes the worker's
+conditional updates match nothing and its work is discarded.
+
+**Retrieval.** Dense search, lexical search and hydration all require `ready` and `is_active` of the caller's own
+versions; filters name documents (families) and are translated in SQL, so a version id can never be used as a filter.
+Results report the stable `document_id` together with `version_id` and `version_number`, and the name shown is the
+version's own.
+
+**Citations.** A stored citation names the exact version it was grounded in (`version_id`, `version_number`). It is shown
+from that version's own chunk (a retained version keeps its text), marked `superseded` when it is no longer active, and
+never from another version's text. When the version or chunk is gone only identifiers remain.

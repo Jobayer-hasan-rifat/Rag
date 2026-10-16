@@ -73,7 +73,8 @@ def test_response_exposes_no_storage_details(auth_client: TestClient) -> None:
         "status", "error_message", "failure_reason", "processing_started_at",
         "processing_completed_at", "page_count", "character_count",
         "chunk_count", "chunking_version", "embedded_chunk_count", "embedding_completed_at",
-        "searchable",
+        "searchable", "version_id", "version_number", "version_count", "active_version_id",
+        "latest_version",
         "collections", "created_at", "updated_at",
     }  # fmt: skip
 

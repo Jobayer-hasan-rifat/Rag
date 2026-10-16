@@ -59,6 +59,10 @@ class ChunkRecord:
     text: str
     start_char: int
     end_char: int
+    # `document_id` is the stable document id; these name the exact version the chunk belongs to
+    version_id: uuid.UUID | None = None
+    version_number: int = 1
+    version_active: bool = True
 
 
 @dataclass(frozen=True)
@@ -76,6 +80,8 @@ class SearchHit:
     start_char: int
     end_char: int
     distance: float
+    version_id: uuid.UUID | None = None
+    version_number: int = 1
 
 
 class EmbeddingRepository:
@@ -239,14 +245,27 @@ class EmbeddingRepository:
     ) -> Any:
         """The nearest vectors as a subquery over the vector table alone.
 
-        Only the caller's own vectors under the active configuration, of documents that are
-        `ready`, are considered. Chunk text and sections are joined afterwards for the `limit`
-        survivors only (joining first made the search 8 times slower, measured).
+        Only the caller's own vectors under the active configuration, of document versions that
+        are `ready` and active, are considered; `document_ids` and the collection name
+        documents (families), so a superseded version can never be selected by any filter.
+        Chunk text and sections are joined afterwards for the `limit` survivors only (joining
+        first made the search 8 times slower, measured).
         """
         distance = ChunkEmbedding.embedding.cosine_distance(vector)
         ready_documents = select(Document.id).where(
-            Document.user_id == user_id, Document.status == "ready"
+            Document.user_id == user_id, Document.status == "ready", Document.is_active.is_(True)
         )
+        if document_ids:
+            ready_documents = ready_documents.where(Document.family_id.in_(list(document_ids)))
+        if collection_id is not None:
+            ready_documents = ready_documents.where(
+                Document.family_id.in_(
+                    select(DocumentCollection.document_id).where(
+                        DocumentCollection.collection_id == collection_id,
+                        DocumentCollection.user_id == user_id,
+                    )
+                )
+            )
         inner = select(
             ChunkEmbedding.chunk_id.label("chunk_id"),
             ChunkEmbedding.document_id.label("document_id"),
@@ -256,17 +275,6 @@ class EmbeddingRepository:
             ChunkEmbedding.config_id == config_id,
             ChunkEmbedding.document_id.in_(ready_documents),
         )
-        if document_ids:
-            inner = inner.where(ChunkEmbedding.document_id.in_(list(document_ids)))
-        if collection_id is not None:
-            inner = inner.where(
-                ChunkEmbedding.document_id.in_(
-                    select(DocumentCollection.document_id).where(
-                        DocumentCollection.collection_id == collection_id,
-                        DocumentCollection.user_id == user_id,
-                    )
-                )
-            )
         return inner.order_by(distance).limit(limit).subquery("nearest")
 
     async def nearest_candidates(
@@ -300,19 +308,22 @@ class EmbeddingRepository:
         return [DenseCandidate(row[0], row[1], float(row[2])) for row in result.all()]
 
     async def hydrate(
-        self, *, user_id: uuid.UUID, chunk_ids: Sequence[uuid.UUID]
+        self, *, user_id: uuid.UUID, chunk_ids: Sequence[uuid.UUID], active_only: bool = True
     ) -> dict[uuid.UUID, ChunkRecord]:
         """Chunk text and source metadata for chosen chunks.
 
         The ownership and `ready` checks are repeated here, so a chunk that a candidate query
-        should never have returned still cannot be shown.
+        should never have returned still cannot be shown. For search results `active_only` also
+        requires the chunk's version to be the active one; stored citations of an answer pass
+        False so a retained (superseded) version still resolves to its own text, never to the
+        text of another version.
         """
         if not chunk_ids:
             return {}
         result = await self._session.execute(
             select(
                 DocumentChunk.id,
-                DocumentChunk.document_id,
+                Document.family_id,
                 Document.filename,
                 DocumentChunk.chunk_index,
                 DocumentSection.ordinal,
@@ -323,6 +334,9 @@ class EmbeddingRepository:
                 DocumentChunk.text,
                 DocumentChunk.start_char,
                 DocumentChunk.end_char,
+                Document.id,
+                Document.version_number,
+                Document.is_active,
             )
             .join(DocumentSection, DocumentSection.id == DocumentChunk.section_id)
             .join(Document, Document.id == DocumentChunk.document_id)
@@ -331,6 +345,7 @@ class EmbeddingRepository:
                 DocumentChunk.user_id == user_id,
                 Document.user_id == user_id,
                 Document.status == "ready",
+                *([Document.is_active.is_(True)] if active_only else []),
             )
         )
         return {
@@ -347,6 +362,9 @@ class EmbeddingRepository:
                 text=row[9],
                 start_char=row[10],
                 end_char=row[11],
+                version_id=row[12],
+                version_number=row[13],
+                version_active=row[14],
             )
             for row in result.all()
         }
@@ -381,7 +399,7 @@ class EmbeddingRepository:
         statement = (
             select(
                 nearest.c.chunk_id,
-                nearest.c.document_id,
+                Document.family_id,
                 Document.filename,
                 DocumentChunk.chunk_index,
                 DocumentSection.ordinal,
@@ -393,6 +411,8 @@ class EmbeddingRepository:
                 DocumentChunk.start_char,
                 DocumentChunk.end_char,
                 nearest.c.distance,
+                Document.id,
+                Document.version_number,
             )
             .join(DocumentChunk, DocumentChunk.id == nearest.c.chunk_id)
             .join(DocumentSection, DocumentSection.id == DocumentChunk.section_id)
@@ -418,6 +438,8 @@ class EmbeddingRepository:
                 start_char=row[10],
                 end_char=row[11],
                 distance=float(row[12]),
+                version_id=row[13],
+                version_number=row[14],
             )
             for row in result.all()
         ]

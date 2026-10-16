@@ -88,6 +88,8 @@ async def semantic_search(
             end_char=item.hit.end_char,
             score=round(item.score, 6),
             distance=round(item.hit.distance, 6),
+            version_id=item.hit.version_id,
+            version_number=item.hit.version_number,
         )
         for item in outcome.results
     ]
@@ -155,6 +157,8 @@ def _hit_fields(item: HybridResult) -> dict[str, Any]:
         "rank": item.rank,
         "chunk_id": record.chunk_id,
         "document_id": record.document_id,
+        "version_id": record.version_id,
+        "version_number": record.version_number,
         "document_name": record.document_name,
         "chunk_index": record.chunk_index,
         "section_ordinal": record.section_ordinal,

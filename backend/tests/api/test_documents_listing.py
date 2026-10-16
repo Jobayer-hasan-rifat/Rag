@@ -224,4 +224,5 @@ def test_listing_includes_collection_membership_without_n_plus_one(
     by_name = {d["filename"]: d["collections"] for d in response.json()["data"]}
     assert by_name["alpha.pdf"][0]["name"] == "Papers"
     assert by_name["gamma.md"] == []
-    assert len(selects) <= 5  # auth, count, page, one batched collections query
+    # auth, count, page, one batched collections query, one batched version summary
+    assert len(selects) <= 6

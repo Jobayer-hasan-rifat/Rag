@@ -21,7 +21,7 @@ class LexicalCandidate:
 _SQL = """
 WITH ready AS (
     SELECT id FROM documents
-    WHERE user_id = :u AND status = 'ready'{doc_filter}{collection_filter}
+    WHERE user_id = :u AND status = 'ready' AND is_active{doc_filter}{collection_filter}
 ),
 terms AS (
     SELECT phrase AS term, 1 AS priority FROM unnest(CAST(:phrases AS text[])) AS phrase
@@ -31,7 +31,7 @@ terms AS (
 ),
 corpus AS (
     SELECT COALESCE(sum(chunk_count), 0)::float AS n
-    FROM documents WHERE user_id = :u AND status = 'ready'
+    FROM documents WHERE user_id = :u AND status = 'ready' AND is_active
 ),
 present AS (
     SELECT t.term, t.priority FROM terms t
@@ -43,7 +43,8 @@ frequency AS (
            (SELECT count(*) FROM document_chunks c
              WHERE c.user_id = :u
                AND c.document_id IN (
-                   SELECT id FROM documents WHERE user_id = :u AND status = 'ready')
+                   SELECT id FROM documents
+                   WHERE user_id = :u AND status = 'ready' AND is_active)
                AND c.search_vector @@ phraseto_tsquery('simple', t.term)) AS n
     FROM (SELECT term FROM present ORDER BY priority DESC, char_length(term) DESC, term
           LIMIT :scan_terms) t
@@ -74,7 +75,7 @@ class LexicalRepository:
     is the honest choice for Bengali). Each query term is weighted by its inverse document
     frequency within the caller's own corpus, because `ts_rank` has no IDF and would let common
     words outweigh a rare identifier. The composite GIN index `(user_id, search_vector)` keeps the
-    scan to the caller's postings. Only `ready` documents are considered.
+    scan to the caller's postings. Only the active `ready` version of each document is considered.
     """
 
     def __init__(self, session: AsyncSession) -> None:
@@ -100,9 +101,9 @@ class LexicalRepository:
         free words (not from quoted phrases)."""
         if not query.searchable:
             return []
-        doc_filter = " AND id = ANY(:docs)" if document_ids else ""
+        doc_filter = " AND family_id = ANY(:docs)" if document_ids else ""
         collection_filter = (
-            " AND id IN (SELECT document_id FROM document_collections "
+            " AND family_id IN (SELECT document_id FROM document_collections "
             "WHERE collection_id = :coll AND user_id = :u)"
             if collection_id is not None
             else ""

@@ -17,9 +17,11 @@ from tests.helpers import (
 pytestmark = pytest.mark.integration
 
 INSERT_DOC = (
-    "INSERT INTO documents (id, user_id, filename, storage_key, file_type, content_type, "
+    "WITH f AS (INSERT INTO document_families (id, user_id) VALUES (:id, :u)) "
+    "INSERT INTO documents (id, user_id, family_id, is_current, filename, storage_key, "
+    "file_type, content_type, "
     "file_size, checksum_sha256, chunk_count) "
-    "VALUES (:id, :u, 'f.txt', :k, 'txt', 'text/plain', 10, :c, 1)"
+    "VALUES (:id, :u, :id, true, 'f.txt', :k, 'txt', 'text/plain', 10, :c, 1)"
 )
 INSERT_SECTION = (
     "INSERT INTO document_sections (id, document_id, ordinal, kind, text, char_count) "

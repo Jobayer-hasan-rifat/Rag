@@ -682,3 +682,20 @@ pip-audit -r requirements.txt
 - **Logging.** Events carry ids, counts and timings only, never questions, answers, titles, idempotency keys or prompts.
 - **Abuse limits.** Separate rate limits for generation and management, 128 KiB body cap, per-user and per-conversation
   caps, bounded page sizes.
+
+## Version Security (Phase 11)
+
+- **Isolation.** Every version carries its owner through a composite foreign key to its document; every version query
+  filters on the caller's id; version operations accept only the owner (administrators included get a 404). A version id
+  under another document, or another user's, is a 404, and a version id cannot be used as a search filter.
+- **Eligibility.** Retrieval returns only ready, active versions, enforced in the SQL of every retriever and again when
+  chunks are loaded; superseded text cannot appear in results, rerank candidates, answers or prompts.
+- **Citation integrity.** A citation is displayed from the chunk of the version it was grounded in and is refused (no
+  text) if that chunk belongs to a different version. Deleting a version or document removes names and headings from
+  stored citations.
+- **Activation.** Only a ready version can be made active (database trigger); activation is serialised per document and
+  ordered by version number, so a stale worker cannot replace a newer version.
+- **Cleanup.** Files are removed before their records; removal is repeatable. A version's file is never shared with
+  another version (unique storage key), so deleting one version cannot remove a file another uses.
+- **Resource bounds.** Versions per document and total stored bytes per user are capped; version listing is paginated;
+  the document listing needs a constant number of queries per page.

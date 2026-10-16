@@ -193,7 +193,11 @@ class ConversationService:
         ids = {
             uuid.UUID(c["chunk_id"]) for m in messages for c in m.citations if not c.get("removed")
         }
-        chunks = await self._embeddings.hydrate(user_id=user_id, chunk_ids=list(ids)) if ids else {}
+        chunks = (
+            await self._embeddings.hydrate(user_id=user_id, chunk_ids=list(ids), active_only=False)
+            if ids
+            else {}
+        )
         return [MessageView(m, chunks) for m in messages]
 
     # --- a turn --------------------------------------------------------------------------
@@ -442,10 +446,11 @@ class ConversationService:
             raise MessageInProgressError()  # a stale sweep or a retry took the question over
         # A cited document deleted while the model worked must not leave its name behind: the
         # documents are locked until this transaction ends, so a later delete scrubs this answer.
-        cited = {uuid.UUID(c["document_id"]) for c in citations}
-        alive = await self._documents.lock_existing_ids(user_id, cited)
+        cited = {uuid.UUID(c["version_id"]) for c in citations if c["version_id"]}
+        alive = await self._documents.lock_existing_versions(user_id, cited)
         citations = [
-            c if uuid.UUID(c["document_id"]) in alive else removed_reference(c) for c in citations
+            c if c["version_id"] and uuid.UUID(c["version_id"]) in alive else removed_reference(c)
+            for c in citations
         ]
         sequence = await repo.allocate_sequence(user_id, conversation_id)
         try:
@@ -482,6 +487,7 @@ def removed_reference(reference: dict[str, Any]) -> dict[str, Any]:
     return {
         "label": reference["label"],
         "document_id": reference["document_id"],
+        "version_id": reference.get("version_id"),
         "chunk_id": reference["chunk_id"],
         "removed": True,
     }

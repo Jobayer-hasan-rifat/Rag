@@ -347,23 +347,47 @@ class ConversationRepository:
     # --- document deletion -------------------------------------------------------------
 
     async def scrub_document_citations(self, user_id: uuid.UUID, document_id: uuid.UUID) -> int:
-        """Reduce stored citations of a deleted document to bare identifiers (label, ids,
-        `removed`): its name and heading are not kept after the document is gone."""
+        """Reduce stored citations of a deleted document (every version) to bare identifiers
+        (label, ids, `removed`): its name and heading are not kept after the document is gone."""
+        return await self._scrub(
+            user_id,
+            matches="elem->>'document_id' = :id",
+            prefilter="citations @> jsonb_build_array(jsonb_build_object('document_id', CAST(:id AS text)))",  # noqa: E501
+            target=document_id,
+        )
+
+    async def scrub_version_citations(self, user_id: uuid.UUID, version_id: uuid.UUID) -> int:
+        """The same for one deleted version. References made before versions existed carry no
+        `version_id`; they name the document's first version through `document_id`, whose value
+        equals that version's id, so they match only when no `version_id` is stored."""
+        return await self._scrub(
+            user_id,
+            matches="(elem->>'version_id' = :id OR "
+            "(jsonb_typeof(elem->'version_id') IS DISTINCT FROM 'string' AND elem->>'document_id' = :id))",  # noqa: E501
+            prefilter="(citations @> jsonb_build_array(jsonb_build_object('version_id', CAST(:id AS text))) "  # noqa: E501
+            "OR citations @> jsonb_build_array(jsonb_build_object('document_id', CAST(:id AS text))))",  # noqa: E501
+            target=version_id,
+        )
+
+    async def _scrub(
+        self, user_id: uuid.UUID, *, matches: str, prefilter: str, target: uuid.UUID
+    ) -> int:
+        # the fragments above are fixed text; the only variable is the bound `:id`
         result = await self._session.execute(
-            text("""
+            text(f"""
                 UPDATE messages SET citations = (
                     SELECT COALESCE(jsonb_agg(
-                        CASE WHEN elem->>'document_id' = :doc
-                             THEN jsonb_build_object('label', elem->'label',
+                        CASE WHEN {matches}
+                             THEN jsonb_strip_nulls(jsonb_build_object('label', elem->'label',
                                                      'document_id', elem->'document_id',
+                                                     'version_id', elem->'version_id',
                                                      'chunk_id', elem->'chunk_id',
-                                                     'removed', true)
+                                                     'removed', true))
                              ELSE elem END ORDER BY ord), '[]'::jsonb)
                     FROM jsonb_array_elements(citations) WITH ORDINALITY AS t(elem, ord))
                 WHERE user_id = CAST(:user AS uuid) AND role = 'assistant'
-                  AND citations @> jsonb_build_array(
-                        jsonb_build_object('document_id', CAST(:doc AS text)))
-                """),
-            {"user": str(user_id), "doc": str(document_id)},
+                  AND {prefilter}
+                """),  # noqa: S608
+            {"user": str(user_id), "id": str(target)},
         )
         return int(result.rowcount or 0)  # type: ignore[attr-defined]

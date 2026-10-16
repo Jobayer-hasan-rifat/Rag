@@ -759,3 +759,34 @@ Constraints that carry the rules:
 
 Citations hold references (label, document and chunk ids, name, offsets, page, heading) and never retrieved text; the
 excerpt is read from the chunk when a message is displayed. `downgrade` drops both tables and their indexes.
+
+## Document Versions (Phase 11, migration `0009`)
+
+**`document_families`**: `id` (the public document id), `user_id` (fk users, cascade), `next_version_number`
+(allocator, at least 1), timestamps; `UNIQUE (id, user_id)`.
+
+**`documents`** (each row is a version) gains `family_id`, `version_number`, `is_active` and `is_current`:
+
+- `FOREIGN KEY (family_id, user_id) REFERENCES document_families (id, user_id) ON DELETE CASCADE`: a version has its
+  document's owner.
+- `UNIQUE (family_id, version_number)`; `CHECK (version_number >= 1)`.
+- Partial unique indexes `uq_documents_one_active (family_id) WHERE is_active` and
+  `uq_documents_one_current (family_id) WHERE is_current`; `CHECK (NOT is_active OR is_current)`.
+- Trigger `trg_documents_activate_ready`: a row cannot be made active unless its status is `ready`. (Leaving `ready`
+  later, for reprocessing, does not clear the flag; retrieval also requires `status = 'ready'`.)
+- Indexes `ix_documents_user_active (user_id) WHERE is_active` (retrieval eligibility) and
+  `ix_documents_user_current_created (user_id, created_at DESC, id DESC) WHERE is_current` (document listing).
+- `UNIQUE (user_id, checksum_sha256)` and `UNIQUE (storage_key)` are unchanged: a user never has the same bytes twice,
+  across all versions.
+
+**`document_collections`** now references `document_families` (membership belongs to the document, not to a version).
+
+**Backfill.** One family per existing document with the same id; every existing row becomes version 1 and current, and
+active if it is `ready`. Existing chunks, vectors, sections and citations keep pointing at the same ids.
+
+**Deployment notes.** The upgrade adds columns with defaults, updates every `documents` row once and rebuilds one
+foreign key on `document_collections`; it takes short exclusive locks on those tables, so run it with the API and workers
+stopped or at low traffic. It is reversible only while every document has a single version: `downgrade` raises with a
+message if any document has more, because the previous schema cannot represent them (delete the extra versions first).
+After a downgrade, membership names the remaining version row. Storage files of deleted versions are removed when the
+version is deleted through the API; a manual database deletion leaves the file behind.

@@ -91,7 +91,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_middleware(
         BodySizeLimitMiddleware,
-        rules={("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES},
+        rules={
+            ("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES,
+            ("POST", "/api/v1/documents/{id}/versions"): (
+                settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
+            ),
+        },
         overhead_bytes=MULTIPART_OVERHEAD_BYTES,
     )
     app.add_middleware(

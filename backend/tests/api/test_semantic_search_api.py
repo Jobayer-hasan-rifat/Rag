@@ -88,7 +88,7 @@ def test_search_response_exposes_exactly_the_documented_fields(auth_client: Test
     assert set(body["data"]["results"][0]) == {
         "rank", "chunk_id", "document_id", "document_name", "chunk_index", "section_ordinal",
         "page_number", "heading", "heading_level", "heading_path", "text", "start_char",
-        "end_char", "score", "distance",
+        "end_char", "score", "distance", "version_id", "version_number",
     }  # fmt: skip
     info = body["data"]["search"]
     assert set(info) == {

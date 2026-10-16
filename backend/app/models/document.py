@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -23,9 +24,64 @@ from app.db.base import Base
 from app.models.base import TimestampMixin
 
 
+class DocumentFamily(TimestampMixin, Base):
+    """The stable identity of a document across its versions.
+
+    Its id is the public document id: collection membership, search filters and citations name
+    the family, never a version. Each row of `documents` is one version of a family.
+    """
+
+    __tablename__ = "document_families"
+    __table_args__ = (
+        CheckConstraint("next_version_number >= 1", name="next_version_number_positive"),
+        UniqueConstraint("id", "user_id", name="uq_document_families_id_user_id"),
+        Index("ix_document_families_user_id", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    next_version_number: Mapped[int] = mapped_column(
+        Integer, server_default=text("1"), default=1, nullable=False
+    )
+
+
 class Document(TimestampMixin, Base):
+    """One version of a document: an uploaded file with its own pipeline state, chunks and
+    vectors. `family_id` is the document's stable identity (see `DocumentFamily`).
+
+    `is_active` marks the version that retrieval may use (at most one per family, and only a
+    `ready` version can be made active); `is_current` marks the version the document is shown
+    as (the active one, otherwise the newest).
+    """
+
     __tablename__ = "documents"
     __table_args__ = (
+        ForeignKeyConstraint(
+            ["family_id", "user_id"],
+            ["document_families.id", "document_families.user_id"],
+            name="fk_documents_family_owner",
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("family_id", "version_number", name="uq_documents_family_version"),
+        CheckConstraint("version_number >= 1", name="version_number_positive"),
+        CheckConstraint("NOT is_active OR is_current", name="active_is_current"),
+        Index(
+            "uq_documents_one_active", "family_id", unique=True, postgresql_where=text("is_active")
+        ),
+        Index(
+            "uq_documents_one_current",
+            "family_id",
+            unique=True,
+            postgresql_where=text("is_current"),
+        ),
+        Index("ix_documents_user_active", "user_id", postgresql_where=text("is_active")),
         CheckConstraint("file_type IN ('pdf', 'docx', 'txt', 'md')", name="file_type_valid"),
         CheckConstraint(
             "status IN ('pending', 'parsing', 'chunking', 'chunked', 'embedding', 'indexing', "
@@ -66,6 +122,16 @@ class Document(TimestampMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    family_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    version_number: Mapped[int] = mapped_column(
+        Integer, server_default=text("1"), default=1, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
+    is_current: Mapped[bool] = mapped_column(
+        Boolean, server_default=text("false"), default=False, nullable=False
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -102,16 +168,24 @@ class Document(TimestampMixin, Base):
 
 
 Index("ix_documents_user_created", Document.user_id, Document.created_at.desc(), Document.id.desc())
+Index(
+    "ix_documents_user_current_created",
+    Document.user_id,
+    Document.created_at.desc(),
+    Document.id.desc(),
+    postgresql_where=text("is_current"),
+)
 
 
 class DocumentCollection(Base):
-    """Membership link. Composite foreign keys force document and collection to share an owner."""
+    """Membership link of a document (its family) and a collection. Composite foreign keys force
+    document and collection to share an owner."""
 
     __tablename__ = "document_collections"
     __table_args__ = (
         ForeignKeyConstraint(
             ["document_id", "user_id"],
-            ["documents.id", "documents.user_id"],
+            ["document_families.id", "document_families.user_id"],
             name="fk_document_collections_document",
             ondelete="CASCADE",
         ),

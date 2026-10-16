@@ -212,7 +212,10 @@ class EmbeddingService:
             await self._session.rollback()
             return await self._not_completed(claimed, context)
         await self._embeddings.delete_other_configs(claimed.id, config_id)
+        activated = self._documents.last_activation
         await self._session.commit()
+        if activated:
+            logger.info("document version activated", extra={**context, "reason": "ready"})
         self._log_done("embedding completed", context, counters, started, embedded, config_id)
         return EmbeddingOutcome("ready")
 

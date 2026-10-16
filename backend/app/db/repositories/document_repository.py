@@ -6,10 +6,11 @@ from typing import Any, Literal
 from sqlalchemy import ColumnElement, case, delete, exists, func, select, type_coerce, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models.chunk_embedding import ChunkEmbedding
 from app.models.collection import Collection
-from app.models.document import Document, DocumentCollection
+from app.models.document import Document, DocumentCollection, DocumentFamily
 from app.models.document_chunk import DocumentChunk
 
 SortField = Literal["created_at", "filename", "file_size"]
@@ -65,6 +66,8 @@ class CollectionRef:
 class DocumentRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        # whether the latest `complete_embedding` call made its version the active one
+        self.last_activation = False
 
     async def add(self, document: Document) -> Document:
         self._session.add(document)
@@ -72,9 +75,12 @@ class DocumentRepository:
         await self._session.refresh(document)
         return document
 
-    async def lock_existing_ids(self, user_id: uuid.UUID, ids: set[uuid.UUID]) -> set[uuid.UUID]:
-        """The caller's documents among `ids` that still exist, locked against deletion until the
-        transaction ends (a concurrent delete waits, then scrubs what was stored meanwhile)."""
+    async def lock_existing_versions(
+        self, user_id: uuid.UUID, ids: set[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """The caller's document versions among `ids` that still exist, locked against deletion
+        until the transaction ends (a concurrent delete waits, then scrubs what was stored
+        meanwhile)."""
         if not ids:
             return set()
         result = await self._session.execute(
@@ -113,7 +119,10 @@ class DocumentRepository:
         page: int,
         page_size: int,
     ) -> tuple[list[Document], int]:
-        conditions: list[ColumnElement[bool]] = [Document.user_id == user_id]
+        conditions: list[ColumnElement[bool]] = [
+            Document.user_id == user_id,
+            Document.is_current.is_(True),
+        ]
         if filters.status:
             conditions.append(Document.status == filters.status)
         if filters.file_type:
@@ -125,7 +134,7 @@ class DocumentRepository:
         if filters.collection_id:
             conditions.append(
                 exists().where(
-                    DocumentCollection.document_id == Document.id,
+                    DocumentCollection.document_id == Document.family_id,
                     DocumentCollection.collection_id == filters.collection_id,
                 )
             )
@@ -455,7 +464,32 @@ class DocumentRepository:
         return bool(result.rowcount)  # type: ignore[attr-defined]
 
     async def complete_embedding(self, document_id: uuid.UUID, *, config_id: uuid.UUID) -> bool:
-        """embedding -> ready, only if every chunk really has a vector under this configuration."""
+        """embedding -> ready, only if every chunk really has a vector under this configuration.
+
+        The family lock is taken before the version row changes (the order every version
+        operation uses), and a version that becomes ready is activated in the same transaction
+        when it is newer than the active one, so no moment shows a newer ready version that is
+        neither active nor intentionally retained."""
+        owner = (
+            await self._session.execute(
+                select(Document.family_id, Document.user_id).where(Document.id == document_id)
+            )
+        ).first()
+        if owner is None or not await self.lock_family(owner[0], owner[1]):
+            return False
+        # a version that already completed under some configuration is being re-indexed: that
+        # must never undo an explicit restore, so only the first readiness may activate it
+        first_time = (
+            await self._session.execute(
+                select(Document.embedding_config_id.is_(None)).where(Document.id == document_id)
+            )
+        ).scalar_one_or_none()
+        if not await self._mark_ready(document_id, config_id):
+            return False
+        self.last_activation = bool(first_time) and await self.activate_if_newer(document_id)
+        return True
+
+    async def _mark_ready(self, document_id: uuid.UUID, config_id: uuid.UUID) -> bool:
         vectors = (
             select(func.count(ChunkEmbedding.id))
             .where(ChunkEmbedding.document_id == Document.id, ChunkEmbedding.config_id == config_id)
@@ -576,10 +610,251 @@ class DocumentRepository:
         return (str(row[0]), int(row[1])) if row else None
 
     async def owned_ids(self, user_id: uuid.UUID, ids: list[uuid.UUID]) -> set[uuid.UUID]:
-        """Which of `ids` are documents owned by `user_id` (admins get no special treatment)."""
+        """Which of `ids` are documents (families) owned by `user_id` (admins get no special
+        treatment)."""
         if not ids:
             return set()
         result = await self._session.execute(
-            select(Document.id).where(Document.user_id == user_id, Document.id.in_(ids))
+            select(DocumentFamily.id).where(
+                DocumentFamily.user_id == user_id, DocumentFamily.id.in_(ids)
+            )
         )
         return set(result.scalars().all())
+
+    # --- versions ---------------------------------------------------------------------------
+
+    async def add_first_version(self, document: Document) -> Document:
+        """A new document: its family takes the id of its first version (so the public document
+        id and the first version id are the same value, as they are for pre-versioning data)."""
+        document.id = document.id or uuid.uuid4()
+        self._session.add(
+            DocumentFamily(id=document.id, user_id=document.user_id, next_version_number=2)
+        )
+        await self._session.flush()
+        document.family_id = document.id
+        document.version_number = 1
+        document.is_current = True
+        return await self.add(document)
+
+    async def lock_family(self, family_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+        """Take the family's row lock (creation, activation and deletion of versions serialise
+        on it); False if the family does not exist or is not the caller's."""
+        row = await self._session.execute(
+            select(DocumentFamily.id)
+            .where(DocumentFamily.id == family_id, DocumentFamily.user_id == user_id)
+            .with_for_update()
+        )
+        return row.scalar_one_or_none() is not None
+
+    async def get_family(self, family_id: uuid.UUID) -> DocumentFamily | None:
+        return await self._session.get(DocumentFamily, family_id)
+
+    async def add_version(self, family_id: uuid.UUID, document: Document) -> Document:
+        """A further version of a locked family. It is never active or current on arrival."""
+        number = (
+            await self._session.execute(
+                update(DocumentFamily)
+                .where(DocumentFamily.id == family_id)
+                .values(
+                    next_version_number=DocumentFamily.next_version_number + 1,
+                    updated_at=func.now(),
+                )
+                .returning(DocumentFamily.next_version_number - 1)
+                .execution_options(synchronize_session=False)
+            )
+        ).scalar_one()
+        document.family_id = family_id
+        document.version_number = int(number)
+        document.is_active = False
+        document.is_current = False
+        await self.add(document)
+        await self.refresh_current(family_id)
+        return document
+
+    async def refresh_current(self, family_id: uuid.UUID) -> None:
+        """The document is shown as its active version, or else its newest. Others are cleared
+        first so the partial unique index never sees two current versions."""
+        target = (
+            await self._session.execute(
+                select(Document.id)
+                .where(Document.family_id == family_id)
+                .order_by(Document.is_active.desc(), Document.version_number.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if target is None:
+            return
+        flags = {"synchronize_session": False}
+        await self._session.execute(
+            update(Document)
+            .where(Document.family_id == family_id, Document.is_current, Document.id != target)
+            .values(is_current=False)
+            .execution_options(**flags)
+        )
+        await self._session.execute(
+            update(Document)
+            .where(Document.id == target, Document.is_current.is_(False))
+            .values(is_current=True)
+            .execution_options(**flags)
+        )
+
+    async def _switch_active(self, family_id: uuid.UUID, version_id: uuid.UUID) -> bool:
+        """Make `version_id` the family's one active (and current) version, in three statements
+        ordered so no moment shows two. Only a ready version is accepted (the database trigger
+        enforces it too)."""
+        flags = {"synchronize_session": False}
+        ready = (
+            await self._session.execute(
+                select(Document.id)
+                .where(
+                    Document.id == version_id,
+                    Document.family_id == family_id,
+                    Document.status == "ready",
+                )
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if ready is None:
+            return False
+        await self._session.execute(
+            update(Document)
+            .where(Document.family_id == family_id, Document.is_active, Document.id != version_id)
+            .values(is_active=False)
+            .execution_options(**flags)
+        )
+        await self._session.execute(
+            update(Document)
+            .where(Document.family_id == family_id, Document.is_current, Document.id != version_id)
+            .values(is_current=False)
+            .execution_options(**flags)
+        )
+        await self._session.execute(
+            update(Document)
+            .where(Document.id == version_id)
+            .values(is_active=True, is_current=True)
+            .execution_options(**flags)
+        )
+        return True
+
+    async def activate_if_newer(self, version_id: uuid.UUID) -> bool:
+        """Make a ready version active when it is newer than the active one (or none is active).
+
+        An older version finishing late never replaces a newer active version. The family lock
+        serialises this with every other activation, restore and version change.
+        """
+        row = (
+            await self._session.execute(
+                select(Document.family_id, Document.user_id, Document.version_number).where(
+                    Document.id == version_id
+                )
+            )
+        ).first()
+        if row is None or not await self.lock_family(row[0], row[1]):
+            return False
+        active = (
+            await self._session.execute(
+                select(Document.version_number).where(
+                    Document.family_id == row[0],
+                    Document.is_active,
+                    Document.status == "ready",
+                )
+            )
+        ).scalar_one_or_none()
+        if active is not None and active >= row[2]:
+            await self.refresh_current(row[0])
+            return False
+        return await self._switch_active(row[0], version_id)
+
+    async def restore_version(self, family_id: uuid.UUID, version_id: uuid.UUID) -> bool:
+        """Explicitly make a retained ready version the active one (family already locked)."""
+        return await self._switch_active(family_id, version_id)
+
+    async def get_version(
+        self, family_id: uuid.UUID, version_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Document | None:
+        result = await self._session.execute(
+            select(Document).where(
+                Document.id == version_id,
+                Document.family_id == family_id,
+                Document.user_id == user_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def current_version(self, family_id: uuid.UUID, user_id: uuid.UUID) -> Document | None:
+        result = await self._session.execute(
+            select(Document).where(
+                Document.family_id == family_id,
+                Document.user_id == user_id,
+                Document.is_current,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def count_versions(self, family_id: uuid.UUID) -> int:
+        result = await self._session.execute(
+            select(func.count()).select_from(Document).where(Document.family_id == family_id)
+        )
+        return int(result.scalar_one())
+
+    async def latest_version(self, family_id: uuid.UUID) -> Document | None:
+        result = await self._session.execute(
+            select(Document)
+            .where(Document.family_id == family_id)
+            .order_by(Document.version_number.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def versions_page(
+        self, family_id: uuid.UUID, user_id: uuid.UUID, *, page: int, page_size: int
+    ) -> tuple[list[Document], int]:
+        conditions = [Document.family_id == family_id, Document.user_id == user_id]
+        total = (
+            await self._session.execute(
+                select(func.count()).select_from(Document).where(*conditions)
+            )
+        ).scalar_one()
+        result = await self._session.execute(
+            select(Document)
+            .where(*conditions)
+            .order_by(Document.version_number.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return list(result.scalars().all()), total
+
+    async def version_summaries(
+        self, family_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[int, Document]]:
+        """(version count, newest version) of each family, in one query for a whole page."""
+        if not family_ids:
+            return {}
+        sibling = aliased(Document)
+        count = (
+            select(func.count())
+            .select_from(sibling)
+            .where(sibling.family_id == Document.family_id)
+            .correlate(Document)
+            .scalar_subquery()
+        )
+        rows = await self._session.execute(
+            select(Document, count)
+            .where(Document.family_id.in_(family_ids))
+            .distinct(Document.family_id)
+            .order_by(Document.family_id, Document.version_number.desc())
+        )
+        return {doc.family_id: (int(total), doc) for doc, total in rows.all()}
+
+    async def storage_keys(self, family_id: uuid.UUID, user_id: uuid.UUID) -> list[str]:
+        result = await self._session.execute(
+            select(Document.storage_key).where(
+                Document.family_id == family_id, Document.user_id == user_id
+            )
+        )
+        return list(result.scalars().all())
+
+    async def delete_family(self, family: DocumentFamily) -> None:
+        """Delete the document with every version, chunk and vector (cascade)."""
+        await self._session.delete(family)
+        await self._session.flush()

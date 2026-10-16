@@ -20,6 +20,8 @@ def build_citation(item: Citation) -> CitationResponse:
     return CitationResponse(
         label=item.block.label,
         document_id=record.document_id,
+        version_id=record.version_id,
+        version_number=record.version_number,
         chunk_id=record.chunk_id,
         document_name=record.document_name,
         chunk_index=record.chunk_index,
@@ -97,6 +99,8 @@ def citation_reference(item: Citation) -> dict[str, Any]:
     return {
         "label": item.block.label,
         "document_id": str(record.document_id),
+        "version_id": str(record.version_id) if record.version_id else None,
+        "version_number": record.version_number,
         "chunk_id": str(record.chunk_id),
         "document_name": record.document_name,
         "chunk_index": record.chunk_index,

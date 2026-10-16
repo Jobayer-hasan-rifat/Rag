@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     storage_local_path: str = Field(default="./data/uploads", min_length=1)
     max_upload_bytes: int = Field(default=52_428_800, ge=1024, le=1_073_741_824)
     max_storage_bytes_per_user: int = Field(default=1_073_741_824, ge=1024)
+    max_versions_per_document: int = Field(default=20, ge=1, le=1000)
 
     processing_max_attempts: int = Field(default=3, ge=1, le=10)
     processing_retry_backoff_seconds: int = Field(default=30, ge=0, le=3600)

@@ -109,6 +109,22 @@ class DuplicateDocumentError(ConflictError):
         )
 
 
+class VersionLimitError(ConflictError):
+    code = "VERSION_LIMIT"
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(
+            f"A document can have at most {limit} versions; delete an old version first",
+            details={"limit": limit},
+        )
+
+
+class VersionStateError(ConflictError):
+    """A version operation that the version's current state does not allow."""
+
+    code = "VERSION_STATE_CONFLICT"
+
+
 class InvalidStatusTransitionError(ConflictError):
     code = "INVALID_STATE_TRANSITION"
 

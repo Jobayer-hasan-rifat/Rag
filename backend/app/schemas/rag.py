@@ -45,6 +45,10 @@ class CitationResponse(BaseModel):
 
     label: str = Field(description="The marker used in the answer, for example S1")
     document_id: uuid.UUID
+    version_id: uuid.UUID | None = Field(
+        default=None, description="The exact document version the passage was read from"
+    )
+    version_number: int | None = None
     chunk_id: uuid.UUID
     document_name: str
     chunk_index: int

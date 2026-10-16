@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.document_repository import escape_like
 from app.models.collection import Collection
-from app.models.document import Document, DocumentCollection
+from app.models.document import DocumentCollection, DocumentFamily
 
 
 class CollectionRepository:
@@ -71,7 +71,9 @@ class CollectionRepository:
         if not ids:
             return set()
         result = await self._session.execute(
-            select(Document.id).where(Document.user_id == user_id, Document.id.in_(ids))
+            select(DocumentFamily.id).where(
+                DocumentFamily.user_id == user_id, DocumentFamily.id.in_(ids)
+            )
         )
         return set(result.scalars().all())
 

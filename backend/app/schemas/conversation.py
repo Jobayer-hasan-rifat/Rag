@@ -40,6 +40,12 @@ class MessageCitation(BaseModel):
 
     label: str
     document_id: uuid.UUID
+    version_id: uuid.UUID | None = Field(
+        default=None,
+        description="The exact version the answer was grounded in (null for answers stored "
+        "before versions existed, which cite the document's first version)",
+    )
+    version_number: int | None = None
     chunk_id: uuid.UUID
     document_name: str | None = None
     chunk_index: int | None = None
@@ -56,6 +62,11 @@ class MessageCitation(BaseModel):
         description="False if the chunk no longer exists, was re-chunked, or is not searchable"
     )
     removed: bool = False
+    superseded: bool = Field(
+        default=False,
+        description="True if the cited version is retained but no longer the active one; the "
+        "excerpt is still that version's own text, never the new version's",
+    )
 
 
 class MessageResponse(BaseModel):

@@ -61,7 +61,8 @@ def test_the_response_exposes_exactly_the_documented_fields(auth_client: TestCli
     assert set(body["data"]["results"][0]) == {
         "rank", "chunk_id", "document_id", "document_name", "chunk_index", "section_ordinal",
         "page_number", "heading", "heading_level", "heading_path", "text", "start_char",
-        "end_char", "score", "dense_rank", "sparse_rank", "dense_score",
+        "end_char", "score", "dense_rank", "sparse_rank", "dense_score", "version_id",
+        "version_number",
     }  # fmt: skip
     assert set(body["data"]["search"]) == {
         "mode", "fusion", "rrf_k", "top_k", "returned", "dense_candidates", "sparse_candidates",

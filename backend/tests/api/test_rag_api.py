@@ -78,7 +78,7 @@ def test_an_answer_is_cited_and_every_citation_comes_from_the_database(
     assert set(citation) == {
         "label", "document_id", "chunk_id", "document_name", "chunk_index", "section_ordinal",
         "page_number", "heading", "heading_path", "start_char", "end_char", "excerpt",
-        "excerpt_truncated", "source_truncated",
+        "excerpt_truncated", "source_truncated", "version_id", "version_number",
     }  # fmt: skip
     assert {"request_id", "timestamp"} <= set(response.json()["meta"])
 
