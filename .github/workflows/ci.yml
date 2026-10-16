@@ -47,6 +47,8 @@ jobs:
       - run: python -m mypy
       - run: python -m pytest -m "not integration"
       - run: python -m pytest -m integration
+      - name: Evaluation, deterministic profile (no model, no ML package; hard gates fail the job)
+        run: python -m evaluation.suite --profile deterministic --baseline evaluation/baselines/deterministic.json
 
   frontend:
     runs-on: ubuntu-latest

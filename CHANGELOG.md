@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 12: End-to-End Evaluation
+
+- `python -m evaluation.suite` (profiles `deterministic` and `models`): retrieval arms with bootstrap and Wilson intervals, candidate recall, reranking quality against cost (cold and warm latency, memory), filter and candidate checks, 35 pipeline scenarios, the answer questions and a citation audit; JSON reports with a stable schema and run metadata
+- Scenario dataset (`evaluation/scenarios/`): document versions (replacement, failed replacement, restore, re-processing, deletion), stored citations after each, conversation history (follow-ups, planted instructions, wrong earlier answers, deleted sources), abstention, injected documents, provider faults, degraded retrieval and tenant isolation, with `hard` (pipeline guarantees) and `behaviour` expectations
+- Dataset cards computed from the data (counts, categories, hashes, limitations), `python -m evaluation.cards`
+- `python -m evaluation.compare_runs`: hard gates that a quality score cannot override, quality and performance warnings with tolerances derived from sample noise, refusal to compare incompatible runs; committed deterministic baseline and a CI step that runs it
+- `python -m evaluation.citation_audit`: automatic review flags (missing citation, unsupplied label, number, quotation or identifier absent from the cited passage, low overlap) and a seeded human-review template with a rubric; no review results are recorded
+- Evaluation tests (`tests/integration/test_evaluation_scenarios.py`, `tests/unit/test_evaluation_framework.py`), including a check that the deterministic tooling imports no ML package
+
+### Changed
+
+- The earlier evaluation loader creates a document family for each evaluation document (it predated versions) and accepts an id namespace; recorded results are unchanged and reproduce exactly with `--legacy-ids`
+
+### Fixed
+
+- A typing error in a Phase 11 test helper that the project's full type check reports
+
 ### Added - Phase 11: Document Versions
 
 - `document_families` and per-document versions (migration `0009`, reversible while every document has one version): stable document id, `version_number`, `is_active` and `is_current` flags with partial unique indexes, an owner foreign key, and a trigger that only lets a ready version become active. Existing documents are backfilled as version 1 with the same id

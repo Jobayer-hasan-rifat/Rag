@@ -183,6 +183,7 @@ async def load_and_embed(
     factory: async_sessionmaker[AsyncSession],
     dataset: Dataset,
     user_id: uuid.UUID,
+    namespace: uuid.UUID = _EVAL_NAMESPACE,
 ) -> tuple[dict[uuid.UUID, str], float, int]:
     """Insert the dataset as chunked documents and embed them with the real EmbeddingService."""
     chunk_to_passage: dict[uuid.UUID, str] = {}
@@ -191,9 +192,10 @@ async def load_and_embed(
         user = await session.get(User, user_id)
         assert user is not None
         for document in dataset.documents:
-            doc_id = uuid.uuid5(_EVAL_NAMESPACE, document.id)
+            doc_id = uuid.uuid5(namespace, document.id)
             document_ids.append(doc_id)
-            session.add(
+            # a document is its first version (the family takes the same id), as an upload makes it
+            await DocumentRepository(session).add_first_version(
                 Document(
                     id=doc_id, user_id=user_id, filename=f"{document.id}.md",
                     storage_key=f"documents/ev/{uuid.uuid4().hex}", file_type="md",
@@ -202,10 +204,9 @@ async def load_and_embed(
                     chunk_count=len(document.passages), chunking_version="eval",
                 )
             )  # fmt: skip
-            await session.flush()
             for ordinal, passage in enumerate(document.passages):
-                section_id = uuid.uuid5(_EVAL_NAMESPACE, passage.id + ":section")
-                chunk_id = uuid.uuid5(_EVAL_NAMESPACE, passage.id + ":chunk")
+                section_id = uuid.uuid5(namespace, passage.id + ":section")
+                chunk_id = uuid.uuid5(namespace, passage.id + ":chunk")
                 session.add(
                     DocumentSection(
                         id=section_id, document_id=doc_id, ordinal=ordinal, kind="section",

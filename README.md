@@ -274,7 +274,7 @@ python -m pytest -m integration         # real PostgreSQL, Redis and Celery work
 python -m pytest --cov                  # everything, with coverage
 ```
 
-Current state (Phase 10): 1657 tests passing and 24 skipped in an ordinary Windows run (the skips are the 23 opt-in tests that load the real embedding, reranker and language models, enabled with RAG_REAL_MODEL_TESTS=1 and RAG_REAL_LLM_TESTS=1, and 1 POSIX-only test). About 98% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model (the real-model tests are the only ones that do). See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
+Current state (Phase 12): 1796 tests passing and 24 skipped in an ordinary Windows run (the skips are the 23 opt-in tests that load the real embedding, reranker and language models, enabled with RAG_REAL_MODEL_TESTS=1 and RAG_REAL_LLM_TESTS=1, and 1 POSIX-only test). About 98% line coverage of `app/`. Ordinary runs use a deterministic embedding provider and never download a model (the real-model tests are the only ones that do). See the [Testing Strategy](docs/11_TESTING_STRATEGY.md).
 
 ## Evaluation
 
@@ -289,7 +289,24 @@ This platform includes systematic evaluation of RAG quality:
 ### Citation Metrics
 - Citation precision, recall, correctness
 
-*The full RAG evaluation framework (generation and citation metrics) is planned.*
+*Phase 12 added a reproducible end-to-end evaluation (below). Database-backed evaluation runs and
+evaluation endpoints, listed in the original roadmap, are not implemented: results are JSON files with
+a stable schema.*
+
+### End-to-end evaluation (Phase 12)
+
+`python -m evaluation.suite` evaluates the real application: retrieval arms (dense, keyword, hybrid,
+reranked at several depths) with confidence intervals, 35 scenarios through the HTTP API (document
+versions, stored citations, conversation history, abstention, prompt injection, provider faults, tenant
+isolation), the answer questions, and a citation audit with a human-review template. The
+`deterministic` profile needs no model and runs in CI (the committed baseline holds 169 hard checks);
+the `models` profile uses the real embedding model, reranker and, opt-in, a generation model. Hard
+gates (isolation, version isolation, citation target integrity, safe abstention) are separate from
+quality warnings and are never overridden by a quality score. On the development corpus, reranking 10
+hybrid candidates with the cross-encoder raised Recall@1 from 0.883 to 0.961 (MRR@10 0.926 to 0.981) at a
+median of 1.1 s per query on one CPU (6.2 s cold, 3.8 GB resident); deeper candidate lists
+cost more and gained nothing. Methodology, definitions, gates, limits and the recorded results with
+their environment: [backend/evaluation/README.md](backend/evaluation/README.md).
 
 ### Retrieval evaluation (implemented in Phase 6)
 

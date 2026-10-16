@@ -1202,6 +1202,41 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 ---
 
+### DEC-072: Evaluation Runs the Real Application in Two Profiles; Hard Gates Are Separate From Quality
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: the evaluation drives the real HTTP API, database and pipeline. The `deterministic` profile (hashing embeddings, a fake reranker, a scripted reader) needs no model and runs in CI; the `models` profile uses the real models and is opt-in. Scenario expectations are `hard` (pipeline guarantees independent of a model: statuses, cited version, what may reach the prompt, citation resolution, filters) or `behaviour` (answer content, exact only with the scripted reader). Hard gates fail a run whatever the quality; quality and performance changes are warnings with tolerances derived from the baseline's own sampling noise. With a baseline, a gate cannot be passed by not running it.
+
+**Reason**: a quality score must never excuse an isolation or data-integrity failure, CI must stay light, and small datasets make thresholds on quality scores unreliable.
+
+**Consequences**: the scripted reader proves the application's gates, not a model's robustness (injection resistance with a real model is measured only with a real model). The roadmap's database-backed evaluation runs and endpoints are not implemented; reports are JSON files.
+
+---
+
+### DEC-073: Evaluation Data Is Immutable, Versioned and Identified by Passage, Not Chunk
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: ground truth names passages (`<document>-<n>`), mapped from retrieved chunks through the evaluation corpus' fixed ids; datasets carry a version and a content hash; runs record both, and results are compared only when profile, dataset hashes and all recorded settings match, otherwise reported as not comparable. Dataset files are never edited to suit a model.
+
+**Reason**: chunk ids change when a document is re-chunked, and numbers from different data or settings must not be read as a trend. Equal-score ties break by chunk id, so even re-using the same text with new ids moves a result by a question; that is the noise floor.
+
+---
+
+### DEC-074: No Model-as-Judge; Automatic Flags Select Answers for Human Review
+
+**Date**: 2026-10-16
+**Status**: Accepted
+
+**Chosen Option**: answer quality is measured with deterministic checks (expected facts, abstention, label validity, database-matching citations, forbidden strings). A citation audit raises flags for numbers, quotations, identifiers and wording absent from the cited passages and produces a seeded review sample with a rubric; no review result is recorded or invented.
+
+**Reason**: a model judge shares the generator's blind spots, favours fluent text and cannot be audited per claim; heuristics cannot prove entailment in every language. They are useful to choose what a person should read.
+
+---
+
 ## Future Decisions to Make
 
 ### To Be Decided

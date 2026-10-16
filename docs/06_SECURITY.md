@@ -699,3 +699,11 @@ pip-audit -r requirements.txt
   another version (unique storage key), so deleting one version cannot remove a file another uses.
 - **Resource bounds.** Versions per document and total stored bytes per user are capped; version listing is paginated;
   the document listing needs a constant number of queries per page.
+
+## Evaluation Tooling (Phase 12)
+
+- Only synthetic, version-controlled datasets are read; nothing reads user files, user conversations or production data.
+- Reports contain metrics, dataset content and run metadata (versions, hardware, settings by name, a reproducing command rebuilt from a fixed option list); prompts are kept in memory for the checks only; no secret, provider URL, API key or local path is written. A committed baseline is stripped of machine, time and git state.
+- Document text reaches a generation model only when a model is named explicitly, and then goes to the configured provider (local by default).
+- Runs are bounded (fixed datasets, one pass per question, bounded output lists); scenario users are created per scenario in a throwaway database.
+- Hard gates cover tenant isolation (another user's reads and writes on documents, versions and conversations must all be 404), version isolation and citation target integrity, and cannot be overridden by a quality score.

@@ -19,9 +19,10 @@ def upload_version(
     name: str = "v.txt",
 ) -> Response:
     data = content.encode() if isinstance(content, str) else content
-    return client.post(
+    response: Response = client.post(
         f"{DOCS}/{document_id}/versions", headers=headers or {}, files={"file": (name, data, "")}
     )
+    return response
 
 
 def new_version(
