@@ -1271,6 +1271,24 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 **Reason**: checking a claim means reading the evidence while the answer stays visible; a modal hides the answer, and a fixed-width panel either squeezes the conversation or the evidence. The text always comes from the cited version, never the active one.
 
+### DEC-079: Keep the Refresh Token in sessionStorage Until the Deployment Topology Is Fixed
+
+**Date**: 2026-10-19
+**Status**: Accepted (revisit when the production topology is decided)
+
+**Chosen Option**: no change to the token contract in this phase. An HttpOnly cookie is the recommended end state; the evidence, the required design (CSRF defence, cookie attributes, removal of the body token) and the migration steps are recorded in `06_SECURITY.md`.
+
+**Reason**: a cookie needs a `SameSite` choice that depends on whether the frontend and API share a registrable domain, which is not yet decided, and a safe migration must remove the token from response bodies, which breaks every existing client. A half-migrated dual mode would keep the token script-readable and add a CSRF surface. The current exposure is narrow (no raw-HTML rendering, strict CSP verified, short access tokens, rotation with reuse detection).
+
+### DEC-080: A Forwarded Client Address Is Believed Only From a Configured Proxy
+
+**Date**: 2026-10-19
+**Status**: Accepted
+
+**Chosen Option**: `TRUSTED_PROXY_CIDRS` lists proxy networks; `X-Forwarded-For` is used only when the connection comes from one of them, read from the right while skipping proxy addresses; any other case uses the peer address. uvicorn's own proxy handling is turned off so there is a single rule.
+
+**Reason**: rate limits key on the client address. Using only the peer collapses every client behind a proxy into one bucket; believing the header from anyone lets a client choose its own bucket.
+
 ---
 
 ## Future Decisions to Make

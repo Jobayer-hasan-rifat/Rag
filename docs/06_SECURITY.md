@@ -707,3 +707,69 @@ pip-audit -r requirements.txt
 - Document text reaches a generation model only when a model is named explicitly, and then goes to the configured provider (local by default).
 - Runs are bounded (fixed datasets, one pass per question, bounded output lists); scenario users are created per scenario in a throwaway database.
 - Hard gates cover tenant isolation (another user's reads and writes on documents, versions and conversations must all be 404), version isolation and citation target integrity, and cannot be overridden by a quality score.
+
+## Security Hardening (Phase 14)
+
+A review of the whole system against the current code, with fixes for what was confirmed. Each change below has a regression test; no API contract that clients rely on was changed.
+
+### Fixed
+
+- **Who is the client.** Rate limits for sign-in, registration and refresh are per client address. Behind a reverse proxy every client previously shared the proxy's address, so ten attempts a minute from anyone locked out everyone. `TRUSTED_PROXY_CIDRS` names the proxy networks; only a request whose connection comes from one of them is allowed to say who the client is (`X-Forwarded-For`, read from the right, skipping the proxies). A request from anywhere else, or with a malformed chain, is limited by its real peer address, so the header cannot be used to dodge a limit. The server image starts uvicorn with `--no-proxy-headers` so there is one place that decides this.
+- **Sign-in fails closed.** If Redis is unavailable the rate limiter used to allow every request, which turned password guessing into unlimited guessing. Sign-in, registration and refresh now answer 503 instead; other limits still fail open (the data endpoints already depend on Redis for token revocation, so an outage degrades the whole API in any case).
+- **Request body size.** Only uploads and search or conversation bodies had a cap. Every other request with a body (`POST`, `PUT`, `PATCH`) is now limited to `MAX_JSON_BODY_BYTES` (64 KiB by default) before it is read, including requests without a declared length.
+- **Response headers.** Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`; API responses add a CSP that allows nothing and `Cache-Control: no-store` unless the route chose its own (downloads do). `Strict-Transport-Security` is sent in staging and production (`HSTS_ENABLED` overrides).
+- **Interactive documentation.** `/docs`, `/redoc` and `/openapi.json` are served in development and test only; `API_DOCS_ENABLED` overrides. A production API no longer publishes its own map.
+- **Budgets on downloads and document management.** A download streams up to the upload limit and a rename or delete does storage and index work; both now have a per-user budget (`RATE_LIMIT_DOWNLOAD_ATTEMPTS`, `RATE_LIMIT_DOCUMENT_MANAGE`). Authentication is checked first, so anonymous requests spend nobody's budget.
+- **Expired refresh tokens** are deleted a day after they expire by a scheduled task (`REFRESH_TOKEN_PURGE_INTERVAL_SECONDS`). Revoked tokens are kept until they would have expired, so replaying one is still recognised as reuse.
+- **Production configuration is refused when unsafe.** In staging and production the application will not start if a CORS origin is not an `https` origin or names localhost; if the database, Redis or Celery URL has no password; if the signing key has fewer than ten distinct characters; or if a remote model endpoint is plain `http` (questions and document text are sent to it). `TRUSTED_PROXY_CIDRS` rejects anything that trusts every address.
+- **Frontend session handling.** A refresh that failed because the network or the server was unavailable used to end the session locally; now only an explicit refusal by the server does. Remembered unsent questions are deleted when the session ends. A document id from an error response is checked before it becomes a link. The theme script is a separate file, so the built application runs under a strict Content-Security-Policy (see below).
+
+### Verified and unchanged
+
+- **Every route is protected.** A test reads the OpenAPI schema and calls every operation anonymously and with malformed credentials; apart from the health probes and the three session endpoints, each answers 401. Other users' documents, versions, conversations, citations, chunks, downloads and search filters are the same 404 as a missing resource; a version of one document cannot be used through another document's path, even by the same owner; administrators have no access to other users' conversations or versions.
+- **Tokens.** Access tokens are signed with a pinned algorithm and carry identity only; refresh tokens are opaque, stored as digests, rotated on every use under a row lock, and a replayed token ends its whole family. Tokens never appear in URLs or logs (tests), and token responses are `no-store`.
+- **Uploads and parsing.** Extension, declared type, signature and size are validated; stored names are generated; archive limits apply to DOCX; parsing runs only in workers with memory, process and filesystem limits; limits on pages, text size, chunk count and processing time are enforced and configurable.
+- **Answers.** Retrieval is scoped to the user and to ready, active versions in SQL; document and conversation text is placed in delimited, escaped blocks and is never an input to access control; a citation must name a source retrieved for that answer, and its text comes from the version it was grounded in; a failed generation stores no answer; retries with an `Idempotency-Key` return the stored result. The model endpoint comes from configuration only, redirects are not followed and environment proxies are ignored.
+- **Rendering.** Model output, document names and conversation text are rendered as text or through a renderer that builds elements without HTML; links are limited to http, https and mailto and open with `noopener noreferrer nofollow`.
+
+### Refresh token storage: evaluation of an HttpOnly cookie
+
+The refresh token is kept in `sessionStorage`, so a cross-site-scripting flaw would let a script read it. Moving it to an `HttpOnly` cookie would remove that, but it is not done in this phase, for reasons that can be checked:
+
+- **The contract returns the token in the response body** and `refresh` and `logout` read it from the request body. A cookie design needs `Set-Cookie` on login and refresh, cookie-based refresh and logout, a CSRF defence (an `Origin` check plus a header a cross-site form cannot send), and credentialed CORS for explicit origins only (already so: no wildcard). Keeping the body token as a fallback would leave the token readable by script and add the CSRF surface, so a migration must remove it, which breaks every existing client and test of the contract.
+- **The right `SameSite` value depends on a deployment that does not exist yet.** `Strict` works when the frontend and the API share a registrable domain (as `localhost:5173` and `localhost:8000` do). If they were deployed on different registrable domains, `SameSite=None` would be required and CSRF protection would carry the whole load. The repository ships only a development frontend container, so the topology is undecided.
+- **The exposure is already narrow.** There is no raw-HTML rendering anywhere (tested), the built application runs under a strict CSP without inline scripts (verified), the token lives in one tab only, access tokens last 15 minutes, and rotation with reuse detection limits a stolen token's value.
+
+Recommended path once the topology is fixed: same-site deployment behind one origin; `Set-Cookie: __Secure-refresh=...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=...`; `refresh` and `logout` read the cookie and reject requests whose `Origin` is not in `CORS_ORIGINS` or that lack a custom header; remove the token from response bodies; `fetch` with `credentials: "include"`; tests for CSRF refusal, rotation, reuse and logout.
+
+### Content-Security-Policy for the web application
+
+The built frontend (`npm run build`) has no inline scripts, so the web server or proxy that serves it can send a strict policy. This one was checked against the real build: the application loaded, registered, signed in, restored its session after a reload and applied the saved theme with no violations.
+
+```
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline';
+  img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.example.org;
+  object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+```
+
+`style-src-attr 'unsafe-inline'` is needed only for a few computed widths (the source panel and skeletons); replace `connect-src` with the API origin. The development server (Vite) injects inline scripts and cannot run under this policy.
+
+### Production prerequisites
+
+- Set `APP_ENV=production` explicitly. The default is `development`, which is deliberately permissive.
+- Terminate TLS at a reverse proxy; set `TRUSTED_PROXY_CIDRS` to that proxy's network and nothing wider; make the API reachable only through the proxy so its size, timeout and header rules cannot be bypassed.
+- Have the proxy limit request size, time and rate as a first layer, and send the CSP above for the frontend.
+- Provide strong random values for `JWT_SECRET_KEY`, the database password and `REDIS_PASSWORD`; keep Redis and Postgres on an internal network. The services refuse to start with placeholder or password-less values.
+- Run exactly one `celery_beat`. Use the `prod` image target (non-root); keep the workers' memory, process and read-only filesystem limits.
+- `GET /health/ready` checks the database and Redis only. It does not check that a worker is running or that the model endpoint answers; monitor those separately (queue depth, task failures, answer errors).
+- Back up PostgreSQL (logical dumps plus WAL where available) and the upload volume together, and test a restore. Redis holds no data that cannot be rebuilt: lost tasks are re-queued from document status.
+- Run `pip-audit` and `npm audit` on every release.
+
+### Accepted risks and known limitations
+
+- The refresh token is script-readable (see above). Mitigation: no raw HTML rendering, strict CSP available, short access tokens, rotation and reuse detection. Follow-up: the cookie design above.
+- A client that retries a refresh whose response was lost, or two tabs that share one copied session, trigger reuse detection and end the session; the user signs in again. This is the price of treating a replayed token as theft.
+- Native PDF parsing runs inside the worker process, which holds database and storage credentials. Mitigation: container limits, read-only filesystem, dropped capabilities, dependency audits. Follow-up: a separate parser container without credentials or network.
+- Registration answers 409 for an existing email (account enumeration, rate-limited per client); there is no email verification, password reset, MFA or breached-password check.
+- Documents are structurally validated, not scanned for malware; they are stored inert and served only as attachments.
+- `torch` (a local-version build) cannot be checked by `pip-audit`; it is pinned and installed from the official CPU index.

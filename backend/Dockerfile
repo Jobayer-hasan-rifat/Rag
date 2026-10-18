@@ -27,7 +27,7 @@ RUN pip install -r requirements-dev.txt
 COPY . .
 RUN chown -R app:app /app
 USER app
-CMD ["uvicorn", "app.main:get_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:get_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers", "--reload"]
 
 # Production-oriented image: runtime dependencies only, non-root.
 FROM base AS prod
@@ -35,4 +35,4 @@ COPY . .
 RUN chown -R app:app /app
 USER app
 EXPOSE 8000
-CMD ["uvicorn", "app.main:get_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:get_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

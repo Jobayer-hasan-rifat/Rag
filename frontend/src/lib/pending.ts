@@ -40,3 +40,17 @@ export function clearPending(conversationId: string): void {
     // nothing to clear
   }
 }
+
+/** Forget every remembered question (sign-out, or a session the server ended). */
+export function clearPendingQuestions(): void {
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(prefix)) keys.push(key);
+    }
+    keys.forEach((key) => sessionStorage.removeItem(key));
+  } catch {
+    // nothing to clear
+  }
+}

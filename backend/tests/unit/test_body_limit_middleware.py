@@ -100,3 +100,42 @@ async def test_non_http_scopes_pass_through() -> None:
     await middleware({"type": "lifespan"}, None, None)  # type: ignore[arg-type]
 
     assert called == ["lifespan"]
+
+
+def _with_default() -> BodySizeLimitMiddleware:
+    return BodySizeLimitMiddleware(
+        _reading_app,
+        rules={("POST", "/search"): 500},
+        default_limit=50,
+        skip=frozenset({("POST", "/up"), ("POST", "/docs/{id}/versions")}),
+    )
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH"])
+async def test_a_default_limit_caps_every_other_request_that_carries_a_body(method: str) -> None:
+    recorder = Recorder([])
+    scope = _scope(method=method, path="/anything", headers=[(b"content-length", b"51")])
+
+    await _with_default()(scope, recorder.receive, recorder.send)
+
+    assert recorder.sent[0]["status"] == 413
+
+
+async def test_the_default_limit_leaves_reads_deletes_and_named_rules_alone() -> None:
+    for scope in (
+        _scope(method="GET", path="/anything", headers=[(b"content-length", b"999")]),
+        _scope(method="DELETE", path="/anything", headers=[(b"content-length", b"999")]),
+        _scope(path="/search", headers=[(b"content-length", b"400")]),
+        _scope(path="/up", headers=[(b"content-length", b"999")]),
+        _scope(path="/docs/abc/versions", headers=[(b"content-length", b"999")]),
+    ):
+        recorder = Recorder([])
+        await _with_default()(scope, recorder.receive, recorder.send)
+        assert recorder.sent[0]["status"] == 200, scope["path"]
+
+
+async def test_a_streamed_body_over_the_default_limit_is_stopped() -> None:
+    recorder = Recorder([b"x" * 30, b"x" * 30])
+
+    with pytest.raises(FileTooLargeError):
+        await _with_default()(_scope(path="/anything"), recorder.receive, recorder.send)

@@ -60,14 +60,21 @@ async function toError(response: Response): Promise<ApiError> {
   return new ApiError(response.status, code, message, details, requestId, Number.isFinite(header) && header > 0 ? header : null);
 }
 
-let refreshing: Promise<boolean> | null = null;
+/**
+ * The outcome of a refresh: `ok` (a new pair is stored), `rejected` (the server refused the refresh
+ * token, so the session is over and has been cleared) or `unavailable` (the server could not be
+ * reached or failed, so the session is kept and a later call may try again).
+ */
+export type RefreshResult = "ok" | "rejected" | "unavailable";
 
-/** Exchange the refresh token for a new pair; resolves false (and clears the session) on failure. */
-export function refreshSession(): Promise<boolean> {
+let refreshing: Promise<RefreshResult> | null = null;
+
+/** Exchange the refresh token for a new pair. Calls made at the same time share one attempt. */
+export function refreshSession(): Promise<RefreshResult> {
   if (refreshing) return refreshing;
   const token = session.refresh();
-  if (!token) return Promise.resolve(false);
-  refreshing = (async () => {
+  if (!token) return Promise.resolve("rejected");
+  refreshing = (async (): Promise<RefreshResult> => {
     try {
       const response = await fetch(buildUrl("/auth/refresh"), {
         method: "POST",
@@ -75,19 +82,29 @@ export function refreshSession(): Promise<boolean> {
         body: JSON.stringify({ refresh_token: token }),
       });
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403 || response.status === 422) session.clear();
-        return false;
+        // only an explicit refusal ends the session; a 429 or 5xx says nothing about the token
+        if (response.status === 401 || response.status === 403 || response.status === 422) {
+          session.clear();
+          return "rejected";
+        }
+        return "unavailable";
       }
       const body = (await response.json()) as Envelope<TokenPair>;
       session.set(body.data);
-      return true;
+      return "ok";
     } catch {
-      return false; // offline: keep the session so a later call can try again
+      return "unavailable";
     } finally {
       refreshing = null;
     }
   })();
   return refreshing;
+}
+
+/** What a failed refresh means to the call that needed it. */
+function refreshFailure(result: RefreshResult): ApiError {
+  if (result === "unavailable") return new ApiError(0, "NETWORK_ERROR", "Network request failed");
+  return new ApiError(401, "SESSION_EXPIRED", "Your session has expired");
 }
 
 async function send(method: string, path: string, options: RequestOptions, retried: boolean): Promise<Response> {
@@ -109,9 +126,9 @@ async function send(method: string, path: string, options: RequestOptions, retri
     throw new ApiError(0, "NETWORK_ERROR", "Network request failed");
   }
   if (response.status === 401 && wantsAuth && !retried) {
-    if (await refreshSession()) return send(method, path, options, true);
-    session.clear();
-    throw new ApiError(401, "SESSION_EXPIRED", "Your session has expired");
+    const result = await refreshSession();
+    if (result === "ok") return send(method, path, options, true);
+    throw refreshFailure(result);
   }
   return response;
 }
@@ -164,10 +181,9 @@ export function upload<T>(
         if (retryAfter) headers.set("Retry-After", retryAfter);
         if (xhr.status === 401 && !retried) {
           refreshSession()
-            .then((ok) => {
-              if (!ok) {
-                session.clear();
-                reject(new ApiError(401, "SESSION_EXPIRED", "Your session has expired"));
+            .then((result) => {
+              if (result !== "ok") {
+                reject(refreshFailure(result));
                 return undefined;
               }
               return attempt(true).then(resolve, reject);

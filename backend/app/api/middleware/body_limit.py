@@ -28,7 +28,11 @@ class BodySizeLimitMiddleware:
         rules: dict[tuple[str, str], int],
         overhead_bytes: int = 0,
         error_factory: Callable[[int], AppError] = FileTooLargeError,
+        default_limit: int | None = None,
+        skip: frozenset[tuple[str, str]] = frozenset(),
     ) -> None:
+        """`default_limit` caps every other request that carries a body (POST, PUT, PATCH),
+        except the routes named in `skip`, which another instance of this middleware handles."""
         self.app = app
         self._rules = {k: v for k, v in rules.items() if "{" not in k[1]}
         # a `{name}` segment in a rule path matches any single path segment
@@ -39,6 +43,11 @@ class BodySizeLimitMiddleware:
         ]
         self._overhead = overhead_bytes
         self._error_factory = error_factory
+        self._default = default_limit
+        self._skip_exact = {k for k in skip if "{" not in k[1]}
+        self._skip_patterns = [
+            (method, _compile_path(path)) for (method, path) in skip if "{" in path
+        ]
 
     def _limit_for(self, scope: Scope) -> int | None:
         exact = self._rules.get((scope["method"], scope["path"]))
@@ -47,6 +56,14 @@ class BodySizeLimitMiddleware:
         for method, pattern, limit in self._patterns:
             if scope["method"] == method and pattern.match(scope["path"]):
                 return limit
+        if self._default is not None and scope["method"] in ("POST", "PUT", "PATCH"):
+            if (scope["method"], scope["path"]) in self._skip_exact:
+                return None
+            if any(
+                m == scope["method"] and pat.match(scope["path"]) for m, pat in self._skip_patterns
+            ):
+                return None
+            return self._default
         return None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

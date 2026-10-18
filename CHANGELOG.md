@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - Phase 14: Hardening
+
+- Client identity for rate limits behind a reverse proxy: `TRUSTED_PROXY_CIDRS`, trusting `X-Forwarded-For` only from the configured networks and reading it from the right; the server image starts uvicorn with `--no-proxy-headers`
+- Sign-in, registration and refresh answer 503, rather than becoming unlimited, when the rate limiter's Redis is unavailable
+- Default request body cap (`MAX_JSON_BODY_BYTES`, 64 KiB) for every endpoint without its own rule
+- Security headers on every response (nosniff, frame denial, referrer policy, API CSP, `no-store`, HSTS in staging and production)
+- Interactive API documentation only in development and test (`API_DOCS_ENABLED`)
+- Per-user budgets for downloads and for document rename and delete
+- Scheduled removal of refresh tokens that expired a day or more ago
+- Production configuration refuses non-https or localhost CORS origins, password-less database, Redis and Celery URLs, a guessable signing key and a plain-http remote model endpoint
+- Frontend: a refresh that fails because the server or network is unavailable no longer ends the session; unsent questions are removed when the session ends; the theme script is an external file so the built app runs under a strict Content-Security-Policy; document ids from error responses are validated before becoming links
+- Tests: every operation in the OpenAPI schema is called anonymously and with malformed credentials; version identifiers cannot cross documents; hardening tests for headers, caps, client identity, fail-closed sign-in, budgets and token purge; production configuration tests; frontend session tests
+- Documentation: hardening review, the evaluation of an HttpOnly refresh cookie, a validated Content-Security-Policy, production prerequisites and accepted risks in `docs/06_SECURITY.md`
+
+### Changed
+
+- Requests with a body to endpoints that had no size rule are refused above 64 KiB (previously unlimited)
+- `/docs`, `/redoc` and `/openapi.json` are no longer served when `APP_ENV` is staging or production
+
 ### Changed - Phase 13.1: Interface Redesign
 
 - New visual identity (name, mark, warm-white and slate palette with one blue accent, serif reading type, system fonts with a Bengali fallback) defined as tokens, with light, dark and follow-the-device themes applied before first paint

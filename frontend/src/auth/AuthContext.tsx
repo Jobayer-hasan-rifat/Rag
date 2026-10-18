@@ -44,9 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        if (!session.access() && !(await refreshSession())) {
-          if (!cancelled) setState({ status: "anonymous", notice: null });
-          return;
+        if (!session.access()) {
+          const result = await refreshSession();
+          if (result !== "ok") {
+            const notice = result === "unavailable" ? "The server could not be reached. Reload the page to try again." : null;
+            if (!cancelled) setState({ status: "anonymous", notice });
+            return;
+          }
         }
         const user = await authService.currentUser();
         if (!cancelled) setState({ status: "authenticated", user });

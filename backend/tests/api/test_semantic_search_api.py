@@ -590,12 +590,16 @@ def test_oversized_search_bodies_are_refused_before_they_are_buffered(
     assert fine.status_code in (200, 422)  # the largest legitimate body still gets through
 
 
-def test_the_body_limit_applies_only_to_search_not_to_other_json_endpoints(
+def test_other_json_endpoints_have_a_smaller_default_cap_than_search(
     auth_client: TestClient,
 ) -> None:
     alice = make_user(auth_client, "alice@example.com")
     big = {"name": "n" * 200_000}
+    modest = {"name": "n" * 40_000}
 
-    response = auth_client.post("/api/v1/collections", headers=alice, json=big)
+    refused = auth_client.post("/api/v1/collections", headers=alice, json=big)
+    passed_the_cap = auth_client.post("/api/v1/collections", headers=alice, json=modest)
 
-    assert response.status_code == 422  # rejected by validation, not by the body cap
+    assert refused.status_code == 413  # the 64 KiB default, not the search limit
+    assert refused.json()["error"]["details"]["max_bytes"] == 65_536
+    assert passed_the_cap.status_code == 422  # rejected by validation, not by the body cap

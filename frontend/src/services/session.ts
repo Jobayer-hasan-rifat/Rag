@@ -8,6 +8,7 @@
  * stronger and needs a backend change (documented as deferred).
  */
 
+import { clearPendingQuestions } from "../lib/pending";
 import type { TokenPair } from "../types/api";
 
 const REFRESH_KEY = "rag.session.refresh";
@@ -43,6 +44,7 @@ export const session = {
   clear(): void {
     accessToken = null;
     writeRefresh(null);
+    clearPendingQuestions(); // a question typed by this user must not outlive their session
     listeners.forEach((listener) => listener());
   },
   /** Called when the server has refused the session for good. */

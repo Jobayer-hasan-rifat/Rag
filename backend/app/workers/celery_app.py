@@ -11,6 +11,7 @@ EMBEDDING_QUEUE = "embedding"
 EMBED_TASK = "app.workers.embedding_tasks.embed_document"
 EMBED_RECOVER_TASK = "app.workers.embedding_tasks.recover_stalled_embeddings"
 REINDEX_TASK = "app.workers.embedding_tasks.reindex_embeddings"
+PURGE_REFRESH_TOKENS_TASK = "app.workers.maintenance_tasks.purge_refresh_tokens"
 
 
 def create_celery_app(settings: Settings | None = None, *, configure_logs: bool = True) -> Celery:
@@ -26,6 +27,7 @@ def create_celery_app(settings: Settings | None = None, *, configure_logs: bool 
             "app.workers.health_tasks",
             "app.workers.document_tasks",
             "app.workers.embedding_tasks",
+            "app.workers.maintenance_tasks",
         ],
     )
     celery.conf.update(
@@ -75,6 +77,7 @@ def create_celery_app(settings: Settings | None = None, *, configure_logs: bool 
                 "time_limit": settings.processing_hard_time_limit_seconds,
             },
             RECOVER_TASK: {"soft_time_limit": 60, "time_limit": 90},
+            PURGE_REFRESH_TOKENS_TASK: {"soft_time_limit": 60, "time_limit": 90},
             EMBED_TASK: {
                 "soft_time_limit": settings.embedding_soft_time_limit_seconds,
                 "time_limit": settings.embedding_hard_time_limit_seconds,
@@ -91,6 +94,10 @@ def create_celery_app(settings: Settings | None = None, *, configure_logs: bool 
             "recover-stalled-embeddings": {
                 "task": EMBED_RECOVER_TASK,
                 "schedule": float(settings.processing_sweep_interval_seconds),
+            },
+            "purge-expired-refresh-tokens": {
+                "task": PURGE_REFRESH_TOKENS_TASK,
+                "schedule": float(settings.refresh_token_purge_interval_seconds),
             },
         },
         rag_settings=settings,

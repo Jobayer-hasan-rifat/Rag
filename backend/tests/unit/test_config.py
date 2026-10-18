@@ -116,7 +116,9 @@ def test_rate_limiting_cannot_be_disabled_in_production(make_settings: SettingsF
 
 
 def test_production_accepts_a_hardened_configuration(make_settings: SettingsFactory) -> None:
-    settings = make_settings(app_env="production", bcrypt_cost_factor=12)
+    settings = make_settings(
+        app_env="production", bcrypt_cost_factor=12, cors_origins=["https://app.example.org"]
+    )
 
     assert settings.rate_limit_enabled is True
 

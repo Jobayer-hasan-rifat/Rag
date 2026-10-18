@@ -79,6 +79,14 @@ Authorization: Bearer <access_token>
 
 ---
 
+### Limits and headers added in Phase 14
+
+- **Request bodies.** Any `POST`, `PUT` or `PATCH` without a size rule of its own is refused with `413 REQUEST_TOO_LARGE` above `MAX_JSON_BODY_BYTES` (64 KiB by default); uploads and search/conversation bodies keep their own limits. A body without a declared length is refused as soon as it passes the limit (the status may then be 400, because the framework reports a failed body read that way).
+- **Rate limits.** Downloads (`RATE_LIMIT_DOWNLOAD_ATTEMPTS`) and document rename or delete (`RATE_LIMIT_DOCUMENT_MANAGE`) answer `429 RATE_LIMIT_EXCEEDED` with `Retry-After` when a user's budget is spent. Authentication is checked first.
+- **Sign-in when Redis is down.** `/auth/register`, `/auth/login` and `/auth/refresh` answer `503 SERVICE_UNAVAILABLE` instead of skipping their rate limit.
+- **Headers.** Every response has `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`; API responses also have `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and `Cache-Control: no-store` unless the route sets its own. `Retry-After` and `Idempotency-Key` are part of the CORS contract (exposed and allowed).
+- **Documentation endpoints.** `/docs`, `/redoc` and `/openapi.json` exist only in development and test (see `API_DOCS_ENABLED`).
+
 ## Authentication Endpoints
 
 All responses use the standard envelope (`data` + `meta`, or `error` + `meta`). Request bodies

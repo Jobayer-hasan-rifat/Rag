@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.refresh_token import RefreshToken
@@ -34,3 +34,12 @@ class RefreshTokenRepository:
             .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
             .values(revoked_at=now)
         )
+
+    async def delete_expired(self, before: datetime) -> int:
+        """Remove tokens that expired before `before`. An expired token can no longer be used,
+        so its row has no security value; revoked rows are kept until they would have expired,
+        because replaying one must still be recognised as reuse and end its family."""
+        result = await self._session.execute(
+            delete(RefreshToken).where(RefreshToken.expires_at < before)
+        )
+        return int(result.rowcount or 0)  # type: ignore[attr-defined]

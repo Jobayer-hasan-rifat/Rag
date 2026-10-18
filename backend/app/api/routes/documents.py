@@ -15,6 +15,8 @@ from app.db.repositories.document_repository import DocumentFilters, SortField, 
 from app.dependencies import (
     CurrentUser,
     DocumentServiceDep,
+    enforce_document_manage_rate_limit,
+    enforce_download_rate_limit,
     enforce_retry_rate_limit,
     enforce_upload_rate_limit,
 )
@@ -217,7 +219,12 @@ async def get_document(
     return envelope(request, _to_response(await service.get(user, document_id)))
 
 
-@router.patch("/{document_id}", summary="Rename a document", responses=_ERRORS)
+@router.patch(
+    "/{document_id}",
+    summary="Rename a document",
+    responses=_ERRORS,
+    dependencies=[Depends(enforce_document_manage_rate_limit)],
+)
 async def update_document(
     document_id: uuid.UUID,
     body: DocumentUpdate,
@@ -284,6 +291,7 @@ async def retry_document(
     summary="Download the original file",
     response_class=StreamingResponse,
     responses=_ERRORS,
+    dependencies=[Depends(enforce_download_rate_limit)],
 )
 async def download_document(
     document_id: uuid.UUID, user: CurrentUser, service: DocumentServiceDep
@@ -306,6 +314,7 @@ async def download_document(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a document and its stored file",
     responses=_ERRORS,
+    dependencies=[Depends(enforce_document_manage_rate_limit)],
 )
 async def delete_document(
     document_id: uuid.UUID, user: CurrentUser, service: DocumentServiceDep
@@ -456,6 +465,7 @@ async def activate_version(
         **_ERRORS,
         409: {"model": ErrorResponse, "description": "The active or only version"},
     },
+    dependencies=[Depends(enforce_document_manage_rate_limit)],
 )
 async def delete_version(
     document_id: uuid.UUID,

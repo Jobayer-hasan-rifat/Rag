@@ -41,6 +41,7 @@ interface Props {
 }
 
 let nextId = 1;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default function UploadZone({ upload, describe, onFinished, multiple = true, compact, label = "Upload documents" }: Props) {
   const [items, setItems] = useState<Item[]>([]);
@@ -84,7 +85,8 @@ export default function UploadZone({ upload, describe, onFinished, multiple = tr
         if (isAbort(error)) {
           patch(item.id, { state: "error", message: "Upload cancelled.", tone: "error" });
         } else if (error instanceof ApiError && error.code === "DUPLICATE_DOCUMENT") {
-          const existing = String(error.details.existing_document_id ?? "");
+          const candidate = String(error.details.existing_document_id ?? "");
+          const existing = UUID.test(candidate) ? candidate : ""; // an id from the server, still never put in a link unchecked
           patch(item.id, {
             state: "done",
             message: "An identical file is already in your library, so nothing new was added.",

@@ -64,7 +64,7 @@ class AuthService:
     async def register(
         self, *, email: str, password: str, display_name: str, client_ip: str
     ) -> User:
-        await self._limiter.check("register:ip", client_ip)
+        await self._limiter.check("register:ip", client_ip, fail_closed=True)
         password_hash = await self._hasher.hash(password)  # always hash: equalises timing
         role = await self._roles.get_by_name(RoleName.USER)
         if role is None:
@@ -83,9 +83,11 @@ class AuthService:
         return user
 
     async def login(self, *, email: str, password: str, client_ip: str) -> TokenPair:
-        await self._limiter.check("login:ip", client_ip)
+        await self._limiter.check("login:ip", client_ip, fail_closed=True)
         # A larger budget than per-IP, so one IP cannot lock a victim out of their own account.
-        await self._limiter.check("login:email", email, budget_multiplier=ACCOUNT_BUDGET_MULTIPLIER)
+        await self._limiter.check(
+            "login:email", email, budget_multiplier=ACCOUNT_BUDGET_MULTIPLIER, fail_closed=True
+        )
         user = await self._users.get_by_email(email)
         password_ok = await self._hasher.verify(password, user.password_hash if user else None)
         if user is None or not password_ok:
@@ -100,7 +102,7 @@ class AuthService:
         return pair
 
     async def refresh(self, *, refresh_token: str, client_ip: str) -> TokenPair:
-        await self._limiter.check("refresh:ip", client_ip)
+        await self._limiter.check("refresh:ip", client_ip, fail_closed=True)
         now = datetime.now(UTC)
         record = await self._refresh_tokens.get_by_hash_for_update(
             hash_refresh_token(refresh_token)

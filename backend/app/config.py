@@ -1,3 +1,4 @@
+import ipaddress
 import re
 from functools import lru_cache
 from pathlib import PurePosixPath, PureWindowsPath
@@ -150,7 +151,20 @@ class Settings(BaseSettings):
     rate_limit_conversation_messages: int = Field(default=10, ge=1)
     rate_limit_conversation_manage: int = Field(default=120, ge=1)
 
+    rate_limit_download_attempts: int = Field(default=60, ge=1)
+    rate_limit_document_manage: int = Field(default=120, ge=1)
+    # Largest body accepted by any endpoint that has no rule of its own (uploads and search have
+    # theirs); it only has to hold the largest JSON request, which is a few kilobytes.
+    max_json_body_bytes: int = Field(default=65_536, ge=1024, le=10_485_760)
+    refresh_token_purge_interval_seconds: int = Field(default=3600, ge=60)
+
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Networks of the reverse proxies allowed to say who the client is (X-Forwarded-For). Empty:
+    # the header is ignored and the peer address is used.
+    trusted_proxy_cidrs: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # None: the interactive API documentation is served in development and test only.
+    api_docs_enabled: bool | None = None
+    hsts_enabled: bool | None = None
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
@@ -161,6 +175,8 @@ class Settings(BaseSettings):
         "rerank_cache_dir",
         "rerank_torch_threads",
         "llm_api_key",
+        "api_docs_enabled",
+        "hsts_enabled",
         mode="before",
     )
     @classmethod
@@ -174,6 +190,27 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @field_validator("trusted_proxy_cidrs", mode="before")
+    @classmethod
+    def _split_proxies(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("trusted_proxy_cidrs")
+    @classmethod
+    def _valid_proxy_networks(cls, networks: list[str]) -> list[str]:
+        for network in networks:
+            try:
+                parsed = ipaddress.ip_network(network, strict=False)
+            except ValueError:
+                raise ValueError(
+                    f"TRUSTED_PROXY_CIDRS entry {network!r} is not an IP or network"
+                ) from None
+            if parsed.prefixlen == 0:
+                raise ValueError("TRUSTED_PROXY_CIDRS must not trust every address")
+        return networks
 
     @field_validator("cors_origins")
     @classmethod
@@ -302,6 +339,24 @@ class Settings(BaseSettings):
             )
 
     @property
+    def docs_enabled(self) -> bool:
+        if self.api_docs_enabled is not None:
+            return self.api_docs_enabled
+        return self.app_env in ("development", "test")
+
+    @property
+    def hsts_active(self) -> bool:
+        if self.hsts_enabled is not None:
+            return self.hsts_enabled
+        return self.app_env in ("staging", "production")
+
+    @property
+    def trusted_proxy_networks(
+        self,
+    ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+        return tuple(ipaddress.ip_network(item, strict=False) for item in self.trusted_proxy_cidrs)
+
+    @property
     def embedding_soft_time_limit_seconds(self) -> int:
         return self.embedding_task_budget_seconds + self.embedding_model_load_allowance_seconds + 30
 
@@ -334,7 +389,37 @@ class Settings(BaseSettings):
                 )
             if not self.rate_limit_enabled:
                 raise ValueError("RATE_LIMIT_ENABLED must be true in staging and production")
+            self._check_production_secrets_and_origins()
         return self
+
+    def _check_production_secrets_and_origins(self) -> None:
+        """Settings that are harmless on a laptop and dangerous in front of real users."""
+        if len(set(self.jwt_secret_key.get_secret_value())) < 10:
+            raise ValueError("JWT_SECRET_KEY looks guessable; use a random value of 32+ characters")
+        for name, url in (
+            ("DATABASE_URL", self.database_url),
+            ("REDIS_URL", self.redis_url),
+            ("CELERY_BROKER_URL", self.celery_broker_url),
+            ("CELERY_RESULT_BACKEND", self.celery_result_backend),
+        ):
+            if not urlparse(url).password:
+                raise ValueError(f"{name} must include a password in staging and production")
+        for origin in self.cors_origins:
+            parsed = urlparse(origin)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.hostname in _LOCAL_HOSTS:
+                raise ValueError(
+                    "CORS_ORIGINS entries must be https origins (not localhost) in staging "
+                    f"and production; got {origin!r}"
+                )
+            if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+                raise ValueError(f"CORS_ORIGINS entry {origin!r} must be an origin, not a URL")
+        if self.rag_enabled:
+            llm = urlparse(self.llm_base_url)
+            if llm.scheme != "https" and llm.hostname not in _LOCAL_HOSTS:
+                raise ValueError(
+                    "LLM_BASE_URL must use https for a remote host in staging and production; "
+                    "documents and questions are sent to it"
+                )
 
 
 @lru_cache

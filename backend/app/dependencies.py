@@ -21,6 +21,7 @@ from app.embeddings.registry import get_provider
 from app.exceptions import AuthenticationError, AuthorizationError
 from app.models.user import User
 from app.security.authorization import RoleName
+from app.security.client_ip import resolve_client_ip
 from app.security.jwt import JWTService
 from app.security.password import PasswordHasher
 from app.security.rate_limit import RateLimiter
@@ -68,8 +69,11 @@ async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-def get_client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
+def get_client_ip(request: Request, settings: SettingsDep) -> str:
+    peer = request.client.host if request.client else None
+    return resolve_client_ip(
+        peer, request.headers.get("x-forwarded-for"), settings.trusted_proxy_networks
+    )
 
 
 ClientIp = Annotated[str, Depends(get_client_ip)]
@@ -302,6 +306,24 @@ async def enforce_retry_rate_limit(
 ) -> None:
     await limiter.check(
         "retry:user", str(user.id), max_attempts=settings.rate_limit_upload_attempts
+    )
+
+
+async def enforce_download_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    """A download streams up to the upload limit, so it is limited per user."""
+    await limiter.check(
+        "download:user", str(user.id), max_attempts=settings.rate_limit_download_attempts
+    )
+
+
+async def enforce_document_manage_rate_limit(
+    user: CurrentUser, limiter: LimiterDep, settings: SettingsDep
+) -> None:
+    """Rename and delete are cheap but not free (storage and index work): a generous budget."""
+    await limiter.check(
+        "document_manage:user", str(user.id), max_attempts=settings.rate_limit_document_manage
     )
 
 

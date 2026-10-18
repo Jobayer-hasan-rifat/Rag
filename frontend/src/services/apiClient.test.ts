@@ -87,6 +87,53 @@ describe("api client", () => {
     stop();
   });
 
+  it("keeps the session when the refresh cannot reach the server or the server fails", async () => {
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/refresh")) throw new TypeError("offline");
+      return failure(401, "AUTHENTICATION_ERROR");
+    });
+    await expect(get("/a")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    expect(session.refresh()).toBe("refresh-1");
+
+    fetchMock.mockImplementation(async (url) =>
+      url.endsWith("/auth/refresh") ? failure(503, "SERVICE_UNAVAILABLE") : failure(401, "AUTHENTICATION_ERROR"),
+    );
+    await expect(get("/a")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    expect(session.refresh()).toBe("refresh-1");
+
+    fetchMock.mockImplementation(async (url) =>
+      url.endsWith("/auth/refresh") ? failure(429, "RATE_LIMIT_EXCEEDED") : failure(401, "AUTHENTICATION_ERROR"),
+    );
+    await expect(get("/a")).rejects.toMatchObject({ code: "NETWORK_ERROR" });
+    expect(session.hasSession()).toBe(true);
+  });
+
+  it("forgets remembered questions when the session ends", () => {
+    sessionStorage.setItem("rag.pending.c1", JSON.stringify({ key: "q-1", content: "private", documentIds: [], rerank: false, startedAt: 1 }));
+    sessionStorage.setItem("unrelated", "kept");
+
+    session.clear();
+
+    expect(sessionStorage.getItem("rag.pending.c1")).toBeNull();
+    expect(sessionStorage.getItem("unrelated")).toBe("kept");
+  });
+
+  it("never puts a token in a URL, and sends the refresh token only in the body of the refresh call", async () => {
+    fetchMock.mockImplementation(async (url) => {
+      if (url.endsWith("/auth/refresh")) return ok({ access_token: "access-2", refresh_token: "refresh-2", token_type: "bearer", expires_in: 900 });
+      return failure(401, "AUTHENTICATION_ERROR");
+    });
+    await get("/a").catch(() => undefined);
+
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(url).not.toMatch(/refresh-[12]|access-[12]/);
+      const headers = JSON.stringify(init?.headers ?? {});
+      expect(headers).not.toContain("refresh-1");
+    }
+    const refreshCall = fetchMock.mock.calls.find(([url]) => url.endsWith("/auth/refresh"));
+    expect(JSON.parse(String(refreshCall?.[1]?.body))).toEqual({ refresh_token: "refresh-1" });
+  });
+
   it("does not try to refresh a failed sign-in", async () => {
     session.clear();
     fetchMock.mockResolvedValueOnce(failure(401, "AUTHENTICATION_ERROR"));

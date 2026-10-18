@@ -9,6 +9,7 @@ from app import __version__
 from app.api.error_handlers import register_error_handlers
 from app.api.middleware.body_limit import BodySizeLimitMiddleware
 from app.api.middleware.request_context import RequestContextMiddleware
+from app.api.middleware.security_headers import SecurityHeadersMiddleware
 from app.api.router import api_v1_router, root_health_router
 from app.config import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
@@ -84,19 +85,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         description="Intelligent Document Processing & RAG Platform API.",
         debug=False,
         lifespan=lifespan,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.docs_enabled else None,
+        redoc_url="/redoc" if settings.docs_enabled else None,
+        openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
 
+    upload_rules = {
+        ("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES,
+        ("POST", "/api/v1/documents/{id}/versions"): (
+            settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
+        ),
+    }
     app.add_middleware(
         BodySizeLimitMiddleware,
-        rules={
-            ("POST", "/api/v1/documents"): settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES,
-            ("POST", "/api/v1/documents/{id}/versions"): (
-                settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
-            ),
-        },
+        rules=upload_rules,
         overhead_bytes=MULTIPART_OVERHEAD_BYTES,
     )
     app.add_middleware(
@@ -110,6 +112,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ("POST", "/api/v1/conversations/{id}/messages"): SEARCH_BODY_LIMIT_BYTES,
         },
         error_factory=RequestTooLargeError,
+        default_limit=settings.max_json_body_bytes,
+        skip=frozenset(upload_rules),
     )
     app.add_middleware(
         CORSMiddleware,
@@ -119,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
         expose_headers=["X-Request-ID", "Content-Disposition", "Retry-After"],
     )
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.hsts_active)
     app.add_middleware(RequestContextMiddleware)
 
     app.state.settings = settings

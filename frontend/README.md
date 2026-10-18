@@ -28,9 +28,9 @@ The API must list the frontend's origin in `CORS_ORIGINS`. The browser sends `Au
 
 - The **access token lives in memory only**. The **refresh token is kept in `sessionStorage`** (never `localStorage`), so a session ends when the tab closes and a script on another origin cannot read it.
 - On a reload the app shows a short "Restoring your session" screen while it exchanges the refresh token; protected routes render nothing until the session is confirmed, so there is no flash of protected content.
-- A `401` triggers one refresh and one retry of the request. Refresh is single-flight because the backend rotates refresh tokens (two parallel refreshes would invalidate each other). If the refresh fails the session is cleared and the user is sent to the sign-in page with a "session expired" message.
+- A `401` triggers one refresh and one retry of the request. Refresh is single-flight because the backend rotates refresh tokens (two parallel refreshes would invalidate each other). If the server refuses the refresh token the session is cleared and the user is sent to the sign-in page with a "session expired" message; if the server or network is merely unavailable (offline, 429, 5xx) the session is kept and the call fails with a network error so a later call can try again. Signing out, or a session the server ended, also removes any remembered unsent question.
 - Signing out revokes the refresh token on the server and clears the browser state.
-- Limitation: `sessionStorage` is readable by any script running in the page (an XSS would reach it). An HttpOnly, SameSite cookie would be stronger; it needs a backend change and is deferred. The app avoids raw HTML rendering to keep that risk low.
+- Limitation: `sessionStorage` is readable by any script running in the page (an XSS would reach it). An HttpOnly, SameSite cookie would be stronger; it needs a backend change and a fixed deployment topology, and the evaluation and migration plan are in `docs/06_SECURITY.md`. The app avoids raw HTML rendering to keep that risk low.
 
 ## Routes
 
@@ -64,6 +64,10 @@ Hybrid (meaning and keywords) is the default; "meaning only" is available. Reran
 - The document filter and rerank setting apply to the next question only and are not carried forward.
 - Answers are rendered by a small Markdown renderer that builds React elements and never injects HTML. Links are limited to http, https and mailto and open with `rel="noopener noreferrer nofollow"`.
 - `[S1]`-style markers become buttons that open the source panel. A citation always shows **its own version's text**. If a newer version is now active the panel says the answer used an earlier version; if the document was deleted it says the source is no longer available and shows no text; text from the active version is never shown for an older citation.
+
+## Content-Security-Policy
+
+The production build has no inline scripts (the theme script is `public/theme-init.js`), so it can be served under a strict policy; the one checked against the real build is in `docs/06_SECURITY.md`. The development server cannot run under it.
 
 ## Layout and accessibility
 
