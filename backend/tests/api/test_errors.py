@@ -80,3 +80,37 @@ def test_unexpected_error_is_generic_and_leaks_nothing(client: TestClient) -> No
     assert "secret.py" not in response.text
     assert "Traceback" not in response.text
     assert response.headers["x-request-id"] == response.json()["meta"]["request_id"]
+
+
+def test_an_unexpected_error_still_carries_the_security_headers(client: TestClient) -> None:
+    # Starlette answers unexpected errors outside the application middleware stack
+    response = client.get("/_test/crash")
+
+    assert response.status_code == 500
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert (
+        response.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+    )
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_an_unexpected_error_in_production_also_sends_hsts(make_settings: SettingsFactory) -> None:
+    settings = make_settings(
+        app_env="production",
+        bcrypt_cost_factor=12,
+        cors_origins=["https://app.example.org"],
+        storage_local_path="/var/lib/rag/uploads",
+    )
+    app = create_app(settings)
+
+    @app.get("/_test/crash")
+    async def crash() -> None:
+        raise RuntimeError("boom")
+
+    with TestClient(app, raise_server_exceptions=False) as production_client:
+        response = production_client.get("/_test/crash")
+
+    assert response.status_code == 500
+    assert response.headers["strict-transport-security"] == "max-age=31536000"

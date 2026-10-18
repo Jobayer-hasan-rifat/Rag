@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.middleware.security_headers import api_security_headers
 from app.api.responses import error_response, request_id_of
 from app.exceptions import AppError
 from app.observability.logging import get_logger
@@ -70,6 +71,7 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> JSONRespo
         status_code=500,
         code="INTERNAL_ERROR",
         message="An unexpected error occurred",
+        headers=api_security_headers(hsts=request.app.state.settings.hsts_active),
     )
 
 

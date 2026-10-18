@@ -8,6 +8,21 @@ _API_CSP = "default-src 'none'; frame-ancestors 'none'"
 _HSTS = "max-age=31536000"
 
 
+def api_security_headers(*, hsts: bool) -> dict[str, str]:
+    """The headers of an API response. Also used by the unexpected-error handler: Starlette runs
+    that handler outside every application middleware, so a 500 would otherwise go out bare."""
+    headers = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Content-Security-Policy": _API_CSP,
+        "Cache-Control": "no-store",
+    }
+    if hsts:
+        headers["Strict-Transport-Security"] = _HSTS
+    return headers
+
+
 class SecurityHeadersMiddleware:
     """Adds `nosniff`, framing and referrer protection to every response.
 

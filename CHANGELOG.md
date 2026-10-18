@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - Phase 15: Release Verification
+
+- Unexpected errors (HTTP 500) now carry the security headers; Starlette answers them outside the application middleware, so the headers added in the previous phase were missing there
+- CI runs `pip-audit` on both requirement files, `npm test` (including the colour-contrast check) and `npm audit --omit=dev`
+- `docs/06_SECURITY.md`: accepted risks as a table with impact, mitigation and follow-up; a record of what was verified against the running deployment, how the pending changes were activated, and what remains deployment-specific
+
 ### Security - Phase 14: Hardening
 
 - Client identity for rate limits behind a reverse proxy: `TRUSTED_PROXY_CIDRS`, trusting `X-Forwarded-For` only from the configured networks and reading it from the right; the server image starts uvicorn with `--no-proxy-headers`

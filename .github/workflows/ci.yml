@@ -47,6 +47,11 @@ jobs:
       - run: python -m mypy
       - run: python -m pytest -m "not integration"
       - run: python -m pytest -m integration
+      - name: Dependency audit (pinned runtime requirements, including the Linux-only ML set)
+        run: |
+          pip install pip-audit
+          python -m pip_audit -r requirements.txt
+          python -m pip_audit -r requirements-ml.txt
       - name: Evaluation, deterministic profile (no model, no ML package; hard gates fail the job)
         run: python -m evaluation.suite --profile deterministic --baseline evaluation/baselines/deterministic.json
 
@@ -65,6 +70,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - run: npm test
+      - run: npm audit --omit=dev
 
   compose:
     runs-on: ubuntu-latest
