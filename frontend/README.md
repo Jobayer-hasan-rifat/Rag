@@ -1,6 +1,6 @@
 # Frontend
 
-React 18, TypeScript (strict), Vite 6 and React Router 7. Styling is plain CSS (`src/styles/tokens.css` for the design tokens, `src/styles/global.css` for components). There is no UI framework and no CSS preprocessor.
+React 18, TypeScript (strict), Vite 6 and React Router 7. Styling is plain CSS: `src/styles/tokens.css` holds the design tokens (light and dark) and `base.css`, `shell.css`, `pages.css` and `workspace.css` hold the components, all loaded through `global.css`. The design is described in [DESIGN.md](DESIGN.md). There is no UI framework and no CSS preprocessor.
 
 ## Running it
 
@@ -9,7 +9,8 @@ cd frontend
 npm install
 npm run dev            # http://localhost:5173 (Vite dev server)
 npm run typecheck      # tsc --noEmit, strict
-npm test               # vitest (node environment; logic, client and renderer tests)
+npm test               # vitest (node environment; logic, client, renderer, theme and contrast tests)
+npm run check:contrast # WCAG AA check of every text/background pair in both themes
 npm run build          # type check, then a production bundle in dist/
 ```
 
@@ -36,12 +37,12 @@ The API must list the frontend's origin in `CORS_ORIGINS`. The browser sends `Au
 | Route | Page |
 |-------|------|
 | `/login`, `/register` | Sign in and account creation (password rules shown before submitting) |
-| `/` | Dashboard: documents needing attention, recent documents, recent conversations, upload |
+| `/` | Home: a three-step start for a new library; otherwise a search box, documents needing attention, recent conversations and documents |
 | `/documents` | Upload (drag and drop or picker, progress, duplicates), library with filters, sorting and pagination |
 | `/documents/:id` | Document details, version history, upload a new version, activate, retry, rename, download, delete |
 | `/search` | Semantic or hybrid search, optional rerank, per-search document filter, source panel |
 | `/workspace`, `/workspace/:conversationId` | Persistent RAG conversations with citations and a source panel |
-| `/settings` | Account, API address and server health |
+| `/settings` | Account, theme (match device, light or dark), API address and server health |
 
 ## Documents
 
@@ -66,11 +67,11 @@ Hybrid (meaning and keywords) is the default; "meaning only" is available. Reran
 
 ## Layout and accessibility
 
-Responsive from about 360 px: the sidebar collapses (state remembered) and becomes an off-canvas drawer on small screens, tables become stacked cards, controls are at least 40 px high. Dialogs and drawers use the native `<dialog>` element (focus trapping, Escape to close). There is a skip link, visible focus styles, labelled inputs, `aria-live` regions for upload and toast messages, and `prefers-reduced-motion` turns transitions off. The font stack covers Latin and Bangla.
+A slim top bar (Home, Documents, Search, Workspace, *Add documents*, account menu) on larger screens; a bottom tab bar on phones. The workspace shows the conversation list, the thread and a resizable source panel side by side on wide screens, and a bottom sheet for sources on phones. *Add documents* opens one upload dialog from anywhere (it keeps running if closed). Dialogs use the native `<dialog>` element, menus follow the menu-button pattern, and every icon-only control is named. Light and dark themes, reduced-motion support, 44 px touch targets and Bangla-capable type are part of the design; the full description, with the principles and the checks behind it, is in [DESIGN.md](DESIGN.md).
 
 ## Tests
 
-`npm test` runs 26 tests: the API client (envelope, errors, refresh single-flight and retry), error mapping, the Markdown renderer (HTML and unsafe links are not interpreted), citation source rules and the pending-question store. There are no browser end-to-end or automated accessibility tests yet; the pages were checked by hand against a running stack.
+`npm test` runs the API client (envelope, errors, refresh single-flight and retry), error mapping, the Markdown renderer (HTML and unsafe links are not interpreted), citation source rules (including which version a source belongs to), the pending-question store, the theme preference and the colour-contrast check of the design tokens. There are no browser end-to-end or automated accessibility tests; the pages were checked by hand against a running stack at phone, tablet and desktop widths.
 
 ## Known limitations
 
@@ -78,4 +79,5 @@ Responsive from about 360 px: the sidebar collapses (state remembered) and becom
 - Refresh token in `sessionStorage` rather than an HttpOnly cookie (see above).
 - Only the extension is checked in the browser; the server validates content.
 - No ESLint configuration; `tsc --strict` is the static check.
+- The source panel's drag handle and the on-screen keyboard behaviour on real phones were not exercised by automation (keyboard resizing was).
 - No automated end-to-end, visual or accessibility test suite.

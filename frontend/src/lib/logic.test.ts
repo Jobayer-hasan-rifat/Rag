@@ -65,6 +65,17 @@ describe("source inspection", () => {
     expect(view.notes[0].text).toMatch(/can no longer be shown/);
   });
 
+  it("labels each kind of source so the panel never calls an old version active", () => {
+    expect(sourceFromCitation(citation({})).state).toBe("active");
+    expect(sourceFromCitation(citation({ superseded: true })).state).toBe("earlier");
+    expect(sourceFromCitation(citation({ source_available: false, excerpt: null })).state).toBe("unavailable");
+    expect(sourceFromCitation(citation({ removed: true, source_available: false, excerpt: null })).state).toBe("deleted");
+  });
+
+  it("carries the answer's marker so the panel can say which source is open", () => {
+    expect(sourceFromCitation(citation({ label: "S3" })).label).toBe("S3");
+  });
+
   it("explains answers saved before versions existed", () => {
     const view = sourceFromCitation(citation({ version_id: null, version_number: null }));
     expect(view.notes.some((n) => n.text.includes("first version"))).toBe(true);

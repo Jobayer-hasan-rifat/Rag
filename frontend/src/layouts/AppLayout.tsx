@@ -1,110 +1,152 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth, useUser } from "../auth/AuthContext";
+import { UploadProvider, useUploadDialog } from "../components/UploadDialog";
+import { BRAND, BrandMark } from "../components/ui/Brand";
 import { Icon, type IconName } from "../components/ui/Icon";
-import { IconButton } from "../components/ui/primitives";
+import { Menu, MenuItem, MenuLabel, MenuLink, MenuSeparator } from "../components/ui/Menu";
+import { useVisibleViewport } from "../hooks/useViewport";
+import { applyTheme, saveTheme, storedTheme, type ThemeChoice } from "../lib/theme";
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
-  { to: "/", label: "Dashboard", icon: "home", end: true },
+  { to: "/", label: "Home", icon: "home", end: true },
   { to: "/documents", label: "Documents", icon: "file" },
   { to: "/search", label: "Search", icon: "search" },
-  { to: "/workspace", label: "AI Workspace", icon: "chat" },
-  { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/workspace", label: "Workspace", icon: "chat" },
 ];
 
-const COLLAPSE_KEY = "rag.ui.sidebar.collapsed";
+const TITLES: Record<string, string> = {
+  "": "Home",
+  documents: "Documents",
+  search: "Search",
+  workspace: "Workspace",
+  settings: "Settings",
+};
 
-function initialCollapsed(): boolean {
-  try {
-    return localStorage.getItem(COLLAPSE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
+const THEMES: { value: ThemeChoice; label: string; icon: IconName }[] = [
+  { value: "system", label: "Match system", icon: "panel" },
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+];
 
-export default function AppLayout() {
+function AccountMenu() {
   const user = useUser();
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [collapsed, setCollapsed] = useState(initialCollapsed);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => setOpen(false), [location.pathname]);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  const toggleCollapsed = () => {
-    setCollapsed((value) => {
-      try {
-        localStorage.setItem(COLLAPSE_KEY, value ? "0" : "1");
-      } catch {
-        // a preference only
-      }
-      return !value;
-    });
-  };
-
-  const signOut = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
+  const [theme, setTheme] = useState<ThemeChoice>(storedTheme);
 
   return (
-    <div className={`shell${collapsed ? " shell-collapsed" : ""}${open ? " shell-open" : ""}`}>
-      <a className="skip-link" href="#main">
+    <Menu
+      label="Account menu"
+      triggerClassName="avatar-btn"
+      trigger={
+        <span className="avatar" aria-hidden="true">
+          {user.display_name.slice(0, 1).toUpperCase()}
+        </span>
+      }
+    >
+      <MenuLabel>
+        <strong>{user.display_name}</strong>
+        <span>{user.email}</span>
+      </MenuLabel>
+      <MenuSeparator />
+      <MenuLink to="/settings" icon="settings">
+        Settings
+      </MenuLink>
+      <MenuSeparator />
+      <MenuLabel>Theme</MenuLabel>
+      {THEMES.map((option) => (
+        <MenuItem
+          key={option.value}
+          icon={option.icon}
+          checked={theme === option.value}
+          onSelect={() => {
+            setTheme(option.value);
+            saveTheme(option.value);
+          }}
+        >
+          {option.label}
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      <MenuItem
+        icon="logout"
+        onSelect={() => {
+          void logout().then(() => navigate("/login", { replace: true }));
+        }}
+      >
+        Sign out
+      </MenuItem>
+    </Menu>
+  );
+}
+
+function UploadButton() {
+  const upload = useUploadDialog();
+  return (
+    <button type="button" className="btn btn-primary btn-md topbar-upload" onClick={upload.open}>
+      <Icon name="upload" size={16} />
+      <span>Add documents</span>
+    </button>
+  );
+}
+
+function Frame() {
+  const location = useLocation();
+  const main = useRef<HTMLElement>(null);
+  const section = location.pathname.split("/")[1] ?? "";
+  const inThread = /^\/workspace\/[^/]+/.test(location.pathname);
+  const fullBleed = section === "workspace";
+  useVisibleViewport();
+
+  useEffect(() => {
+    const theme = storedTheme();
+    applyTheme(theme);
+  }, []);
+
+  // Each section gets its own tab title, and moving to another section moves focus to the content.
+  const first = useRef(true);
+  useEffect(() => {
+    document.title = `${TITLES[section] ?? "Page"} · ${BRAND}`;
+    if (first.current) first.current = false;
+    else main.current?.focus({ preventScroll: true });
+  }, [section]);
+
+  return (
+    <div className={`app${inThread ? " app-thread" : ""}`}>
+      <a className="skip-link" href="#main" onClick={(event) => { event.preventDefault(); main.current?.focus(); }}>
         Skip to content
       </a>
-      <aside className="sidebar" aria-label="Main">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Icon name="layers" size={20} />
-          </span>
-          <span className="brand-name">Document Workspace</span>
-        </div>
-        <nav className="nav">
+      <header className="topbar">
+        <Link className="brand" to="/" aria-label={`${BRAND}, home`}>
+          <BrandMark />
+          <span className="brand-name">{BRAND}</span>
+        </Link>
+        <nav className="mainnav" aria-label="Main">
           {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-link${isActive ? " active" : ""}`} title={item.label}>
-              <Icon name={item.icon} />
-              <span className="nav-label">{item.label}</span>
+            <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `navlink${isActive ? " active" : ""}`}>
+              <Icon name={item.icon} size={20} />
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-foot">
-          <div className="user-chip" title={user.email}>
-            <span className="avatar" aria-hidden="true">
-              {user.display_name.slice(0, 1).toUpperCase()}
-            </span>
-            <span className="user-text">
-              <strong>{user.display_name}</strong>
-              <small>{user.email}</small>
-            </span>
-          </div>
-          <button type="button" className="nav-link nav-button" onClick={signOut}>
-            <Icon name="logout" />
-            <span className="nav-label">Sign out</span>
-          </button>
-          <button type="button" className="nav-link nav-button collapse-toggle" onClick={toggleCollapsed} aria-pressed={collapsed}>
-            <Icon name="chevron" />
-            <span className="nav-label">{collapsed ? "Expand" : "Collapse"}</span>
-          </button>
+        <div className="topbar-actions">
+          <UploadButton />
+          <AccountMenu />
         </div>
-      </aside>
-      {open ? <div className="scrim" onClick={() => setOpen(false)} aria-hidden="true" /> : null}
-      <div className="content">
-        <header className="topbar">
-          <IconButton icon="menu" label="Open navigation" onClick={() => setOpen(true)} aria-expanded={open} />
-          <span className="topbar-title">Document Workspace</span>
-        </header>
-        <main id="main" className="main" tabIndex={-1}>
-          <Outlet />
-        </main>
-      </div>
+      </header>
+      <main id="main" ref={main} className={`main${fullBleed ? " main-full" : ""}`} tabIndex={-1}>
+        <Outlet />
+      </main>
     </div>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <UploadProvider>
+      <Frame />
+    </UploadProvider>
   );
 }

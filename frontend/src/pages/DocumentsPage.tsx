@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DocumentStatus, isBusy, needsRetry, versionNote } from "../components/documentParts";
 import { ConfirmDialog } from "../components/ui/Dialog";
+import { Menu, MenuItem, MenuLink } from "../components/ui/Menu";
 import { useToast } from "../components/ui/Toast";
 import { Button, EmptyState, ErrorNotice, LoadingBlock, PageHeader, Pagination, Select, TextInput } from "../components/ui/primitives";
 import UploadZone from "../components/UploadZone";
+import { useAskAbout } from "../hooks/useAskAbout";
 import { useResource } from "../hooks/useResource";
 import { useDebounced, usePolling } from "../hooks/useTimers";
+import { useMediaQuery } from "../hooks/useViewport";
 import { formatBytes, formatDate, STATUS_LABEL } from "../lib/format";
-import { deleteDocument, listDocuments, retryDocument, uploadDocument } from "../services/documentService";
+import { useOnLibraryChanged } from "../lib/libraryEvents";
+import { deleteDocument, downloadDocument, listDocuments, retryDocument, uploadDocument } from "../services/documentService";
 import type { DocumentItem, DocumentStatus as Status, SortField } from "../types/api";
 
 const STATUSES: Status[] = ["ready", "failed", "pending", "parsing", "chunking", "chunked", "embedding"];
@@ -30,6 +34,9 @@ export default function DocumentsPage() {
   const [sortKey, setSortKey] = useState("new");
   const [doomed, setDoomed] = useState<DocumentItem | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const wide = useMediaQuery("(min-width: 720px)");
+  const { ask, busy: asking } = useAskAbout();
   const sort = SORTS.find((entry) => entry.value === sortKey) ?? SORTS[0];
 
   const list = useResource(
@@ -39,8 +46,32 @@ export default function DocumentsPage() {
   );
   const items = list.data?.items ?? [];
   usePolling(list.reload, 4000, items.some(isBusy));
+  useOnLibraryChanged(list.reload);
+
+  // tell screen-reader users when a document they were waiting for finishes or fails
+  const seen = useRef<Map<string, Status>>(new Map());
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    const messages: string[] = [];
+    for (const doc of items) {
+      const before = seen.current.get(doc.id);
+      if (before && before !== doc.status) {
+        if (doc.status === "ready") messages.push(`${doc.filename} is ready to search.`);
+        else if (doc.status === "failed") messages.push(`${doc.filename} could not be processed.`);
+      }
+      seen.current.set(doc.id, doc.status);
+    }
+    if (messages.length > 0) setAnnouncement(messages.join(" "));
+  }, [items]);
 
   const filtered = Boolean(search || status || type);
+  const clearFilters = () => {
+    setText("");
+    setStatus("");
+    setType("");
+    setSortKey("new");
+    setPage(1);
+  };
 
   const retry = async (doc: DocumentItem) => {
     setRetrying(doc.id);
@@ -55,6 +86,14 @@ export default function DocumentsPage() {
     }
   };
 
+  const save = async (doc: DocumentItem) => {
+    try {
+      await downloadDocument(doc.id, doc.filename);
+    } catch (error) {
+      toast.error(error);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!doomed) return;
     await deleteDocument(doomed.id);
@@ -66,44 +105,87 @@ export default function DocumentsPage() {
 
   return (
     <>
-      <PageHeader title="Documents" subtitle="Upload files, follow their processing and manage versions." />
+      <p className="visually-hidden" role="status" aria-live="polite">
+        {announcement}
+      </p>
+      <PageHeader title="Documents" subtitle="Everything you have added. A document can be searched and cited once it shows as Ready." />
       <UploadZone
+        compact={items.length > 0}
         upload={(file, handlers) => uploadDocument(file, handlers)}
-        describe={(file) => ({ message: `“${file.name}” was uploaded and is being processed. It is not searchable until processing finishes.` })}
+        describe={(file) => ({ message: `“${file.name}” was uploaded and is being processed. It is not searchable until it is ready.` })}
         onFinished={() => {
           setPage(1);
           list.reload();
         }}
       />
 
-      <section className="panel" aria-labelledby="library-heading">
+      <section className="panel panel-flush" aria-labelledby="library-heading">
         <div className="toolbar">
           <h2 id="library-heading">Library</h2>
           <div className="filters">
-            <TextInput type="search" placeholder="Search by file name" aria-label="Search by file name" value={text} onChange={(e) => { setText(e.target.value); setPage(1); }} />
-            <Select aria-label="Filter by status" value={status} onChange={(e) => { setStatus(e.target.value as Status | ""); setPage(1); }}>
-              <option value="">Any status</option>
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {STATUS_LABEL[value]}
-                </option>
-              ))}
-            </Select>
-            <Select aria-label="Filter by file type" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
-              <option value="">Any type</option>
-              {["pdf", "docx", "txt", "md"].map((value) => (
-                <option key={value} value={value}>
-                  {value.toUpperCase()}
-                </option>
-              ))}
-            </Select>
-            <Select aria-label="Sort" value={sortKey} onChange={(e) => { setSortKey(e.target.value); setPage(1); }}>
-              {SORTS.map((entry) => (
-                <option key={entry.value} value={entry.value}>
-                  {entry.label}
-                </option>
-              ))}
-            </Select>
+            <TextInput
+              type="search"
+              placeholder="Search by file name"
+              aria-label="Search by file name"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                setPage(1);
+              }}
+            />
+            {!wide ? (
+              <Button icon="sliders" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((value) => !value)}>
+                {status || type || sortKey !== "new" ? "Filter and sort (on)" : "Filter and sort"}
+              </Button>
+            ) : null}
+            {wide || filtersOpen ? (
+              <div className="filter-selects">
+                <Select
+                  aria-label="Filter by status"
+                  value={status}
+                  onChange={(e) => {
+                    setStatus(e.target.value as Status | "");
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Any status</option>
+                  {STATUSES.map((value) => (
+                    <option key={value} value={value}>
+                      {STATUS_LABEL[value]}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="Filter by file type"
+                  value={type}
+                  onChange={(e) => {
+                    setType(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Any type</option>
+                  {["pdf", "docx", "txt", "md"].map((value) => (
+                    <option key={value} value={value}>
+                      {value.toUpperCase()}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="Sort"
+                  value={sortKey}
+                  onChange={(e) => {
+                    setSortKey(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  {SORTS.map((entry) => (
+                    <option key={entry.value} value={entry.value}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -112,13 +194,15 @@ export default function DocumentsPage() {
         ) : !list.data ? (
           <LoadingBlock label="Loading documents" />
         ) : items.length === 0 ? (
-          <EmptyState title={filtered ? "No documents match" : "No documents yet"}>
-            {filtered ? "Try a different search or clear the filters." : "Upload a PDF, Word, text or Markdown file above to get started."}
+          <EmptyState title={filtered ? "No documents match" : "Your library is empty"} action={filtered ? <Button onClick={clearFilters}>Clear filters</Button> : undefined}>
+            {filtered
+              ? "Try a different name or clear the filters."
+              : "Drop a PDF, Word, text or Markdown file above. When it shows as Ready you can search it and ask questions about it."}
           </EmptyState>
         ) : (
           <>
             {list.error ? <ErrorNotice error={list.error} onRetry={list.reload} compact /> : null}
-            <table className="table">
+            <table className="table doc-table">
               <thead>
                 <tr>
                   <th scope="col">Name</th>
@@ -133,29 +217,46 @@ export default function DocumentsPage() {
               <tbody aria-busy={list.loading || undefined}>
                 {items.map((doc) => (
                   <tr key={doc.id}>
-                    <td data-label="Name">
-                      <Link to={`/documents/${doc.id}`} className="doc-name">
-                        {doc.filename}
-                      </Link>
-                      <div className="muted small">
-                        {doc.file_type.toUpperCase()} · {versionNote(doc)}
-                      </div>
+                    <td data-label="Name" className="cell-name">
+                      <span className="type-tile" aria-hidden="true">
+                        {doc.file_type.toUpperCase()}
+                      </span>
+                      <span className="name-block">
+                        <Link to={`/documents/${doc.id}`} className="doc-name" dir="auto">
+                          {doc.filename}
+                        </Link>
+                        <span className="muted small">{versionNote(doc)}</span>
+                      </span>
                     </td>
-                    <td data-label="Status">
+                    <td data-label="Status" className="cell-status">
                       <DocumentStatus doc={doc} />
                     </td>
-                    <td data-label="Size">{formatBytes(doc.file_size)}</td>
-                    <td data-label="Added">{formatDate(doc.created_at)}</td>
+                    <td data-label="Size" className="cell-num">
+                      {formatBytes(doc.file_size)}
+                    </td>
+                    <td data-label="Added" className="cell-num">
+                      {formatDate(doc.created_at)}
+                    </td>
                     <td className="row-actions">
                       {needsRetry(doc) ? (
                         <Button size="sm" icon="retry" busy={retrying === doc.id} onClick={() => void retry(doc)}>
                           Retry
                         </Button>
                       ) : null}
-                      <Link className="btn btn-secondary btn-sm" to={`/documents/${doc.id}`}>
-                        Open
-                      </Link>
-                      <Button size="sm" variant="ghost" icon="trash" aria-label={`Delete ${doc.filename}`} onClick={() => setDoomed(doc)} />
+                      <Menu label={`Actions for ${doc.filename}`}>
+                        <MenuLink to={`/documents/${doc.id}`} icon="file">
+                          Open details
+                        </MenuLink>
+                        <MenuItem icon="chat" disabled={asking || doc.status !== "ready"} onSelect={() => void ask({ [doc.id]: doc.filename })}>
+                          Ask about this document
+                        </MenuItem>
+                        <MenuItem icon="download" onSelect={() => void save(doc)}>
+                          Download
+                        </MenuItem>
+                        <MenuItem icon="trash" danger onSelect={() => setDoomed(doc)}>
+                          Delete…
+                        </MenuItem>
+                      </Menu>
                     </td>
                   </tr>
                 ))}

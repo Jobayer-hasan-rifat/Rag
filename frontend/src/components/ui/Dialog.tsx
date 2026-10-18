@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { describeError } from "../../services/errors";
 import { Button, ErrorNotice } from "./primitives";
@@ -12,14 +12,17 @@ interface DialogProps {
   /** `drawer` slides in from the right (source inspection); `modal` is centred. */
   variant?: "modal" | "drawer";
   footer?: ReactNode;
+  /** Keep the content mounted while closed (for example an upload queue that must keep running). */
+  keepMounted?: boolean;
 }
 
 /**
  * A modal built on the native <dialog> element: the browser traps focus, makes the page behind
  * inert, closes on Escape and restores focus to the opener.
  */
-export function Dialog({ open, title, onClose, children, variant = "modal", footer }: DialogProps) {
+export function Dialog({ open, title, onClose, children, variant = "modal", footer, keepMounted }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
@@ -30,16 +33,16 @@ export function Dialog({ open, title, onClose, children, variant = "modal", foot
     <dialog
       ref={ref}
       className={`dialog dialog-${variant}`}
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
       onClose={onClose}
       onClick={(event) => {
         if (event.target === ref.current) onClose(); // a click on the backdrop
       }}
     >
-      {open ? (
+      {open || keepMounted ? (
         <div className="dialog-panel">
           <header className="dialog-header">
-            <h2 id="dialog-title">{title}</h2>
+            <h2 id={titleId}>{title}</h2>
             <IconButton icon="x" label="Close" onClick={onClose} />
           </header>
           <div className="dialog-body">{children}</div>

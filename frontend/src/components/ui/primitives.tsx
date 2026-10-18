@@ -1,4 +1,4 @@
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 import { describeError } from "../../services/errors";
 import type { DocumentStatus } from "../../types/api";
@@ -71,7 +71,7 @@ export function LoadingBlock({ label = "Loading" }: { label?: string }) {
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="empty-state">
-      <h3>{title}</h3>
+      <h2>{title}</h2>
       {children ? <p>{children}</p> : null}
       {action ? <div className="empty-action">{action}</div> : null}
     </div>
@@ -111,7 +111,7 @@ export function StatusPill({ status }: { status: DocumentStatus }) {
   const tone = status === "ready" ? "ok" : status === "failed" ? "bad" : "wait";
   return (
     <span className={`pill pill-${tone}`} title={STATUS_HELP[status]}>
-      <span className="pill-dot" aria-hidden="true" />
+      {tone === "ok" ? <Icon name="check" size={13} /> : tone === "bad" ? <Icon name="alert" size={13} /> : <span className="pill-spin" aria-hidden="true" />}
       {STATUS_LABEL[status]}
       {isProcessing(status) ? <span className="visually-hidden"> (in progress, not searchable yet)</span> : null}
     </span>
@@ -150,6 +150,28 @@ export function Field({ label, hint, error, children }: FieldProps) {
         </span>
       ) : null}
     </div>
+  );
+}
+
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
+  const [shown, setShown] = useState(false);
+  return (
+    <span className="password-wrap">
+      <input {...props} type={shown ? "text" : "password"} className={`input${props.className ? ` ${props.className}` : ""}`} />
+      <button type="button" className="password-toggle" onClick={() => setShown((value) => !value)} aria-pressed={shown} aria-label={shown ? "Hide password" : "Show password"}>
+        <Icon name={shown ? "eyeOff" : "eye"} size={18} />
+      </button>
+    </span>
+  );
+}
+
+export function Switch({ label, checked, onChange, disabled, hint }: { label: string; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean; hint?: string }) {
+  return (
+    <label className={`switch${disabled ? " switch-disabled" : ""}`} title={hint}>
+      <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+      <span className="switch-track" aria-hidden="true" />
+      <span>{label}</span>
+    </label>
   );
 }
 

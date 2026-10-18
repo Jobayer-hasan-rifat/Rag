@@ -2,8 +2,8 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
-import { Icon } from "../components/ui/Icon";
-import { Button, ErrorNotice, Field, Notice, TextInput } from "../components/ui/primitives";
+import { BRAND, BrandMark } from "../components/ui/Brand";
+import { Button, ErrorNotice, Field, Notice, PasswordInput, TextInput } from "../components/ui/primitives";
 
 /** The password rules the server enforces, checked here only to explain them early. */
 export function passwordProblem(password: string): string | null {
@@ -52,13 +52,11 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Icon name="layers" size={20} />
-          </span>
-          <span>Document Workspace</span>
+          <BrandMark size={32} />
+          <span>{BRAND}</span>
         </div>
         <h1>{registering ? "Create your account" : "Sign in"}</h1>
-        <p className="muted">
+        <p className="muted auth-lead">
           {registering
             ? "Your documents and conversations are private to your account."
             : "Search and ask questions across your own documents."}
@@ -67,17 +65,16 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
         <form onSubmit={submit} noValidate>
           {registering ? (
             <Field label="Display name" error={nameError}>
-              {(props) => <TextInput {...props} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />}
+              {(props) => <TextInput {...props} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required autoFocus />}
             </Field>
           ) : null}
           <Field label="Email">
-            {(props) => <TextInput {...props} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />}
+            {(props) => <TextInput {...props} type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} required autoFocus={!registering} />}
           </Field>
           <Field label="Password" hint={registering ? "At least 8 characters with a lowercase letter, an uppercase letter and a digit." : undefined} error={passwordError}>
             {(props) => (
-              <TextInput
+              <PasswordInput
                 {...props}
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={registering ? "new-password" : "current-password"}

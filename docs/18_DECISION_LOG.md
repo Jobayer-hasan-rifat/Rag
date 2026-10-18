@@ -1253,6 +1253,24 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 **Reason**: the backend is the source of truth for versions and answers, and a retry that creates a second question or a restore that is shown before it happened would mislead the user.
 
+### DEC-077: Top Navigation and Bottom Tabs Instead of a Sidebar
+
+**Date**: 2026-10-19
+**Status**: Accepted
+
+**Chosen Option**: four destinations in a slim top bar on large screens and in a bottom tab bar on phones; settings, theme and sign out in an account menu; one global *Add documents* action.
+
+**Reason**: the sidebar spent horizontal space that the library table and the workspace need, and it listed two items (settings, sign out) that are rarely used. With four destinations a tab bar is within thumb reach and needs no drawer. Inside a conversation on a phone the navigation hides so the thread and composer own the screen.
+
+### DEC-078: The Source Panel Sits Beside the Conversation and Is Resizable
+
+**Date**: 2026-10-19
+**Status**: Accepted
+
+**Chosen Option**: on windows at least 1180 px wide a cited source opens in a panel beside the thread that can be dragged or resized with the keyboard, closed, and is remembered; below that it is a drawer, and on phones a bottom sheet. The panel shows the version the citation was grounded in and says so when that version is no longer active.
+
+**Reason**: checking a claim means reading the evidence while the answer stays visible; a modal hides the answer, and a fixed-width panel either squeezes the conversation or the evidence. The text always comes from the cited version, never the active one.
+
 ---
 
 ## Future Decisions to Make

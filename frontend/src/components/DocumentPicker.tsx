@@ -35,7 +35,7 @@ export default function DocumentPicker({ selected, onChange, disabled }: Props) 
 
   return (
     <>
-      <Button size="sm" icon="file" onClick={() => setOpen(true)} disabled={disabled} aria-haspopup="dialog">
+      <Button size="sm" variant="ghost" icon="file" onClick={() => setOpen(true)} disabled={disabled} aria-haspopup="dialog">
         {count === 0 ? "All documents" : `${count} document${count > 1 ? "s" : ""} selected`}
       </Button>
       {count > 0 ? (

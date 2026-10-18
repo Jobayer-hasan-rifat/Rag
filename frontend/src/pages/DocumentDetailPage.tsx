@@ -3,9 +3,12 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { isBusy } from "../components/documentParts";
 import { ConfirmDialog, Dialog } from "../components/ui/Dialog";
+import { Icon } from "../components/ui/Icon";
+import { Menu, MenuItem } from "../components/ui/Menu";
 import { useToast } from "../components/ui/Toast";
 import { Button, EmptyState, ErrorNotice, Field, LoadingBlock, StatusPill, TextInput, VersionTag } from "../components/ui/primitives";
 import UploadZone from "../components/UploadZone";
+import { useAskAbout } from "../hooks/useAskAbout";
 import { useResource } from "../hooks/useResource";
 import { usePolling } from "../hooks/useTimers";
 import { failureText, formatBytes, formatDateTime, isProcessing, STATUS_HELP } from "../lib/format";
@@ -23,17 +26,30 @@ import {
 import { ApiError } from "../services/errors";
 import type { DocumentVersion } from "../types/api";
 
-function versionState(version: DocumentVersion): { label: string; tone: "ok" | "wait" | "bad" | "muted" } {
-  if (version.status === "failed") return { label: "Failed", tone: "bad" };
-  if (isProcessing(version.status)) return { label: "Processing", tone: "wait" };
-  if (version.is_active) return { label: "Active", tone: "ok" };
-  return { label: "Superseded", tone: "muted" };
+type Tone = "ok" | "wait" | "bad" | "muted";
+
+/** The state of one version in words a reader can act on; never "active" unless the API says so. */
+function versionState(version: DocumentVersion): { label: string; tone: Tone; hint: string } {
+  if (version.status === "failed") return { label: "Failed", tone: "bad", hint: "This version could not be processed. It is not used for search or answers." };
+  if (isProcessing(version.status)) return { label: "Processing", tone: "wait", hint: "Not searchable yet. The active version keeps serving search until this one is ready." };
+  if (version.is_active) return { label: "Active", tone: "ok", hint: "Search and answers use this version." };
+  return { label: "Not active", tone: "muted", hint: "Ready, but search and answers are using another version." };
+}
+
+function StateBadge({ tone, label }: { tone: Tone; label: string }) {
+  return (
+    <span className={`pill pill-${tone}`}>
+      {tone === "ok" ? <Icon name="check" size={13} /> : tone === "bad" ? <Icon name="alert" size={13} /> : tone === "wait" ? <span className="pill-spin" aria-hidden="true" /> : null}
+      {label}
+    </span>
+  );
 }
 
 export default function DocumentDetailPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { ask, busy: asking } = useAskAbout();
   const doc = useResource((signal) => getDocument(id, signal), [id]);
   const versions = useResource((signal) => listVersions(id, signal), [id]);
   const [busyVersion, setBusyVersion] = useState<string | null>(null);
@@ -54,7 +70,7 @@ export default function DocumentDetailPage() {
 
   if (doc.error instanceof ApiError && doc.error.status === 404) {
     return (
-      <EmptyState title="Document not found" action={<Link className="btn btn-secondary" to="/documents">Back to documents</Link>}>
+      <EmptyState title="Document not found" action={<Link className="btn btn-secondary btn-md" to="/documents">Back to documents</Link>}>
         It may have been deleted, or it belongs to another account.
       </EmptyState>
     );
@@ -63,6 +79,9 @@ export default function DocumentDetailPage() {
   if (!doc.data) return <LoadingBlock label="Loading document" />;
   const d = doc.data;
   const list = versions.data ?? [];
+  const activeVersion = list.find((version) => version.is_active);
+  const shownIsActive = d.active_version_id !== null && d.active_version_id === d.version_id;
+  const latest = d.latest_version ?? null;
 
   const act = async (version: DocumentVersion, run: () => Promise<unknown>, done: string) => {
     setBusyVersion(version.id);
@@ -105,65 +124,95 @@ export default function DocumentDetailPage() {
 
   return (
     <>
-      <p className="breadcrumb">
-        <Link to="/documents">Documents</Link> / <span>{d.filename}</span>
-      </p>
-      <header className="page-header">
-        <div>
-          <h1>{d.filename}</h1>
+      <nav className="breadcrumb" aria-label="Breadcrumb">
+        <Link to="/documents">Documents</Link>
+        <Icon name="chevron" size={14} />
+        <span aria-current="page">{d.filename}</span>
+      </nav>
+
+      <header className="doc-header">
+        <span className="type-tile type-tile-lg" aria-hidden="true">
+          {d.file_type.toUpperCase()}
+        </span>
+        <div className="doc-header-text">
+          <h1 dir="auto">{d.filename}</h1>
           <p className="muted">
-            {d.file_type.toUpperCase()} · {formatBytes(d.file_size)} · added {formatDateTime(d.created_at)}
+            {formatBytes(d.file_size)} · added {formatDateTime(d.created_at)}
           </p>
+          <div className="doc-header-status">
+            <StatusPill status={d.status} />
+            <span className="muted small">{STATUS_HELP[d.status]}</span>
+          </div>
         </div>
-        <div className="page-actions">
+        <div className="doc-header-actions">
+          <Button variant="primary" icon="chat" busy={asking} disabled={!d.active_version_id} onClick={() => void ask({ [d.id]: d.filename })}>
+            Ask about this
+          </Button>
           <Button icon="download" busy={downloading} onClick={() => void save()}>
-            Download current
+            Download
           </Button>
-          <Button icon="pencil" onClick={() => { setName(d.filename); setRenameError(null); setRenaming(true); }}>
-            Rename
-          </Button>
-          <Button variant="danger" icon="trash" onClick={() => setDeleting("document")}>
-            Delete
-          </Button>
+          <Menu label="More document actions">
+            <MenuItem
+              icon="pencil"
+              onSelect={() => {
+                setName(d.filename);
+                setRenameError(null);
+                setRenaming(true);
+              }}
+            >
+              Rename
+            </MenuItem>
+            <MenuItem icon="trash" danger onSelect={() => setDeleting("document")}>
+              Delete document…
+            </MenuItem>
+          </Menu>
         </div>
       </header>
 
-      <section className="panel summary-grid" aria-label="Summary">
-        <div>
-          <span className="label">Status</span>
-          <StatusPill status={d.status} />
-          <p className="muted small">{STATUS_HELP[d.status]}</p>
-        </div>
-        <div>
-          <span className="label">Shown version</span>
-          <p>
-            <VersionTag number={d.version_number} tone={d.active_version_id === d.version_id ? "active" : "muted"} />{" "}
-            of {d.version_count}
-          </p>
-          <p className="muted small">{d.active_version_id ? "This is the version search and answers use." : "No version is searchable yet."}</p>
-        </div>
-        <div>
-          <span className="label">Latest version</span>
-          <p>
-            <VersionTag number={d.latest_version?.version_number ?? d.version_number} />{" "}
-            {d.latest_version ? d.latest_version.status : d.status}
-          </p>
-          {d.latest_version?.status === "failed" ? <p className="muted small">{failureText(d.latest_version.failure_reason)}</p> : null}
-        </div>
-        <div>
-          <span className="label">Passages</span>
-          <p>{d.chunk_count ?? "-"}</p>
-          <p className="muted small">{d.page_count ? `${d.page_count} pages` : "Page count not available"}</p>
-        </div>
+      <section className="panel callout" aria-label="What search and answers use">
+        <h2 className="visually-hidden">What search and answers use</h2>
+        <dl className="facts facts-wide">
+          <div>
+            <dt>Used for search and answers</dt>
+            <dd>
+              {d.active_version_id ? (
+                <>
+                  <VersionTag number={activeVersion?.version_number ?? (shownIsActive ? d.version_number : null)} tone="active" /> of {d.version_count}
+                </>
+              ) : (
+                "No version yet"
+              )}
+            </dd>
+            <dd className="muted small">{d.active_version_id ? "Only this version's passages are searched and cited." : "No version is searchable yet, so nothing can be searched or cited."}</dd>
+          </div>
+          <div>
+            <dt>Version shown on this page</dt>
+            <dd>
+              <VersionTag number={d.version_number} tone={shownIsActive ? "active" : "muted"} /> {shownIsActive ? "active" : "not the active version"}
+            </dd>
+          </div>
+          <div>
+            <dt>Latest upload</dt>
+            <dd>
+              <VersionTag number={latest?.version_number ?? d.version_number} /> {latest ? latest.status : d.status}
+            </dd>
+            {latest?.status === "failed" ? <dd className="muted small">{failureText(latest.failure_reason)}</dd> : null}
+          </div>
+          <div>
+            <dt>Passages</dt>
+            <dd>{d.chunk_count ?? "–"}</dd>
+            <dd className="muted small">{d.page_count ? `${d.page_count} pages` : "Page count not available"}</dd>
+          </div>
+        </dl>
       </section>
 
       <section className="panel" aria-labelledby="versions-heading">
         <div className="toolbar">
           <h2 id="versions-heading">Versions</h2>
         </div>
-        <p className="muted">
-          A new upload becomes a new version. The current version keeps serving search and answers until the new one has
-          finished processing; a failed upload changes nothing. Older versions are kept until you delete them.
+        <p className="muted measure">
+          A new upload becomes a new version. The active version keeps serving search and answers until the new one has finished processing; a failed upload
+          changes nothing. Older conversation answers keep pointing at the version they used, and are marked “earlier version” when it is no longer active.
         </p>
         <UploadZone
           compact
@@ -173,7 +222,7 @@ export default function DocumentDetailPage() {
           describe={(file, reply) => {
             const result = reply.data as { created: boolean; version: DocumentVersion };
             return result.created
-              ? { message: `“${file.name}” was uploaded as version ${result.version.version_number}. The current version stays active until it is ready.` }
+              ? { message: `“${file.name}” was uploaded as version ${result.version.version_number}. The active version stays active until it is ready.` }
               : { message: `This file is already version ${result.version.version_number} of this document, so no new version was created.` };
           }}
           onFinished={reloadAll}
@@ -183,74 +232,50 @@ export default function DocumentDetailPage() {
         ) : !versions.data ? (
           <LoadingBlock label="Loading versions" />
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th scope="col">Version</th>
-                <th scope="col">State</th>
-                <th scope="col">Added</th>
-                <th scope="col">Size</th>
-                <th scope="col">
-                  <span className="visually-hidden">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((version) => {
-                const state = versionState(version);
-                return (
-                  <tr key={version.id}>
-                    <td data-label="Version">
+          <ol className="versions" aria-label="Version history, newest first">
+            {list.map((version) => {
+              const state = versionState(version);
+              return (
+                <li key={version.id} className={`version${version.is_active ? " version-active" : ""}`}>
+                  <div className="version-main">
+                    <div className="version-title">
                       <VersionTag number={version.version_number} tone={version.is_active ? "active" : "muted"} />
-                      <div className="muted small">{version.filename}</div>
-                    </td>
-                    <td data-label="State">
-                      <span className={`pill pill-${state.tone}`}>
-                        <span className="pill-dot" aria-hidden="true" />
-                        {state.label}
-                      </span>
-                      <details className="version-details">
-                        <summary>Details</summary>
-                        <dl>
-                          <dt>Status</dt>
-                          <dd>{version.status}</dd>
-                          {version.status === "failed" ? (
-                            <>
-                              <dt>Why it failed</dt>
-                              <dd>{version.error_message ?? failureText(version.failure_reason)}</dd>
-                            </>
-                          ) : null}
-                          <dt>Passages</dt>
-                          <dd>{version.chunk_count ?? "-"}</dd>
-                          <dt>Processed</dt>
-                          <dd>{version.processing_completed_at ? formatDateTime(version.processing_completed_at) : "-"}</dd>
-                          <dt>Searchable</dt>
-                          <dd>{version.searchable ? "Yes" : "No"}</dd>
-                        </dl>
-                      </details>
-                    </td>
-                    <td data-label="Added">{formatDateTime(version.created_at)}</td>
-                    <td data-label="Size">{formatBytes(version.file_size)}</td>
-                    <td className="row-actions">
-                      {version.status === "failed" ? (
-                        <Button size="sm" icon="retry" busy={busyVersion === version.id} onClick={() => void act(version, () => retryVersion(d.id, version.id), `Processing of version ${version.version_number} was queued again.`)}>
-                          Retry
-                        </Button>
-                      ) : null}
-                      {version.status === "ready" && !version.is_active ? (
-                        <Button size="sm" icon="restore" busy={busyVersion === version.id} onClick={() => setRestoring(version)}>
-                          Make active
-                        </Button>
-                      ) : null}
-                      {!version.is_active && list.length > 1 ? (
-                        <Button size="sm" variant="ghost" icon="trash" aria-label={`Delete version ${version.version_number}`} onClick={() => setDeleting(version)} />
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      <StateBadge tone={state.tone} label={state.label} />
+                      {version.searchable ? <span className="muted small">Searchable</span> : <span className="muted small">Not searchable</span>}
+                    </div>
+                    <p className="version-name" dir="auto">
+                      {version.filename}
+                    </p>
+                    <p className="muted small">
+                      {formatDateTime(version.created_at)} · {formatBytes(version.file_size)}
+                      {version.chunk_count !== null && version.chunk_count !== undefined ? ` · ${version.chunk_count} passages` : ""}
+                    </p>
+                    <p className="small version-hint">{state.hint}</p>
+                    {version.status === "failed" ? <p className="small version-fail">{version.error_message ?? failureText(version.failure_reason)}</p> : null}
+                  </div>
+                  <div className="version-actions">
+                    {version.status === "failed" ? (
+                      <Button size="sm" icon="retry" busy={busyVersion === version.id} onClick={() => void act(version, () => retryVersion(d.id, version.id), `Processing of version ${version.version_number} was queued again.`)}>
+                        Retry
+                      </Button>
+                    ) : null}
+                    {version.status === "ready" && !version.is_active ? (
+                      <Button size="sm" icon="restore" busy={busyVersion === version.id} onClick={() => setRestoring(version)}>
+                        Make active
+                      </Button>
+                    ) : null}
+                    {!version.is_active && list.length > 1 ? (
+                      <Menu label={`More actions for version ${version.version_number}`}>
+                        <MenuItem icon="trash" danger onSelect={() => setDeleting(version)}>
+                          Delete version…
+                        </MenuItem>
+                      </Menu>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </section>
 

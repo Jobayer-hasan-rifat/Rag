@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
 
+import { useMediaQuery } from "../hooks/useViewport";
 import { ACCEPT, formatBytes, hasSupportedExtension } from "../lib/format";
 import type { Reply } from "../services/apiClient";
 import { ApiError, describeError, isAbort } from "../services/errors";
@@ -49,6 +50,7 @@ export default function UploadZone({ upload, describe, onFinished, multiple = tr
   const queue = useRef<Item[]>([]);
   const abort = useRef<AbortController | null>(null);
   const mounted = useRef(true);
+  const touch = useMediaQuery("(pointer: coarse)");
 
   useEffect(() => {
     mounted.current = true; // set again on the remount React StrictMode performs in development
@@ -133,16 +135,16 @@ export default function UploadZone({ upload, describe, onFinished, multiple = tr
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
       >
-        <Icon name="upload" size={compact ? 20 : 26} />
+        <Icon name="upload" size={compact ? 20 : 24} />
         <div className="dropzone-text">
           <strong>{label}</strong>
           <span>
-            Drop {multiple ? "files" : "a file"} here or{" "}
-            <button type="button" className="link-button" onClick={() => input.current?.click()}>
-              browse
+            {touch ? null : <>Drop {multiple ? "files" : "a file"} here, or </>}
+            <button type="button" className={touch ? "btn btn-secondary btn-md" : "link-button"} onClick={() => input.current?.click()}>
+              {touch ? `Choose ${multiple ? "files" : "a file"}` : "browse"}
             </button>
-            . PDF, DOCX, TXT or Markdown; the server limits file size (50 MB by default).
           </span>
+          <span className="dropzone-rules">PDF, DOCX, TXT or Markdown. The server limits the size of a file (50 MB by default).</span>
         </div>
         <input
           ref={input}

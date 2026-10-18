@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Phase 13.1: Interface Redesign
+
+- New visual identity (name, mark, warm-white and slate palette with one blue accent, serif reading type, system fonts with a Bengali fallback) defined as tokens, with light, dark and follow-the-device themes applied before first paint
+- Shell: a slim top bar replaces the sidebar on large screens; a bottom tab bar and compact top bar on phones; an account menu with theme and sign out; one *Add documents* dialog available everywhere that keeps uploading when closed
+- Workspace: collapsible conversation list, question-and-answer entries with numbered source markers, and a source panel docked beside the thread that can be resized and closed (a drawer below 1180 px, a bottom sheet on phones); composer that grows with its text, scopes one question to chosen documents and sends with Enter only on keyboard devices; a question that never reached the server can be sent again after a reload
+- Documents: compact table with row menus (details, ask about it, download, delete) and stacked rows on phones; clearer version history that states which version search uses, which are searchable and why an older citation says "earlier version"
+- Search: one prominent field with options summarised on one line; results offer view source, open document and ask about that document (a new conversation limited to it)
+- Home: a three-step start for an empty library, and a continue-working view otherwise (no decorative statistics)
+- Sign-in and registration with a password show/hide control; settings gain an appearance choice
+- Accessibility: contrast-checked tokens (`npm run check:contrast`, also run by `npm test`), keyboard-operable menus and resizer, named icon controls, one `h1` per page, announced upload and processing changes, 44 px touch targets, section titles and focus moved on navigation
+- `frontend/DESIGN.md` describing the design and its references
+
+### Fixed
+
+- A search opened from a link (`/search?q=...`) stayed on "Searching" under React StrictMode in development because the aborted first request was never repeated
+
 ### Added - Phase 13: Frontend Integration
 
 - React application over the existing API: sign-in and registration, dashboard, documents (drag-and-drop upload with progress and duplicate handling, filters, sorting, pagination), document details with version history (upload, activate, retry, delete, download), semantic and hybrid search with optional rerank and a source panel, and persistent conversations with citations

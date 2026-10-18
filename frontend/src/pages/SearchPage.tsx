@@ -3,7 +3,9 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import DocumentPicker, { type Selection } from "../components/DocumentPicker";
 import SourcePanel, { sourceFromHit, type SourceView } from "../components/SourcePanel";
-import { Button, EmptyState, ErrorNotice, LoadingBlock, Notice, PageHeader, Select, TextInput, VersionTag } from "../components/ui/primitives";
+import { Icon } from "../components/ui/Icon";
+import { Button, EmptyState, ErrorNotice, LoadingBlock, Notice, PageHeader, Select, Switch, TextInput, VersionTag } from "../components/ui/primitives";
+import { useAskAbout } from "../hooks/useAskAbout";
 import { ApiError, isAbort } from "../services/errors";
 import { search, type SearchMode } from "../services/searchService";
 import type { SearchHit, SearchResponse } from "../types/api";
@@ -39,6 +41,7 @@ export default function SearchPage() {
   const [state, setState] = useState<{ status: "idle" | "loading" | "done" | "error"; data?: SearchResponse; error?: unknown; asked?: string; mode?: SearchMode }>({ status: "idle" });
   const [source, setSource] = useState<SourceView | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const { ask, busy: asking } = useAskAbout();
 
   const run = async (text: string) => {
     const trimmed = text.trim();
@@ -63,13 +66,10 @@ export default function SearchPage() {
     }
   };
 
-  // a search started from another page (?q=...)
-  const started = useRef(false);
+  // a search started from another page (?q=...); React StrictMode mounts twice in development, and the
+  // second mount must start the search again because the first one is aborted by the cleanup
   useEffect(() => {
-    if (initial && !started.current) {
-      started.current = true;
-      void run(initial);
-    }
+    if (initial) void run(initial);
     return () => controller.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,41 +84,57 @@ export default function SearchPage() {
   return (
     <>
       <PageHeader title="Search" subtitle="Find the passages in your documents that match a question or a phrase." />
-      <form className="panel search-form" onSubmit={submit} role="search">
+      <form className="search-form" onSubmit={submit} role="search">
         <div className="search-row">
           <TextInput type="search" aria-label="Search your documents" placeholder="What are you looking for?" value={query} onChange={(e) => setQuery(e.target.value)} maxLength={2000} autoFocus />
           <Button type="submit" variant="primary" icon="search" busy={state.status === "loading"} disabled={!query.trim()}>
             Search
           </Button>
         </div>
-        <div className="options-row">
-          <label className="inline-field">
-            <span>Method</span>
-            <Select value={mode} onChange={(e) => setMode(e.target.value as SearchMode)}>
-              <option value="hybrid">Meaning and keywords (recommended)</option>
-              <option value="semantic">Meaning only</option>
-            </Select>
-          </label>
-          <label className="inline-field">
-            <span>Results</span>
-            <Select value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
-              {[5, 10, 20].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className={`check${mode !== "hybrid" || rerankOff ? " check-disabled" : ""}`}>
-            <input type="checkbox" checked={rerank && mode === "hybrid"} disabled={mode !== "hybrid" || rerankOff} onChange={(e) => setRerank(e.target.checked)} />
-            <span>Rerank the best matches (slower, can improve order)</span>
-          </label>
-          <div className="picker-row">
-            <DocumentPicker selected={docs} onChange={setDocs} />
+        <details className="options">
+          <summary>
+            <Icon name="sliders" size={16} />
+            <span>
+              Options: {mode === "hybrid" ? "meaning and keywords" : "meaning only"}, {topK} results
+              {rerank && mode === "hybrid" && !rerankOff ? ", reranked" : ""}
+              {Object.keys(docs).length > 0 ? `, ${Object.keys(docs).length} document${Object.keys(docs).length > 1 ? "s" : ""}` : ""}
+            </span>
+          </summary>
+          <div className="options-row">
+            <label className="inline-field">
+              <span>Method</span>
+              <Select value={mode} onChange={(e) => setMode(e.target.value as SearchMode)}>
+                <option value="hybrid">Meaning and keywords (recommended)</option>
+                <option value="semantic">Meaning only</option>
+              </Select>
+            </label>
+            <label className="inline-field">
+              <span>Results</span>
+              <Select value={topK} onChange={(e) => setTopK(Number(e.target.value))}>
+                {[5, 10, 20].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <div className="inline-field">
+              <span>Documents</span>
+              <div className="picker-row">
+                <DocumentPicker selected={docs} onChange={setDocs} />
+              </div>
+            </div>
+            <Switch
+              label="Rerank the best matches"
+              hint="Reorder the top passages with a second model. Slower; can improve the order. Available with meaning and keywords."
+              checked={rerank && mode === "hybrid"}
+              disabled={mode !== "hybrid" || rerankOff}
+              onChange={setRerank}
+            />
           </div>
-        </div>
-        {rerankOff ? <Notice tone="warn">Reranking is not enabled on this server, so it is switched off here.</Notice> : null}
-        {Object.keys(docs).length > 0 ? <p className="muted small">Searching only: {Object.values(docs).join(", ")}</p> : null}
+          {rerankOff ? <Notice tone="warn">Reranking is not enabled on this server, so it is switched off here.</Notice> : null}
+          {Object.keys(docs).length > 0 ? <p className="muted small">Searching only: {Object.values(docs).join(", ")}</p> : null}
+        </details>
       </form>
 
       <section aria-live="polite" aria-busy={state.status === "loading"}>
@@ -144,7 +160,7 @@ export default function SearchPage() {
             {result.results.length === 0 ? (
               <EmptyState title="Nothing matched">Try different words, remove a document filter, or check that your documents have finished processing.</EmptyState>
             ) : (
-              <ol className="results">
+              <ol className="results" aria-label="Search results">
                 {result.results.map((hit) => (
                   <li key={hit.chunk_id} className="result">
                     <div className="result-head">
@@ -159,9 +175,18 @@ export default function SearchPage() {
                     </p>
                     <div className="result-foot">
                       <span className="muted small">{foundBy(hit, state.mode ?? mode)}</span>
-                      <Button size="sm" variant="ghost" onClick={() => setSource(sourceFromHit(hit))}>
-                        View source
-                      </Button>
+                      <div className="result-actions">
+                        <Button size="sm" variant="ghost" onClick={() => setSource(sourceFromHit(hit))}>
+                          View source
+                        </Button>
+                        <Link className="btn btn-ghost btn-sm" to={`/documents/${hit.document_id}`}>
+                          <Icon name="file" size={16} />
+                          <span>Open document</span>
+                        </Link>
+                        <Button size="sm" variant="ghost" icon="chat" busy={asking} onClick={() => void ask({ [hit.document_id]: hit.document_name })}>
+                          Ask about it
+                        </Button>
+                      </div>
                     </div>
                   </li>
                 ))}
