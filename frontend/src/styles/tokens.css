@@ -1,0 +1,102 @@
+/* Design tokens: the only place colours, type, spacing, radii, borders and shadows are defined. */
+:root {
+  /* colour: a refined medium blue, slate and cool grays on warm white surfaces */
+  --blue-50: #eef3fb;
+  --blue-100: #dbe6f6;
+  --blue-300: #8fb0e3;
+  --blue-500: #3f74c9;
+  --blue-600: #2f62b3;
+  --blue-700: #264f91;
+  --slate-900: #1b2430;
+  --slate-700: #384454;
+  --slate-600: #546172;
+  --slate-500: #6a7788;
+  --slate-300: #c9d1dc;
+  --slate-200: #dde3ea;
+  --slate-100: #eaeef3;
+  --slate-50: #f3f5f8;
+  --warm-white: #fdfcfa;
+  --green-600: #1c7a4b;
+  --green-50: #e8f4ed;
+  --amber-700: #8a5a00;
+  --amber-50: #fbf3e0;
+  --red-600: #b3261e;
+  --red-50: #fbeceb;
+
+  --color-bg: var(--slate-50);
+  --color-surface: var(--warm-white);
+  --color-surface-2: #f8f9fb;
+  --color-text: var(--slate-900);
+  --color-muted: var(--slate-600);
+  --color-border: var(--slate-200);
+  --color-border-strong: var(--slate-300);
+  --color-primary: var(--blue-600);
+  --color-primary-hover: var(--blue-700);
+  --color-primary-soft: var(--blue-50);
+  --color-ok: var(--green-600);
+  --color-ok-soft: var(--green-50);
+  --color-warn: var(--amber-700);
+  --color-warn-soft: var(--amber-50);
+  --color-bad: var(--red-600);
+  --color-bad-soft: var(--red-50);
+  --color-focus: #1d4ed8;
+
+  /* type: system fonts with Bangla fallbacks */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Bengali", "Nirmala UI", "Kalpurush", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 0.78rem;
+  --text-sm: 0.875rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.4rem;
+  --text-2xl: 1.75rem;
+  --leading: 1.55;
+
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* shape and depth */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --border: 1px solid var(--color-border);
+  --shadow-sm: 0 1px 2px rgba(27, 36, 48, 0.06);
+  --shadow-md: 0 6px 18px rgba(27, 36, 48, 0.1);
+  --shadow-lg: 0 18px 48px rgba(27, 36, 48, 0.18);
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 120ms;
+  --normal: 200ms;
+
+  --sidebar-width: 15rem;
+  --sidebar-collapsed: 4.25rem;
+  --touch: 2.5rem;
+
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--leading);
+  color: var(--color-text);
+  background: var(--color-bg);
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --fast: 0ms;
+    --normal: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

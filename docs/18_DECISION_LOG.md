@@ -1235,6 +1235,24 @@ The model revision must be a full commit hash (settings validation refuses a bra
 
 **Reason**: a model judge shares the generator's blind spots, favours fluent text and cannot be audited per claim; heuristics cannot prove entailment in every language. They are useful to choose what a person should read.
 
+### DEC-075: Access Token in Memory, Refresh Token in sessionStorage
+
+**Date**: 2026-10-18
+**Status**: Accepted
+
+**Chosen Option**: the access token is held in memory; the refresh token is kept in `sessionStorage`, refreshed single-flight (the backend rotates refresh tokens), and cleared on failure or sign-out.
+
+**Reason**: nothing long-lived is written to `localStorage`, a session ends with the tab, and no backend change was needed. An HttpOnly SameSite cookie is stronger against script access to the token but needs cookie issuance, CSRF handling and CORS credential changes; it is deferred and listed as a limitation.
+
+### DEC-076: The Interface Reconciles With the Server and Never Shows an Unconfirmed State
+
+**Date**: 2026-10-18
+**Status**: Accepted
+
+**Chosen Option**: restores, deletes and retries show their new state only after the server responds; a question's `Idempotency-Key` is kept in `sessionStorage` while it is pending so a retry reuses it; threads are reloaded from the server after a refresh; citations render the cited version's own text.
+
+**Reason**: the backend is the source of truth for versions and answers, and a retry that creates a second question or a restore that is shown before it happened would mislead the user.
+
 ---
 
 ## Future Decisions to Make

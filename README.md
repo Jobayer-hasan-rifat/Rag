@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 11 complete (document versioning and safe reprocessing, on top of persistent conversations and grounded RAG answers; answering is off by default). Sharing, evaluation and a frontend are not implemented yet.
+> **Status**: 🚧 In Development - Phase 13 complete (a React workspace over the existing API: documents and versions, search, persistent cited conversations; on top of end-to-end evaluation, versioning, conversations and grounded RAG answers; answering is off by default). Sharing and an evaluation dashboard are not in the interface yet.
 
 ## Overview
 
@@ -20,6 +20,8 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
+
+**Phase 13 (frontend)**: a responsive React and TypeScript application with sign-in and registration, a dashboard, document upload with progress and duplicate handling, a filterable library, version history with activate, retry and delete, semantic and hybrid search, and persistent RAG conversations whose citations open a source panel showing the exact version that was cited. See [frontend/README.md](frontend/README.md) for routes, the auth flow, configuration and limitations, and decisions DEC-075 and DEC-076.
 
 **Phase 11 (document versions)**: a document has a stable id and any number of versions (`POST /api/v1/documents/{id}/versions`). Each version is processed, chunked and embedded separately; the previous version stays active and searchable until the replacement is fully ready, a failed replacement changes nothing for search, an older job finishing late never replaces a newer version, and a retained version can be restored or deleted explicitly. Search, keyword search, reranking and answers use only the active version; stored conversation citations keep pointing at the exact version they were grounded in. Identical content is stored once per user. See the [API specification](docs/05_API_SPECIFICATION.md) and decisions DEC-068 to DEC-071.
 
@@ -207,7 +209,7 @@ Frontend on the host (Node 22):
 cd frontend
 npm install
 npm run dev          # http://localhost:5173
-npm run typecheck && npm run build
+npm run typecheck && npm test && npm run build
 ```
 
 ## Project Structure
@@ -218,7 +220,7 @@ npm run typecheck && npm run build
 │   ├── app/             # api, services, db, workers, parsers, storage, observability, schemas
 │   ├── alembic/         # Database migrations
 │   └── tests/           # unit, api, integration
-├── frontend/            # React + TypeScript + Vite application shell
+├── frontend/            # React + TypeScript + Vite application (see frontend/README.md)
 ├── docs/                # Engineering documentation
 ├── docker-compose.yml   # Development environment
 └── .github/workflows/   # CI
@@ -239,9 +241,9 @@ npm run typecheck && npm run build
 | 8 | Reranking | ✅ Complete |
 | 9 | RAG | ✅ Complete |
 | 10 | Conversations | ✅ Complete |
-| 11 | Versioning & Access Control | ⏳ Planned |
-| 12 | Evaluation | ⏳ Planned |
-| 13 | Frontend | ⏳ Planned |
+| 11 | Versioning | ✅ Complete |
+| 12 | Evaluation | ✅ Complete |
+| 13 | Frontend | ✅ Complete |
 | 14 | Security Hardening | ⏳ Planned |
 | 15 | Performance & Benchmarking | ⏳ Planned |
 | 16 | CI/CD & Deployment | ⏳ Planned |

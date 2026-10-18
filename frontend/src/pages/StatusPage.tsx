@@ -1,12 +1,13 @@
 import StatusBadge from "../components/StatusBadge";
+import { Button } from "../components/ui/primitives";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 
+/** Reachability of the API and the services it depends on. */
 export default function StatusPage() {
   const health = useBackendHealth();
 
   return (
-    <section>
-      <h2>Backend status</h2>
+    <div className="status-block">
       <ul className="status-list">
         <li>
           <span>API</span>
@@ -21,9 +22,9 @@ export default function StatusPage() {
           <StatusBadge state={health.redis} />
         </li>
       </ul>
-      <button type="button" onClick={health.refresh}>
-        Refresh
-      </button>
-    </section>
+      <Button size="sm" icon="retry" onClick={health.refresh}>
+        Check again
+      </Button>
+    </div>
   );
 }

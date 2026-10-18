@@ -27,6 +27,24 @@ def test_preflight_for_allowed_origin_succeeds(offline_client: TestClient) -> No
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
 
 
+def test_preflight_allows_idempotency_key_and_exposes_retry_after(
+    offline_client: TestClient,
+) -> None:
+    response = offline_client.options(
+        "/api/v1/conversations/00000000-0000-0000-0000-000000000000/messages",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type,idempotency-key",
+        },
+    )
+    simple = offline_client.get("/health/live", headers={"Origin": "http://localhost:5173"})
+
+    assert response.status_code == 200
+    assert "idempotency-key" in response.headers["access-control-allow-headers"].lower()
+    assert "retry-after" in simple.headers["access-control-expose-headers"].lower()
+
+
 def test_openapi_documents_versioned_routes_only(offline_client: TestClient) -> None:
     schema = offline_client.get("/openapi.json").json()
 

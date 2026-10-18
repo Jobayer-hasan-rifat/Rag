@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 13: Frontend Integration
+
+- React application over the existing API: sign-in and registration, dashboard, documents (drag-and-drop upload with progress and duplicate handling, filters, sorting, pagination), document details with version history (upload, activate, retry, delete, download), semantic and hybrid search with optional rerank and a source panel, and persistent conversations with citations
+- Authentication: access token in memory, refresh token in `sessionStorage`, single-flight refresh with one retry, protected routes with no flash of protected content
+- Conversations: `Idempotency-Key` on every question with the key kept for a retry, reconciliation after a reload, polling while a question is pending, explicit handling of busy, in-progress, key-reuse, rate-limit and provider failures, no streaming
+- Citations name their version; superseded citations say so and show only their own version's text; deleted sources show no text
+- Safe Markdown renderer (no raw HTML, restricted link schemes), typed API client with centralised error mapping, design tokens in plain CSS, native dialogs, toasts, skeletons, reduced-motion support
+- Frontend tests (`npm test`, vitest) and `frontend/README.md`
+
+### Fixed
+
+- CORS: the API now allows the `Idempotency-Key` request header and exposes `Retry-After`; without the first, a browser could not send a conversation message at all (the preflight was rejected)
+
 ### Added - Phase 12: End-to-End Evaluation
 
 - `python -m evaluation.suite` (profiles `deterministic` and `models`): retrieval arms with bootstrap and Wilson intervals, candidate recall, reranking quality against cost (cold and warm latency, memory), filter and candidate checks, 35 pipeline scenarios, the answer questions and a citation audit; JSON reports with a stable schema and run metadata
