@@ -64,6 +64,7 @@ def test_documentation_can_be_switched_on_explicitly(make_settings: SettingsFact
         assert c.get("/openapi.json").status_code == 200
 
 
+@pytest.mark.integration
 def test_a_download_keeps_its_own_cache_and_csp_headers(auth_client: TestClient) -> None:
     alice = make_user(auth_client, "alice@example.com")
     doc = upload_ok(
@@ -116,6 +117,7 @@ def test_a_streamed_body_without_content_length_is_also_capped(offline_client: T
     assert response.status_code in (400, 413)
 
 
+@pytest.mark.integration
 def test_the_cap_does_not_touch_uploads_or_ordinary_requests(auth_client: TestClient) -> None:
     alice = make_user(auth_client, "alice@example.com")
 
