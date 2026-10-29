@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - OCR for scanned PDFs
+
+- Scanned PDF pages (no text layer, but an image) are read with Tesseract, the open-source OCR engine, during processing: `app/parsers/ocr.py` and `parsers/pdf_parser.py`. Page numbers are kept; a page that already has text, and a blank page, are never recognised
+- English and Bangla by default (`OCR_LANGUAGES`, any installed Tesseract language works); Tesseract and the `eng` and `ben` language data are installed in the Docker image
+- Settings: `OCR_ENABLED` (off in code, on in Compose), `OCR_LANGUAGES`, `OCR_DPI`, `OCR_MAX_PAGES` (default 60 recognised pages per document, the rest are counted and logged), `OCR_PAGE_TIMEOUT_SECONDS`, `OCR_PAGE_SEGMENTATION_MODE`, `OCR_MIN_TEXT_CHARS`
+- Recognition runs as a child process with a fixed argument list, the page image on standard input and no temporary files; the image is rendered by the worker, so Tesseract never sees the uploaded file. A failing or slow page is counted and left empty; it never fails the document. The number of recognised, skipped and failed pages is recorded with the document's processing metadata
+- The "no readable text" message no longer says OCR is unsupported; it says OCR may be off or may not have recognised the scan
+- Tests: the wrapper, the extractor's decisions, settings, the pipeline with a deterministic engine, and a real-Tesseract test that runs wherever the program is installed (the Docker image)
+
 ### Security - Phase 15: Release Verification
 
 - Unexpected errors (HTTP 500) now carry the security headers; Starlette answers them outside the application middleware, so the headers added in the previous phase were missing there

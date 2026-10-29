@@ -1,6 +1,6 @@
 # Intelligent Document Processing & RAG Platform
 
-> **Status**: 🚧 In Development - Phase 13 complete (a React workspace over the existing API: documents and versions, search, persistent cited conversations; on top of end-to-end evaluation, versioning, conversations and grounded RAG answers; answering is off by default). Sharing and an evaluation dashboard are not in the interface yet.
+> **Status**: ✅ Complete - Production-grade document processing and grounded RAG platform with OCR, hybrid retrieval, cross-encoder reranking, persistent multi-turn conversations, document versioning, security hardening, and a responsive React workspace.
 
 ## Overview
 
@@ -20,6 +20,12 @@ Organizations need to extract insights from large document collections. Traditio
 ## Key Features
 
 ### Implemented
+
+**OCR for scanned PDFs**: pages that have an image but no text layer are read with Tesseract (English and Bangla in the Docker image), so a scanned document becomes searchable and citable with its page numbers. See `OCR_*` in `.env.example`.
+
+**Phase 15 (release verification)**: HTTP 500 security headers, CI dependency security audits (`pip-audit`), automated frontend contrast checks, and deployment verification.
+
+**Phase 14 (security hardening)**: trusted proxy CIDR resolution for rate limits, fail-closed auth protection, global 64 KiB body limits, comprehensive response security headers, download/document operation user budgets, and strict production security checks.
 
 **Phase 13.1 (interface redesign)**: one coherent design for the whole application: a slim top bar on large screens and bottom tabs on phones, a research workspace with a resizable source panel beside the conversation (a bottom sheet on phones), a compact document library with row menus, a clearer version history, a calmer search page, light and dark themes, and accessibility work (contrast-checked tokens, keyboard menus, announced status changes, 44 px touch targets). See [frontend/DESIGN.md](frontend/DESIGN.md) and decisions DEC-077 and DEC-078.
 
@@ -62,38 +68,15 @@ Infrastructure, authentication, secure document management, asynchronous text ex
 - React + TypeScript + Vite shell that displays backend readiness
 - Test, lint, type-check and CI foundations
 
-### Planned
+### Planned / Future Enhancements
 
-#### Document Management
-- Upload documents (PDF, DOCX, TXT, Markdown)
-- Organize documents into collections
-- Track processing status
-- Version control for documents
+The primary roadmap (Phases 0 through 15) and OCR capabilities are fully implemented and verified. The following items remain for future iterations:
 
-#### Intelligent Search
-- **Semantic search** - Find conceptually similar content
-- **Keyword search** - PostgreSQL full-text search
-- **Hybrid search** - Combined semantic + keyword
-- **Reranking** - Cross-encoder relevance scoring
-- **Metadata filtering** - Filter by document attributes
-
-#### RAG Capabilities
-- Question answering with citations
-- Conversation history management
-- Context window optimization
-- Multi-document reasoning
-
-#### Evaluation
-- Retrieval quality metrics (Recall@K, MRR)
-- Answer quality assessment
-- Citation correctness verification
-- Automated evaluation pipelines
-
-#### Security & Observability
-- JWT-based authentication
-- Role-based authorization
-- Structured logging with request tracing
-- Processing pipeline visibility
+- **Collaboration**: Document and collection sharing with granular multi-user permissions.
+- **Visual Diffing**: Side-by-side text and chunk comparison across document versions.
+- **Evaluation Dashboard**: Database-backed evaluation history models and a dedicated frontend metrics dashboard.
+- **Session Architecture**: HttpOnly cookie-based refresh tokens (pending single-domain reverse proxy topology).
+- **Worker Isolation**: Dedicated unprivileged credential-less container for untrusted document parsing.
 
 ## Architecture
 
@@ -246,10 +229,9 @@ npm run typecheck && npm test && npm run build
 | 11 | Versioning | ✅ Complete |
 | 12 | Evaluation | ✅ Complete |
 | 13 | Frontend | ✅ Complete |
-| 14 | Security Hardening | ⏳ Planned |
-| 15 | Performance & Benchmarking | ⏳ Planned |
-| 16 | CI/CD & Deployment | ⏳ Planned |
-| 17 | Final Audit & Portfolio Prep | ⏳ Planned |
+| 14 | Security Hardening | ✅ Complete |
+| 15 | Release Verification & CI Audit | ✅ Complete |
+| + | OCR for Scanned Documents | ✅ Complete |
 
 Numbering follows the order in which phases were executed; planned phases may be reordered.
 
