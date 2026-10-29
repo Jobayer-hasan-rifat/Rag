@@ -20,6 +20,12 @@ RUN pip install --index-url https://download.pytorch.org/whl/cpu \
     && pip install -r requirements-ml.txt
 ENV HF_HOME=/data/models
 
+# OCR for scanned PDFs: the Tesseract program and its English and Bangla language data (Debian
+# packages, so the versions follow the base image). Used only by the processing worker.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-ben \
+    && rm -rf /var/lib/apt/lists/*
+
 # Development image: adds test and lint tooling; source is bind-mounted by Compose.
 FROM base AS dev
 COPY requirements-dev.txt ./

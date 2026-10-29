@@ -72,7 +72,7 @@ export const STATUS_HELP: Record<DocumentStatus, string> = {
 };
 
 const FAILURE_TEXT: Record<string, string> = {
-  empty_document: "The file has no readable text.",
+  empty_document: "No readable text was found. A scanned file needs OCR, which may be off or may not have recognised this scan.",
   corrupt_document: "The file appears to be damaged.",
   encrypted_document: "The file is password protected, so its text cannot be read.",
   unsupported_format: "The file format is not supported.",

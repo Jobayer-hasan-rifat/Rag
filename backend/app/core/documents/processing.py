@@ -2,8 +2,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 PROCESSING_VERSION = "p4.1"
+
+
+if TYPE_CHECKING:
+    from app.parsers.ocr import OcrConfig
 
 
 class FailureReason(StrEnum):
@@ -35,8 +40,8 @@ SAFE_MESSAGES: dict[FailureReason, str] = {
     FailureReason.ENCRYPTED_DOCUMENT: "Password-protected documents are not supported.",
     FailureReason.UNSUPPORTED_FORMAT: "This document format cannot be processed.",
     FailureReason.EMPTY_DOCUMENT: (
-        "No extractable text was found. Scanned or image-only documents need OCR, "
-        "which is not supported."
+        "No readable text was found. A scanned or image-only document needs OCR, which may be "
+        "turned off on this server or may not have recognised this scan."
     ),
     FailureReason.TOO_MANY_PAGES: "The document has more pages than the processing limit.",
     FailureReason.CONTENT_TOO_LARGE: "The document contains more text than the processing limit.",
@@ -69,6 +74,7 @@ class ExtractionLimits:
     max_pages: int
     max_text_chars: int
     max_docx_uncompressed_bytes: int
+    ocr: "OcrConfig | None" = None  # set when scanned pages should be read with OCR
 
 
 class Deadline:

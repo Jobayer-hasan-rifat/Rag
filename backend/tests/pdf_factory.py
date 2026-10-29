@@ -70,3 +70,44 @@ def make_pdf(
             )
         )
     return bytes(document.tobytes())
+
+
+def _image_page(document: pymupdf.Document, text: str) -> None:
+    """An image-only page: the text is drawn, rendered to pixels, and only the pixels are kept."""
+    source = pymupdf.open()
+    page = source.new_page(width=595, height=842)
+    page.insert_textbox(pymupdf.Rect(50, 60, 545, 700), text, fontsize=22)
+    pixels = page.get_pixmap(dpi=150)
+    target = document.new_page(width=595, height=842)
+    target.insert_image(target.rect, pixmap=pixels)
+
+
+def mixed_pdf(*pages: str) -> bytes:
+    """Each entry is 'scan:<text>' (image only), 'text:<text>' (text layer) or 'blank'."""
+    document = pymupdf.open()
+    for entry in pages:
+        kind, _, content = entry.partition(":")
+        if kind == "scan":
+            _image_page(document, content)
+        elif kind == "text":
+            document.new_page().insert_text((72, 72), content)
+        else:
+            document.new_page()
+    data = document.tobytes(deflate=True, garbage=3)
+    document.close()
+    return bytes(data)
+
+
+def huge_scan_pdf() -> bytes:
+    """One 41-inch-square page holding a small white image (to test render scaling)."""
+    document = pymupdf.open()
+    page = document.new_page(width=3000, height=3000)
+    pixels = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 300, 300), False)
+    pixels.set_rect(pixels.irect, (255,))
+    page.insert_image(page.rect, pixmap=pixels)
+    return bytes(document.tobytes())
+
+
+def png_size(png: bytes) -> tuple[int, int]:
+    pixels = pymupdf.Pixmap(png)
+    return int(pixels.width), int(pixels.height)

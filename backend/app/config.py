@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     processing_sweep_interval_seconds: int = Field(default=60, ge=5)
     processing_pending_requeue_after_seconds: int = Field(default=120, ge=10)
     processing_sweep_batch_size: int = Field(default=100, ge=1, le=1000)
+    # OCR for scanned PDF pages (Tesseract; see app/parsers/ocr.py). Off unless the Tesseract
+    # program and its language data are installed, as they are in the Docker image.
+    ocr_enabled: bool = False
+    ocr_languages: str = "eng+ben"
+    ocr_dpi: int = Field(default=300, ge=100, le=600)
+    ocr_max_pages: int = Field(default=60, ge=1, le=2000)
+    ocr_page_timeout_seconds: int = Field(default=30, ge=5, le=300)
+    ocr_page_segmentation_mode: int = Field(default=3, ge=0, le=13)
+    ocr_min_text_chars: int = Field(default=25, ge=1, le=10_000)
     chunking_max_chars: int = Field(default=1000, ge=100, le=20_000)
     chunking_overlap_chars: int = Field(default=150, ge=0)
     chunking_min_chars: int = Field(default=20, ge=1)
@@ -218,6 +227,13 @@ class Settings(BaseSettings):
         if any(origin == "*" for origin in origins):
             raise ValueError("CORS_ORIGINS must list explicit origins; '*' is not allowed")
         return origins
+
+    @field_validator("ocr_languages")
+    @classmethod
+    def _valid_ocr_languages(cls, languages: str) -> str:
+        if not re.fullmatch(r"[a-z]{3}(?:_[a-z]+)?(?:\+[a-z]{3}(?:_[a-z]+)?)*", languages):
+            raise ValueError("OCR_LANGUAGES must look like eng+ben")
+        return languages
 
     @field_validator("database_url")
     @classmethod

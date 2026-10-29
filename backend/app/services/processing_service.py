@@ -26,6 +26,7 @@ from app.db.repositories.document_repository import ClaimedDocument, DocumentRep
 from app.db.repositories.section_repository import NewSection, SectionRepository
 from app.observability.logging import get_logger
 from app.parsers.base import ExtractionResult
+from app.parsers.ocr import ocr_config
 from app.parsers.registry import get_extractor
 from app.storage.base import ObjectNotFoundError, StorageError, StorageProvider
 
@@ -77,6 +78,7 @@ class ProcessingService:
             max_pages=settings.processing_max_pages,
             max_text_chars=settings.processing_max_text_chars,
             max_docx_uncompressed_bytes=settings.processing_max_docx_uncompressed_bytes,
+            ocr=ocr_config(settings),
         )
 
     # --- entry points ---------------------------------------------------------------------
